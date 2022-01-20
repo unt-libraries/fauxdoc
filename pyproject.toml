@@ -4,28 +4,61 @@ version = "1.0.0"
 description = ""
 authors = ["Jason Thomale <jason.thomale@unt.edu>"]
 packages = [
-  { include = "solrfixtures", from = "src"}
+    { include = "solrfixtures", from = "src"}
 ]
 
 [tool.poetry.dependencies]
 python = "^3.7"
 pytz = [
-  { version = ">=2020.5", python = "^3.9" },
-  { version = ">=2020.4", python = "~3.7 || ~3.8" }
+    { version = ">=2020.5", python = "^3.9" },
+    { version = ">=2020.4", python = "~3.7 || ~3.8" }
 ]
 ujson = [
-  { version = ">=4.2.0", python = "^3.10" },
-  { version = ">=4.0.0", python = "~3.9" },
-  { version = ">=2.0.0", python = "~3.7 || ~3.8" }
+    { version = ">=4.2.0", python = "^3.10" },
+    { version = ">=4.0.0", python = "~3.9" },
+    { version = ">=2.0.0", python = "~3.7 || ~3.8" }
 ]
-[tool.poetry.dev-dependencies]
 pytest = [
-  { version = "^6.2.5", python = "^3.10" },
-  { version = ">=5.4.2", python = "~3.9" },
-  { version = ">=5.1.0", python= "~3.7 || ~3.8" }
+    { version = "^6.2.5", python = "^3.10", optional = true },
+    { version = ">=5.4.2", python = "~3.9" , optional = true },
+    { version = ">=5.1.0", python= "~3.7 || ~3.8", optional = true }
 ]
 
+[tool.poetry.extras]
+test = ["pytest"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = py{37,38,39,310}-{oldest,latest}
+isolated_build = True
+
+[testenv]
+extras =
+    test
+commands =
+    pytest
+
+[testenv:py{37,38}-oldest]
+deps =
+    pytest==5.1.0
+    ujson==2.0.0
+    pytz==2020.4
+
+[testenv:py39-oldest]
+deps =
+    pytest==5.4.2
+    ujson==4.0.0
+    pytz==2020.5
+
+[testenv:py310-oldest]
+deps =
+    pytest==6.2.5
+    ujson==4.2.0
+    pytz==2020.5
+"""
+
