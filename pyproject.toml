@@ -1,7 +1,8 @@
 [tool.poetry]
 name = "solrfixtures"
 version = "1.0.0"
-description = ""
+description = "Python package for generating randomized data for populating Solr test fixtures. Sort of like model bakery for Solr."
+readme = "README.md"
 authors = ["Jason Thomale <jason.thomale@unt.edu>"]
 packages = [
     { include = "solrfixtures", from = "src"}
@@ -20,7 +21,7 @@ ujson = [
 ]
 pytest = [
     { version = "^6.2.5", python = "^3.10", optional = true },
-    { version = ">=5.4.2", python = "~3.9" , optional = true },
+    { version = ">=5.4.2", python = "~3.9",  optional = true },
     { version = ">=5.1.0", python= "~3.7 || ~3.8", optional = true }
 ]
 
@@ -60,5 +61,22 @@ deps =
     pytest==6.2.5
     ujson==4.2.0
     pytz==2020.5
+
+[testenv:build_package]
+basepython=python3.10
+skip_install = True
+deps =
+    pytest
+    twine
+    poetry
+allowlist_externals =
+    bash
+commands =
+    -python -m poetry version {posargs}
+    python -m poetry build
+    bash -c "python -m twine check dist/*-$(python -m poetry version -s)-*.whl"
+    bash -c "python -m twine check dist/*-$(python -m poetry version -s).*.gz"
+    bash -c "python -m pip install dist/*-$(python -m poetry version -s)-*.whl"
+    pytest
 """
 
