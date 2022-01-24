@@ -38,7 +38,7 @@ def test_solrfixturefactory_make_basic_fields(data_emitter, gen_factory,
 
     assert len(docs) == 1000
     assert all([v >= 1 and v <= 999999 for v in values['id']])
-    assert all([l in alphabet for v in values['code'] for l in v])
+    assert all([ch in alphabet for val in values['code'] for ch in val])
     assert all([len(v) >= 1 and len(v) <= 8 for v in values['code']])
     assert all([len(wl) >= 1 and len(wl) <= 5 for wl in title_words_lists])
     assert all([len(w) >= 2 and len(w) <= 6 for w in title_words])
@@ -317,4 +317,3 @@ def test_solrfixturefactory_fieldgen_order(profgen_fields, auto_fields,
     for doc in docs:
         generated_values = [int(doc[fn]) for fn in profgen_fields]
         assert generated_values == sorted(generated_values)
-

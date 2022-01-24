@@ -151,6 +151,3 @@ def fixture_factory(profile):
         profile = profile or solr_profile()
         return sf.SolrFixtureFactory(profile)
     return _fixture_factory
-
-
-

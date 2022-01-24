@@ -1,6 +1,8 @@
 """
 Generate document set fixtures for Solr testing.
 """
+
+
 class SolrFixtureFactory(object):
     """
     Class that creates documents to be used in Solr-related test
@@ -66,4 +68,3 @@ class SolrFixtureFactory(object):
         """
         self.profile.reset_fields()
         return self.make_more([], number, **field_gen_overrides)
-

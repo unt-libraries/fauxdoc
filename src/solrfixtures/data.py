@@ -69,7 +69,7 @@ class DataEmitter(object):
         len_choices = range(mn, mx + 1)
         if len_weights is None:
             return random.choice(len_choices)
-        return random.choices(len_choices, cum_weights=len_weights)[0]        
+        return random.choices(len_choices, cum_weights=len_weights)[0]
 
     def _emit_string(self, mn=0, mx=0, alphabet=None, len_weights=None):
         """
@@ -295,4 +295,3 @@ class SolrDataGenFactory(object):
             counters['from_left'] -= number
             return number
         return _counter
-

@@ -160,7 +160,7 @@ class SolrProfile(object):
     def reset_fields(self):
         """
         Reset any state stored on fields, like lists of unique values.
-        
+
         Use this any time you need to reset to generate a new batch of
         records from scratch.
         """
@@ -219,16 +219,16 @@ class SolrProfile(object):
             return self.to_python(gen(record))
 
         def _do_unique_gen(self, gen, record, records):
-            value = self._do_gen(gen, record)
+            val = self._do_gen(gen, record)
 
             if gen.max_unique is not None:
-                if value in self.unique_vals and len(records) >= gen.max_unique:
+                if val in self.unique_vals and len(records) >= gen.max_unique:
                     raise type(self).ViolatesUniqueness
 
-            while value in self.unique_vals:
-                value = self._do_gen(gen, record)
-            self.unique_vals.add(value)
-            return value
+            while val in self.unique_vals:
+                val = self._do_gen(gen, record)
+            self.unique_vals.add(val)
+            return val
 
         def gen_value(self, gen=None, record=None, records=None):
             """
@@ -243,4 +243,3 @@ class SolrProfile(object):
             if self['unique']:
                 return self._do_unique_gen(gen, record, records)
             return self._do_gen(gen, record)
-

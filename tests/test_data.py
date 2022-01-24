@@ -226,7 +226,3 @@ def test_solrdatagenfactory_precisedistributioncounter(num_cycles, max_total,
     assert sum(first) == max_total
     assert sum(second) == 0
     assert [c <= mx and c >= mn for c in first]
-
-
-
-

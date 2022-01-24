@@ -37,15 +37,15 @@ def test_solrprofile_init_fields_structure(profile):
     """
     prof = profile('test', None, None)
     assert prof.fields['haystack_id']['name'] == 'haystack_id'
-    assert prof.fields['haystack_id']['is_key'] == True
+    assert prof.fields['haystack_id']['is_key'] is True
     assert prof.fields['haystack_id']['type'] == 'string'
     assert prof.fields['haystack_id']['pytype'] == str
     assert prof.fields['haystack_id']['emtype'] == 'string'
-    assert prof.fields['haystack_id']['multi'] == False
-    assert prof.fields['haystack_id']['unique'] == True
-    assert prof.fields['id']['is_key'] == False
+    assert prof.fields['haystack_id']['multi'] is False
+    assert prof.fields['haystack_id']['unique'] is True
+    assert prof.fields['id']['is_key'] is False
     assert prof.fields['notes']['type'] == 'text_en'
-    assert prof.fields['notes']['multi'] == True
+    assert prof.fields['notes']['multi'] is True
 
 
 def test_solrprofile_init_fields_include_all(schema, profile):
@@ -87,8 +87,8 @@ def test_solrprofile_init_fields_unique(profile):
     """
     unique_fields = ['haystack_id', 'code']
     prof = profile('test', None, unique_fields)
-    assert all([prof.fields[fn]['unique'] == True for fn in unique_fields])
-    assert all([prof.fields[fn]['unique'] == False for fn in prof.fields
+    assert all([prof.fields[fn]['unique'] is True for fn in unique_fields])
+    assert all([prof.fields[fn]['unique'] is False for fn in prof.fields
                 if fn not in unique_fields])
 
 
@@ -98,7 +98,7 @@ def test_solrprofile_init_fields_multi_unique_error(profile):
     field that is both `multi` and `unique` should result in an error.
     """
     with pytest.raises(NotImplementedError):
-        prof = profile('test', ['notes'], ['notes'])
+        profile('test', ['notes'], ['notes'])
 
 
 def test_solrprofile_init_fields_invalid_types_error(schema, profile,
@@ -115,7 +115,7 @@ def test_solrprofile_init_fields_invalid_types_error(schema, profile,
                              'multiValued': False})
     assert invalid_type not in solr_types
     with pytest.raises(schema_types_error):
-        prof = profile(my_schema=schema)
+        profile(my_schema=schema)
 
 
 def test_solrprofile_init_unused_fields_invalid_types_okay(schema, profile,
@@ -150,4 +150,3 @@ def test_solrprofile_init_fields_with_custom_type(schema, profile, solr_types):
     assert custom_name in prof.fields
     assert prof.fields[custom_name]['pytype'] == str
     assert prof.fields[custom_name]['emtype'] == 'string'
-

@@ -26,4 +26,3 @@ solrfixtures
 ## Development and Testing
 
 [Top](#top)
-
