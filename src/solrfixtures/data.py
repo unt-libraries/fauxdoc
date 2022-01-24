@@ -196,7 +196,7 @@ class SolrDataGenFactory(object):
         choices = [v for v in values]
         random.shuffle(choices)
 
-        def _choice_function(record):
+        def _choice_function(_record):
             if repeatable:
                 return random.choice(choices)
             return choices.pop() if choices else None

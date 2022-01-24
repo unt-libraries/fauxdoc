@@ -21,7 +21,6 @@ class SolrProfile(object):
         that has a Solr type not included in the `solr_types` data
         structure used during initialization.
         """
-        pass
 
     DEFAULT_SOLR_FIELD_TYPE_MAPPING = {
         'string': {'pytype': str, 'emtype': 'string'},
@@ -103,6 +102,7 @@ class SolrProfile(object):
         Fetch the Solr schema in JSON format via the provided pysolr
         connection object (`conn`).
         """
+        # pylint: disable=protected-access
         jsn = conn._send_request('get', 'schema?wt=json')
         return ujson.loads(jsn)['schema']
 
@@ -181,7 +181,6 @@ class SolrProfile(object):
             value for a given record set (e.g. if all unique values are
             used up).
             """
-            pass
 
         def __init__(self, params, gen_factory):
             super(SolrProfile.Field, self).__init__(params)

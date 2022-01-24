@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 """
 Contains pytest test fixtures for solrfixtures tests.
 """
