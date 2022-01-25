@@ -3,7 +3,7 @@ Generate document set fixtures for Solr testing.
 """
 
 
-class SolrFixtureFactory(object):
+class SolrFixtureFactory:
     """
     Class that creates documents to be used in Solr-related test
     fixtures. Data created conforms to a particular
@@ -52,7 +52,7 @@ class SolrFixtureFactory(object):
         full_docset = list(docset)
         for i in range(0, number):
             if report_every and i and i % report_every == 0:
-                print('  Finished {} of {}.'.format(i, number))
+                print(f'  Finished {i} of {number}.')
             try:
                 doc = self._make_doc(full_docset, field_gen_overrides)
             except self.profile.Field.ViolatesUniqueness:

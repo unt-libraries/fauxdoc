@@ -10,7 +10,7 @@ import ujson
 from . import data
 
 
-class SolrProfile(object):
+class SolrProfile:
     """
     Class used for creating objects that represent a Solr profile, i.e.
     a subset of fields from a particular schema.
@@ -82,15 +82,16 @@ class SolrProfile(object):
         filtered_fields = self._filter_schema_fields(schema, user_fields)
         self._check_schema_types(filtered_fields, solr_types)
         self.fields = {}
-        for sf in filtered_fields:
+        all_unique_fields = set(unique_fields) | set([self.key_name])
+        for schema_field in filtered_fields:
             field = type(self).Field({
-                'name': sf['name'],
-                'is_key': sf['name'] == self.key_name,
-                'type': sf['type'],
-                'emtype': solr_types[sf['type']]['emtype'],
-                'pytype': solr_types[sf['type']]['pytype'],
-                'multi': sf.get('multiValued', False),
-                'unique': sf['name'] in list(unique_fields) + [self.key_name]
+                'name': schema_field['name'],
+                'is_key': schema_field['name'] == self.key_name,
+                'type': schema_field['type'],
+                'emtype': solr_types[schema_field['type']]['emtype'],
+                'pytype': solr_types[schema_field['type']]['pytype'],
+                'multi': schema_field.get('multiValued', False),
+                'unique': schema_field['name'] in all_unique_fields
             }, gen_factory)
             self.fields[field['name']] = field
         self.name = name
@@ -105,7 +106,8 @@ class SolrProfile(object):
         jsn = conn._send_request('get', 'schema?wt=json')
         return ujson.loads(jsn)['schema']
 
-    def _get_schema_field(self, schema_fields, name):
+    @staticmethod
+    def _get_schema_field(schema_fields, name):
         """
         Return a dict from the Solr schema for a field matching `name`.
         Returns the first match found, or None.
@@ -129,14 +131,15 @@ class SolrProfile(object):
                 return_fields.append(field)
         return return_fields
 
-    def _check_schema_types(self, schema_fields, solr_types):
-        schema_types = set([field['type'] for field in schema_fields])
+    @classmethod
+    def _check_schema_types(cls, schema_fields, solr_types):
+        schema_types = set(field['type'] for field in schema_fields)
         unknown_types = schema_types - set(solr_types.keys())
         if len(unknown_types) > 0:
-            msg = ('Found field types in Solr schema that do not have '
-                   'matching entries in the defined Solr field type mapping '
-                   '(`solr_types` arg). {}').format(', '.join(unknown_types))
-            raise type(self).SchemaTypesError(msg)
+            msg = (f'Found field types in Solr schema that do not have '
+                   f'matching entries in the defined Solr field type mapping '
+                   f"(`solr_types` arg). {', '.join(unknown_types)}")
+            raise cls.SchemaTypesError(msg)
 
     def set_field_gens(self, *field_gens):
         """
@@ -195,6 +198,9 @@ class SolrProfile(object):
                 self.auto_gen = gen_factory.type(self['emtype'])
 
         def reset(self):
+            """
+            Reset state on this object.
+            """
             self.unique_vals = set()
 
         def to_python(self, val):

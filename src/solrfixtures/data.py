@@ -7,7 +7,7 @@ import random
 import pytz
 
 
-class DataEmitter(object):
+class DataEmitter:
     """
     Class containing emitter methods for generating randomized data.
     """
@@ -39,14 +39,14 @@ class DataEmitter(object):
         if you only want to override a few values.
         """
         user_defaults = emitter_defaults or {}
-        combined_defaults = {}
-        for k, v in type(self).default_emitter_defaults.items():
-            combined_defaults[k] = v.copy()
-            combined_defaults[k].update(user_defaults.get(k, {}))
-            if 'alphabet' in v and combined_defaults[k]['alphabet'] is None:
+        both_defaults = {}
+        for key, val in type(self).default_emitter_defaults.items():
+            both_defaults[key] = val.copy()
+            both_defaults[key].update(user_defaults.get(key, {}))
+            if 'alphabet' in val and both_defaults[key]['alphabet'] is None:
                 alphabet = alphabet or self.make_unicode_alphabet()
-                combined_defaults[k]['alphabet'] = alphabet
-        self.emitter_defaults = combined_defaults
+                both_defaults[key]['alphabet'] = alphabet
+        self.emitter_defaults = both_defaults
 
     @staticmethod
     def make_unicode_alphabet(uchar_ranges=None):
@@ -65,7 +65,8 @@ class DataEmitter(object):
             for code in range(this_range[0], this_range[1] + 1)
         ]
 
-    def _choose_token_length(self, mn, mx, len_weights):
+    @staticmethod
+    def _choose_token_length(mn, mx, len_weights):
         len_choices = range(mn, mx + 1)
         if len_weights is None:
             return random.choice(len_choices)
@@ -95,13 +96,15 @@ class DataEmitter(object):
         words = [self._emit_string(*args) for _ in range(text_length)]
         return ' '.join(words)
 
-    def _emit_int(self, mn=0, mx=0):
+    @staticmethod
+    def _emit_int(mn=0, mx=0):
         """
         Generate a random int between `mn` and `mx`.
         """
         return random.randint(mn, mx)
 
-    def _emit_date(self, mn=(2000, 1, 1, 0, 0), mx=None):
+    @staticmethod
+    def _emit_date(mn=(2000, 1, 1, 0, 0), mx=None):
         """
         Generate a random UTC date between `mn` and `mx`. If `mx` is
         None, the default is now. Returns a timezone-aware
@@ -119,11 +122,12 @@ class DataEmitter(object):
         new_date = datetime.datetime.utcfromtimestamp(new_ts)
         return new_date.replace(tzinfo=pytz.utc)
 
-    def _emit_boolean(self):
+    @staticmethod
+    def _emit_boolean():
         """
         Generate a random boolean value.
         """
-        return True if random.randint(0, 1) else False
+        return bool(random.randint(0, 1))
 
     def _calculate_emitter_params(self, emtype, **user_params):
         """
@@ -162,11 +166,11 @@ class DataEmitter(object):
         `user_params`.
         """
         params = self._calculate_emitter_params(emtype, **user_params)
-        emitter = getattr(self, '_emit_{}'.format(emtype))
+        emitter = getattr(self, f'_emit_{emtype}')
         return emitter(**params)
 
 
-class SolrDataGenFactory(object):
+class SolrDataGenFactory:
     """
     Factory for creating "gen" data generation functions.
     """
@@ -192,8 +196,9 @@ class SolrDataGenFactory(object):
         gen.max_unique = max_unique
         return gen
 
-    def _make_choice_function(self, values, repeatable):
-        choices = [v for v in values]
+    @staticmethod
+    def _make_choice_function(values, repeatable):
+        choices = list(values)
         random.shuffle(choices)
 
         def _choice_function(_record):
@@ -220,19 +225,25 @@ class SolrDataGenFactory(object):
         items are chosen. Pass `repeatable=False` if choices cannot be
         repeated.
         """
-        ch = self._make_choice_function(values, repeatable)
+        choose = self._make_choice_function(values, repeatable)
         max_unique = len(values)
-        return self(lambda r: [v for v in [ch(r) for _ in range(0, counter())]
-                               if v is not None], max_unique)
+        def multi_choice_gen(record):
+            return [
+                val for val in [
+                    choose(record) for _ in range(0, counter())
+                ] if val is not None
+            ]
+        return self(multi_choice_gen, max_unique)
 
     def type(self, emtype, **params):
         """
         Return an emitter gen function for the given emtype using the
         given params.
         """
-        em = self.emitter.emit
         max_unique = self.emitter.determine_max_unique_values(emtype, **params)
-        return self(lambda r: em(emtype, **params), max_unique)
+        def type_emitter_gen(_record):
+            return self.emitter.emit(emtype, **params)
+        return self(type_emitter_gen, max_unique)
 
     def multi_type(self, emtype, counter, **params):
         """
@@ -240,10 +251,13 @@ class SolrDataGenFactory(object):
         the given params. `counter` is a function whose return value
         determines how many values are generated.
         """
-        em = self.emitter.emit
         max_unique = self.emitter.determine_max_unique_values(emtype, **params)
-        return self(lambda r: [em(emtype, **params)
-                               for _ in range(0, counter())], max_unique)
+        def multi_type_emitter_gen(_record):
+            return [
+                self.emitter.emit(emtype, **params)
+                    for _ in range(0, counter())
+            ]
+        return self(multi_type_emitter_gen, max_unique)
 
     def static(self, value):
         """
