@@ -75,7 +75,7 @@ basepython=python3.10
 deps =
     pylint
 commands =
-    pylint solrfixtures tests -d all -e E,W --ignore=__pycache__
+    pylint solrfixtures tests --errors-only --ignore=__pycache__
 
 [testenv:pylint_all]
 basepython=python3.10

@@ -102,7 +102,6 @@ class SolrProfile(object):
         Fetch the Solr schema in JSON format via the provided pysolr
         connection object (`conn`).
         """
-        # pylint: disable=protected-access
         jsn = conn._send_request('get', 'schema?wt=json')
         return ujson.loads(jsn)['schema']
 
