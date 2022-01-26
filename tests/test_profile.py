@@ -65,7 +65,7 @@ def test_solrprofile_init_fields_include_selective(profile):
     user_fields = ['haystack_id', 'creation_date', 'code', 'label']
     prof = profile('test', user_fields, None)
     assert len(prof.fields) == len(user_fields)
-    assert all([fname in prof.fields for fname in user_fields])
+    assert all(fname in prof.fields for fname in user_fields)
 
 
 def test_solrprofile_init_fields_include_dynamic(profile):
@@ -76,7 +76,7 @@ def test_solrprofile_init_fields_include_dynamic(profile):
     user_fields = ['haystack_id', 'code', 'test_facet', 'test_display']
     prof = profile('test', user_fields, None)
     assert len(prof.fields) == len(user_fields)
-    assert all([fname in prof.fields for fname in user_fields])
+    assert all(fname in prof.fields for fname in user_fields)
 
 
 def test_solrprofile_init_fields_unique(profile):
@@ -87,9 +87,9 @@ def test_solrprofile_init_fields_unique(profile):
     """
     unique_fields = ['haystack_id', 'code']
     prof = profile('test', None, unique_fields)
-    assert all([prof.fields[fn]['unique'] is True for fn in unique_fields])
-    assert all([prof.fields[fn]['unique'] is False for fn in prof.fields
-                if fn not in unique_fields])
+    assert all(prof.fields[fn]['unique'] is True for fn in unique_fields)
+    assert all(prof.fields[fn]['unique'] is False for fn in prof.fields
+               if fn not in unique_fields)
 
 
 def test_solrprofile_init_fields_multi_unique_error(profile):

@@ -37,14 +37,13 @@ def test_solrfixturefactory_make_basic_fields(data_emitter, gen_factory,
     max_date = datetime.datetime(*defaults['date']['mx'], tzinfo=pytz.utc)
 
     assert len(docs) == 1000
-    assert all([v >= 1 and v <= 999999 for v in values['id']])
-    assert all([ch in alphabet for val in values['code'] for ch in val])
-    assert all([len(v) >= 1 and len(v) <= 8 for v in values['code']])
-    assert all([len(wl) >= 1 and len(wl) <= 5 for wl in title_words_lists])
-    assert all([len(w) >= 2 and len(w) <= 6 for w in title_words])
-    assert all([v >= min_date and v <= max_date
-                for v in values['creation_date']])
-    assert all([v in (True, False) for v in values['suppressed']])
+    assert all(1 <= v <= 999999 for v in values['id'])
+    assert all(ch in alphabet for val in values['code'] for ch in val)
+    assert all(1 <= len(v) <= 8 for v in values['code'])
+    assert all(1 <= len(wl) <= 5 for wl in title_words_lists)
+    assert all(2 <= len(w) <= 6 for w in title_words)
+    assert all(min_date <= v <= max_date for v in values['creation_date'])
+    assert all(v in (True, False) for v in values['suppressed'])
 
 
 def test_solrfixturefactory_make_multi_fields(profile, fixture_factory):
@@ -62,16 +61,14 @@ def test_solrfixturefactory_make_multi_fields(profile, fixture_factory):
     ftypes = {fname: f['pytype'] for fname, f in prof.fields.items()}
 
     assert len(docs) == 1000
-    assert all([isinstance(v, ftypes['notes'])
-                for vlist in values['notes']
-                for v in vlist])
-    assert all([isinstance(v, ftypes['children_ids'])
-                for vlist in values['children_ids']
-                for v in vlist])
-    assert all([len(vlist) >= 1 and len(vlist) <= 10
-                for vlist in values['notes']])
-    assert all([len(vlist) >= 1 and len(vlist) <= 10
-                for vlist in values['children_ids']])
+    assert all(isinstance(v, ftypes['notes'])
+               for vlist in values['notes']
+               for v in vlist)
+    assert all(isinstance(v, ftypes['children_ids'])
+               for vlist in values['children_ids']
+               for v in vlist)
+    assert all(1 <= len(vlist) <= 10 for vlist in values['notes'])
+    assert all(1 <= len(vlist) <= 10 for vlist in values['children_ids'])
 
 
 @pytest.mark.parametrize('fields, defaults, attempted, expected', [
@@ -101,7 +98,7 @@ def test_solrfixturefactory_make_unique_fields(fields, defaults, attempted,
 
     assert len(docs) == expected
     # converting the generated values list to a set tests uniqueness
-    assert all([len(set(values[fname])) == expected for fname in values])
+    assert all(len(set(values[fname])) == expected for fname in values)
 
 
 @pytest.mark.parametrize('fields, unique, defaults, attempted, expected', [
@@ -138,8 +135,8 @@ def test_solrfixturefactory_makemore(fields, unique, defaults, attempted,
     assert len(first_docset) == attempted_first
     assert first_docset == first_docset_copy
     assert len(docs) == expected
-    assert all([len(values[fname]) == expected for fname in values])
-    assert all([len(set(values[fname])) == expected for fname in unique])
+    assert all(len(values[fname]) == expected for fname in values)
+    assert all(len(set(values[fname])) == expected for fname in unique)
 
 
 def test_solrfixturefactory_custom_gens(gen_factory, profile, fixture_factory):
@@ -152,7 +149,7 @@ def test_solrfixturefactory_custom_gens(gen_factory, profile, fixture_factory):
     gens = gen_factory()
 
     def haystack_id(doc):
-        return '{}.{}'.format(doc['django_ct'], doc['django_id'])
+        return f"{doc['django_ct']}.{doc['django_id']}"
 
     def id_(doc):
         return doc['django_id']
@@ -176,16 +173,18 @@ def test_solrfixturefactory_custom_gens(gen_factory, profile, fixture_factory):
     ftypes = {fname: f['pytype'] for fname, f in prof.fields.items()}
 
     assert len(docs) == 1000
-    assert all([len(values[fname]) == 1000 for fname in values])
-    assert all([len(set(values[fname])) == 1000 for fname in unique])
-    assert all([isinstance(v, ftypes[f]) for f in values for v in values[f]])
-    assert all([v == 'base.location' for v in values['django_ct']])
-    assert all([int(v) >= 1 and int(v) <= 999999 for v in values['django_id']])
-    assert all([d['haystack_id'] == '.'.join([d['django_ct'], d['django_id']])
-                for d in docs])
-    assert all([d['id'] == int(d['django_id']) for d in docs])
-    assert all([len(v) >= 3 and len(v) <= 5 for v in values['code']])
-    assert all([v == 'Location' for v in values['type']])
+    assert all(len(values[fname]) == 1000 for fname in values)
+    assert all(len(set(values[fname])) == 1000 for fname in unique)
+    assert all(isinstance(v, ftypes[fname])
+               for fname in values
+               for v in values[fname])
+    assert all(v == 'base.location' for v in values['django_ct'])
+    assert all(1 <= int(v) <= 999999 for v in values['django_id'])
+    assert all(d['haystack_id'] == f"{d['django_ct']}.{d['django_id']}"
+               for d in docs)
+    assert all(d['id'] == int(d['django_id']) for d in docs)
+    assert all(3 <= len(v) <= 5 for v in values['code'])
+    assert all(v == 'Location' for v in values['type'])
 
 
 @pytest.mark.parametrize('profgen_fields, callgen_fields', [
@@ -247,15 +246,15 @@ def test_solrfixturefactory_fieldgen_precedence(profgen_fields, callgen_fields,
     values = {fname: [d[fname] for d in docs] for fname in prof.fields}
 
     assert len(docs) == 10
-    assert all([int(v) == 1
-                for fname in expected_use_profgen
-                for v in values[fname]])
-    assert all([int(v) == 2
-                for fname in expected_use_callgen
-                for v in values[fname]])
-    assert all([v not in (1, 2)
-                for fname in expected_use_basegen
-                for v in values[fname]])
+    assert all(int(v) == 1
+               for fname in expected_use_profgen
+               for v in values[fname])
+    assert all(int(v) == 2
+               for fname in expected_use_callgen
+               for v in values[fname])
+    assert all(v not in (1, 2)
+               for fname in expected_use_basegen
+               for v in values[fname])
 
 
 @pytest.mark.parametrize('profgen_fields, auto_fields, callgen_fields', [

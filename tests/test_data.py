@@ -10,14 +10,14 @@ import pytz
 @pytest.mark.parametrize('emtype, defaults, overrides, vcheck', [
     ('int', {'mx': 5}, None, lambda v: v <= 5),
     ('int', None, {'mx': 5}, lambda v: v <= 5),
-    ('int', {'mx': 5}, {'mn': 3}, lambda v: v <= 5 and v >= 3),
-    ('int', {'mx': 10}, {'mn': 3, 'mx': 5}, lambda v: v <= 5 and v >= 3),
-    ('int', {'mn': 5, 'mx': 10}, None, lambda v: v >= 5 and v <= 10),
+    ('int', {'mx': 5}, {'mn': 3}, lambda v: 3 <= v <= 5),
+    ('int', {'mx': 10}, {'mn': 3, 'mx': 5}, lambda v: 3 <= v <= 5),
+    ('int', {'mn': 5, 'mx': 10}, None, lambda v: 5 <= v <= 10),
     ('string', {'mn': 5}, None, lambda v: len(v) >= 5),
     ('string', {'alphabet': 'abcd'}, None,
-     lambda v: all([char in 'abcd' for char in v])),
+     lambda v: all(char in 'abcd' for char in v)),
     ('string', {'alphabet': 'abcd'}, {'alphabet': 'ab'},
-     lambda v: all([char in 'ab' for char in v]))
+     lambda v: all(char in 'ab' for char in v))
 ])
 def test_dataemitter_parameters(emtype, defaults, overrides, vcheck,
                                 data_emitter):
@@ -31,8 +31,8 @@ def test_dataemitter_parameters(emtype, defaults, overrides, vcheck,
     em_defaults = defaults if defaults is None else {emtype: defaults}
     em = data_emitter(emitter_defaults=em_defaults)
     params = overrides or {}
-    values = [em.emit(emtype, **params) for _ in range(0, 100)]
-    assert all([vcheck(v) for v in values])
+    values = (em.emit(emtype, **params) for _ in range(0, 100))
+    assert all(vcheck(v) for v in values)
 
 
 @pytest.mark.parametrize('choices, repeatable, try_num, exp_num', [
@@ -51,9 +51,9 @@ def test_solrdatagenfactory_choice(choices, repeatable, try_num, exp_num,
     is True, then choices can be repeated.
     """
     gen = gen_factory().choice(choices, repeatable)
-    values = [v for v in [gen({}) for _ in range(0, try_num)] if v is not None]
+    values = [v for v in (gen({}) for _ in range(0, try_num)) if v is not None]
     assert len(values) == exp_num
-    assert all([v in choices for v in values])
+    assert all(v in choices for v in values)
     if not repeatable:
         assert len(set(values)) == exp_num
 
@@ -81,13 +81,13 @@ def test_solrdatagenfactory_multichoice(choices, multi_num, repeatable,
     return an empty list each time it is called.
     """
     gen = gen_factory().multi_choice(choices, lambda: multi_num, repeatable)
-    value_lists = [vl for vl in [gen({}) for _ in range(0, try_num)] if vl]
+    value_lists = [vl for vl in (gen({}) for _ in range(0, try_num)) if vl]
     values = [v for vlist in value_lists for v in vlist]
     last = value_lists.pop()
     assert len(value_lists) == exp_num - 1
-    assert all([len(vl) == multi_num for vl in value_lists])
+    assert all(len(vl) == multi_num for vl in value_lists)
     assert len(last) == exp_last_num
-    assert all([v in choices for v in values])
+    assert all(v in choices for v in values)
     if not repeatable:
         assert len(set(values)) == ((exp_num - 1) * multi_num) + exp_last_num
 
@@ -100,10 +100,10 @@ def test_solrdatagenfactory_type_string(gen_factory):
     """
     alph = list('abcdefghijklmnopqrstuvwxyz')
     gen = gen_factory().type('string', mn=0, mx=10, alphabet=alph)
-    values = [gen({}) for _ in range(0, 1000)]
-    chars = [char for string in values for char in string]
-    assert all([len(v) >= 0 and len(v) <= 10 for v in values])
-    assert all([char in alph for char in chars])
+    values = (gen({}) for _ in range(0, 1000))
+    chars = (char for string in values for char in string)
+    assert all(0 <= len(v) <= 10 for v in values)
+    assert all(char in alph for char in chars)
 
 
 def test_solrdatagenfactory_type_text(gen_factory):
@@ -114,11 +114,11 @@ def test_solrdatagenfactory_type_text(gen_factory):
     """
     gen = gen_factory().type('text', mn_words=1, mx_words=2, mn_word_len=3,
                              mx_word_len=5)
-    values = [gen({}) for _ in range(0, 1000)]
-    words_lists = [v.split(' ') for v in values]
-    words = [w for words_list in words_lists for w in words_list]
-    assert all([len(w) >= 1 and len(w) <= 2 for w in words_lists])
-    assert all([len(w) >= 3 and len(w) <= 5 for w in words])
+    values = (gen({}) for _ in range(0, 1000))
+    words_lists = (v.split(' ') for v in values)
+    words = (w for words_list in words_lists for w in words_list)
+    assert all(1 <= len(w) <= 2 for w in words_lists)
+    assert all(3 <= len(w) <= 5 for w in words)
 
 
 def test_solrdatagenfactory_type_int(gen_factory):
@@ -128,8 +128,8 @@ def test_solrdatagenfactory_type_int(gen_factory):
     value based on the mn/mx params.
     """
     gen = gen_factory().type('int', mn=0, mx=10)
-    values = [gen({}) for _ in range(0, 1000)]
-    assert all([v >= 0 and v <= 10 for v in values])
+    values = (gen({}) for _ in range(0, 1000))
+    assert all(0 <= v <= 10 for v in values)
 
 
 def test_solrdatagenfactory_type_boolean(gen_factory):
@@ -139,8 +139,8 @@ def test_solrdatagenfactory_type_boolean(gen_factory):
     value.
     """
     gen = gen_factory().type('boolean')
-    values = [gen({}) for _ in range(0, 10)]
-    assert all([v in (True, False) for v in values])
+    values = (gen({}) for _ in range(0, 10))
+    assert all(v in (True, False) for v in values)
 
 
 def test_solrdatagenfactory_type_date(gen_factory):
@@ -154,8 +154,8 @@ def test_solrdatagenfactory_type_date(gen_factory):
     min_date = datetime.datetime(*min_tuple, tzinfo=pytz.utc)
     max_date = datetime.datetime(*max_tuple, tzinfo=pytz.utc)
     gen = gen_factory().type('date', mn=min_tuple, mx=max_tuple)
-    values = [gen({}) for _ in range(0, 1000)]
-    assert all([v >= min_date and v <= max_date for v in values])
+    values = (gen({}) for _ in range(0, 1000))
+    assert all(min_date <= v <= max_date for v in values)
 
 
 def test_solrdatagenfactory_multitype(gen_factory):
@@ -166,10 +166,10 @@ def test_solrdatagenfactory_multitype(gen_factory):
     """
     num = 3
     gen = gen_factory().multi_type('int', lambda: num, mn=0, mx=10)
-    value_lists = [[v for v in gen({})] for _ in range(0, 10)]
-    values = [v for value_list in value_lists for v in value_list]
-    assert all([len(vlist) == num for vlist in value_lists])
-    assert all([v >= 0 and v <= 10 for v in values])
+    value_lists = (gen({}) for _ in range(0, 10))
+    values = (v for value_list in value_lists for v in value_list)
+    assert all(len(vlist) == num for vlist in value_lists)
+    assert all(0 <= v <= 10 for v in values)
 
 
 def test_solrdatagenfactory_static(gen_factory):
@@ -178,8 +178,8 @@ def test_solrdatagenfactory_static(gen_factory):
     function that returns the correct static value when called.
     """
     gen = gen_factory().static('Hello world.')
-    values = [gen({}) for _ in range(0, 10)]
-    assert all([v == 'Hello world.' for v in values])
+    values = (gen({}) for _ in range(0, 10))
+    assert all(v == 'Hello world.' for v in values)
 
 
 def test_solrdatagenfactory_staticcounter(gen_factory):
@@ -187,9 +187,8 @@ def test_solrdatagenfactory_staticcounter(gen_factory):
     The `SolrDataGenFactory` `static_counter` method should create a
     counter function that always returns the provided number.
     """
-    count = gen_factory().static_counter(5)
-    counts = [count() for _ in range(0, 100)]
-    assert counts == [5] * 100
+    counter = gen_factory().static_counter(5)
+    assert all(counter() == 5 for _ in range(0, 100))
 
 
 def test_solrdatagenfactory_randomcounter(gen_factory):
@@ -198,9 +197,8 @@ def test_solrdatagenfactory_randomcounter(gen_factory):
     counter function that returns a random number between the min and
     max values provided.
     """
-    count = gen_factory().random_counter(0, 10)
-    counts = [count() for _ in range(0, 100)]
-    assert [c <= 10 and c >= 0 for c in counts]
+    counter = gen_factory().random_counter(0, 10)
+    assert all(0 <= counter() <= 10 for _ in range(0, 100))
 
 
 @pytest.mark.parametrize('num_cycles, max_total, mn, mx', [
@@ -219,10 +217,10 @@ def test_solrdatagenfactory_precisedistributioncounter(num_cycles, max_total,
     Each count that's generated should fall within the given `mn` and
     `mx` values.
     """
-    count = gen_factory().precise_distribution_counter(num_cycles, max_total,
-                                                       mn, mx)
-    counts = [count() for _ in range(0, 100)]
-    first, second = counts[0:num_cycles], counts[num_cycles:]
-    assert sum(first) == max_total
-    assert sum(second) == 0
-    assert [c <= mx and c >= mn for c in first]
+    counter = gen_factory().precise_distribution_counter(num_cycles, max_total,
+                                                         mn, mx)
+    nonzero_count = [counter() for _ in range(0, num_cycles)]
+    print(nonzero_count)
+    assert sum(nonzero_count) == max_total
+    assert all(counter() == 0 for _ in range(0, 100))
+    assert all(mn <= num <= mx for num in nonzero_count)
