@@ -205,6 +205,7 @@ class SolrDataGenFactory:
             if repeatable:
                 return random.choice(choices)
             return choices.pop() if choices else None
+
         return _choice_function
 
     def choice(self, values, repeatable=True):
@@ -227,12 +228,11 @@ class SolrDataGenFactory:
         """
         choose = self._make_choice_function(values, repeatable)
         max_unique = len(values)
+
         def multi_choice_gen(record):
-            return [
-                val for val in [
-                    choose(record) for _ in range(0, counter())
-                ] if val is not None
-            ]
+            choices = (choose(record) for _ in range(0, counter()))
+            return [val for val in choices if val is not None]
+
         return self(multi_choice_gen, max_unique)
 
     def type(self, emtype, **params):
@@ -241,8 +241,10 @@ class SolrDataGenFactory:
         given params.
         """
         max_unique = self.emitter.determine_max_unique_values(emtype, **params)
+
         def type_emitter_gen(_record):
             return self.emitter.emit(emtype, **params)
+
         return self(type_emitter_gen, max_unique)
 
     def multi_type(self, emtype, counter, **params):
@@ -252,11 +254,11 @@ class SolrDataGenFactory:
         determines how many values are generated.
         """
         max_unique = self.emitter.determine_max_unique_values(emtype, **params)
+
         def multi_type_emitter_gen(_record):
-            return [
-                self.emitter.emit(emtype, **params)
-                    for _ in range(0, counter())
-            ]
+            emit = self.emitter.emit
+            return [emit(emtype, **params) for _ in range(0, counter())]
+
         return self(multi_type_emitter_gen, max_unique)
 
     def static(self, value):
