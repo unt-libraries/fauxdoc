@@ -201,26 +201,43 @@ def test_solrdatagenfactory_randomcounter(gen_factory):
     assert all(0 <= counter() <= 10 for _ in range(0, 100))
 
 
-@pytest.mark.parametrize('num_cycles, max_total, mn, mx', [
-    (5, 26, 1, 10),
-    (5, 5, 1, 10),
-    (5, 6, 1, 10),
-    (100, 200, 1, 3),
+@pytest.mark.parametrize('num_cycles, max_total, dev', [
+    (5, 26, 2),
+    (5, 5, 1),
+    (5, 6, 1),
+    (100, 2000, 20),
+    (100, 2000, 0),
+    (100, 2000, None),
 ])
 def test_solrdatagenfactory_precisedistributioncounter(num_cycles, max_total,
-                                                       mn, mx, gen_factory):
+                                                       dev, gen_factory):
     """
     The `SolrDataGenFactory` `precise_distribution_counter` method
     should create a counter function that returns a more-or-less even
     (but not uniform) distribution of values, which should always sum
     to exactly the given `max_total` when run `num_cycles` times.
-    Each count that's generated should fall within the given `mn` and
-    `mx` values.
+    Each count that's generated should be >1.
     """
     counter = gen_factory().precise_distribution_counter(num_cycles, max_total,
-                                                         mn, mx)
+                                                         dev)
     nonzero_count = [counter() for _ in range(0, num_cycles)]
-    print(nonzero_count)
     assert sum(nonzero_count) == max_total
     assert all(counter() == 0 for _ in range(0, 100))
-    assert all(mn <= num <= mx for num in nonzero_count)
+    assert all(num > 0 for num in nonzero_count)
+
+
+@pytest.mark.parametrize('num_cycles, max_total, dev', [
+    (5, 6, 2),
+    (100, 2000, 21),
+    (100, 2000, 99999)
+])
+def test_solrdatagenfactory_precisedistributioncounter_err(num_cycles,
+                                                           max_total, dev,
+                                                           gen_factory):
+    """
+    The `SolrDataGenFactory` `precise_distribution_counter` method
+    should raise a ValueError if the provided `dev` (deviation) is
+    larger than the allowed cap, which is total / cycles.
+    """
+    with pytest.raises(ValueError):
+        gen_factory().precise_distribution_counter(num_cycles, max_total, dev)

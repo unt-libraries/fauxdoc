@@ -82,7 +82,7 @@ basepython=python3.10
 deps =
     pylint
 commands =
-    pylint solrfixtures tests --ignore=__pycache__
+    pylint solrfixtures tests --ignore=__pycache__ --good-names=_,i,mn,mx,em
 
 [testenv:build_package]
 basepython=python3.10
