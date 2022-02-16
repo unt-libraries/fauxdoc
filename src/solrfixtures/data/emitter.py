@@ -1,9 +1,108 @@
 """Contains functions and classes for emitting randomized data values."""
+from abc import ABC, abstractmethod
 import datetime
 import random
+from typing import Any, Optional, List, Union
 
 import pytz
 
+
+def make_alphabet(uchar_ranges: Optional[List[tuple]] = None) -> List[str]:
+    """Generates an alphabet from provided unicode character ranges.
+
+    This creates a list of characters to use as an alphabet for string
+    and text-type emitter objects. Tip: a range like
+    (ord('A'), ord('Z')) gives you letters from A to Z.
+
+    Args:
+        uchar_ranges: (Optional.) A list of tuples, where each tuple
+        represents a range of Unicode code points to include in your
+        alphabet. RANGES ARE INCLUSIVE, unlike Python range objects.
+        If not provided, defaults to: [
+            (0x0021, 0x0021), (0x0023, 0x0026), (0x0028, 0x007E),
+            (0x00A1, 0x00AC), (0x00AE, 0x00FF)
+        ]
+
+    Returns:
+        A list of characters that fall within the provided ranges.
+    """
+    uchar_ranges = uchar_ranges or [
+        (0x0021, 0x0021), (0x0023, 0x0026), (0x0028, 0x007E), (0x00A1, 0x00AC),
+        (0x00AE, 0x00FF)
+    ]
+    return [
+        chr(code) for (start, end) in uchar_ranges
+        for code in range(start, end + 1)
+    ]
+
+
+class BaseEmitter(ABC):
+    """Simple abstract base class for defining emitter objects.
+
+    Subclass this to implement an emitter object. At this level all we
+    require is an `emit` method. Use `__init__` to configure whatever
+    options your emitter may need.
+
+    The `__call__` method wraps `emit` so you can emit data values
+    simply by calling the object.
+
+    Attributes:
+        rng: A random.Random object. Use this for generating random
+            values in subclasses.
+    """
+
+    def __init__(self) -> None:
+        """Inits the emitter with a new RNG instance."""
+        self.rng = random.Random()
+
+    def __call__(self) -> Any:
+        """Wraps the `self.emit` method so that this obj is callable."""
+        return self.emit()
+
+    @abstractmethod
+    def emit(self) -> Any:
+        """Returns an atomic data value of a certain type.
+
+        Override this in your base class. It should return whatever
+        value is appropriate given your emitter class.
+        """
+
+
+class IntEmitter(BaseEmitter):
+    """Class for picking and emitting random integer values.
+
+    Attributes:
+        mn: The minimum possible random integer to pick.
+        mx: The maximum possible random integer to pick.
+        weights: (Optional.) A list of cumulative weights to use when
+            making the random selection, passed to random.choices as
+            the `cum_weights` argument. If not provided, then this
+            simply calls random.randint(mn, mx) when emitting a value.
+    """
+
+    def __init__(self,
+                 mn: int,
+                 mx: int,
+                 weights: Optional[List[Union[int, float]]] = None) -> None:
+        """Inits IntEmitter with mn, mx, and weights."""
+        super().__init__()
+        self.mn = mn
+        self.mx = mx
+        self.weights = weights
+
+    def emit(self) -> int:
+        """Returns a random integer.
+
+        Object attributes control the min/max range and weighting for
+        generated values.
+        """
+        if self.weights is None:
+            return self.rng.randint(self.mn, self.mx)
+        return self.rng.choices(range(self.mn, self.mx + 1),
+                                cum_weights=self.weights)[0]
+
+
+# OLD CODE IS BELOW -- We want to refactor this out -------------------
 
 class DataEmitter:
     """
