@@ -80,9 +80,11 @@ class IntEmitter(BaseEmitter):
         mn: The minimum possible random integer to pick.
         mx: The maximum possible random integer to pick.
         weights: (Optional.) A sequence of cumulative weights to use
-            when making the random selection, passed to random.choices
-            as the `cum_weights` argument. If not provided, then this
-            simply calls random.randint(mn, mx) when emitting a value.
+            when making the selection, to make certain integers
+            relatively more or less likely to be picked. If provided,
+            the number of weights must be equal to the total number of
+            integers that may be selected. If not provided, then no
+            weighting is applied, and all integers are equally likely.
     """
 
     def __init__(self,
@@ -99,6 +101,14 @@ class IntEmitter(BaseEmitter):
             >>> list(itertools.accumulate(weights))
             [70, 80, 100]
         """
+        if weights is not None and len(weights) != mx - mn + 1:
+            raise ValueError(
+                f'The number of weights provided does not match the total '
+                f'number of integers that may be chosen. (There are '
+                f'{mx - mn + 1} integers between {mn} and {mx}, but '
+                f'{len(weights)} weights were provided.)'
+            )
+
         super().__init__()
         self.mn = mn
         self.mx = mx
@@ -132,11 +142,14 @@ class StringEmitter(BaseEmitter):
             strings.
         alphabet_weights: (Optional.) A sequence of cumulative weights
             controlling the chances that each alphabet character will
-            selected during string generation.
+            selected during string generation. The number of weights
+            must match the number of characters in `alphabet`. If not
+            provided, weighting is not used, and each character is
+            equally likely to be selected.
         len_emitter: An `IntEmitter` object used internally to generate
             a randomized string length for each call to `emit`. The
-            `len_mn`, `len_mx`, and `len_weights` values supplied to `__init__`
-            are used to initialize it.
+            `len_mn`, `len_mx`, and `len_weights` values supplied to
+            `__init__` are used to initialize it.
     """
 
     def __init__(self,
@@ -146,10 +159,11 @@ class StringEmitter(BaseEmitter):
                  len_weights: Optional[Sequence[Number]] = None,
                  alphabet_weights: Optional[Sequence[Number]] = None) -> None:
         """Inits StringEmitter with an alphabet and len_emitter.
-        
-        The `mn`, `mx`, and `len_weights` args provided to __init__ are
-        used to instantiate an `IntEmitter` that generates randomized
-        string lengths. They are stored as attributes on that object.
+
+        The `len_mn`, `len_mx`, and `len_weights` args provided to
+        __init__ are used to instantiate an `IntEmitter` that generates
+        randomized string lengths. They are stored as attributes on
+        that object.
 
         Note that all weights should be the *cumulative* weights, e.g.
         [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
@@ -162,29 +176,48 @@ class StringEmitter(BaseEmitter):
         Args:
             len_mn: The minimum length for generated strings.
             len_mx: The maximum length for generated strings.
-            alphabet: A sequence of characters to use when generating
-                strings.
+            alphabet: See attributes for this class.
             len_weights: (Optional.) A sequence of cumulative weights
                 controlling the chances a string will be a certain
-                length.
-            alphabet_weights: (Optional.) A sequence of cumulative
-                weights controlling the chances that each alphabet
-                character will be selected.
+                length. The number of weights provided here should
+                match the total number of string length possibilities.
+                If not provided, weighting is not used, and each string
+                length has an equal chance of being selected.
+            alphabet_weights: (Optional.) See attributes for this
+                class.
         """
+        try:
+            len_emitter = IntEmitter(len_mn, len_mx, weights=len_weights)
+        except ValueError:
+            raise ValueError(
+                f'The number of len_weights provided does not match the total '
+                f'number of string lengths that may be chosen. (There are '
+                f'{len_mx - len_mn + 1} total possible string lengths, but '
+                f'{len(len_weights)} weights were provided.)'
+            )
+        if alphabet_weights is not None:
+            if len(alphabet_weights) != len(alphabet):
+                raise ValueError(
+                    f'The number of alphabet_weights provided does not match '
+                    f'the number of characters in the alphabet. (For a '
+                    f'{len(alphabet)}-character alphabet you must provide '
+                    f'exactly that number of alphabet_weights.)'
+                )
+
         super().__init__()
         self.alphabet = alphabet
         self.alphabet_weights = alphabet_weights
-        self.len_emitter = IntEmitter(len_mn, len_mx, len_weights)
+        self.len_emitter = len_emitter
 
     def emit(self) -> str:
         """Returns a str with random characters and a random length.
 
         Object attributes control the min/max number of characters, the
-        alphabet used to generate the string, and weighting controlling
+        alphabet used to generate the string, and the weighting for
         the distribution of string lengths and characters.
         """
         chosen = self.rng.choices(self.alphabet,
-                                  cum_weights=self.alphabet_weights, 
+                                  cum_weights=self.alphabet_weights,
                                   k=self.len_emitter())
         return ''.join(chosen)
 
