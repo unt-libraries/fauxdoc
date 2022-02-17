@@ -2,23 +2,26 @@
 from abc import ABC, abstractmethod
 import datetime
 import random
-from typing import Any, Optional, List, Union
+from typing import Any, Optional, List, Sequence, Union
 
 import pytz
 
 
-def make_alphabet(uchar_ranges: Optional[List[tuple]] = None) -> List[str]:
+Number = Union[int, float]
+
+
+def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     """Generates an alphabet from provided unicode character ranges.
 
     This creates a list of characters to use as an alphabet for string
-    and text-type emitter objects. Tip: a range like
+    and text-type emitter objects. Tip: providing a range like
     (ord('A'), ord('Z')) gives you letters from A to Z.
 
     Args:
-        uchar_ranges: (Optional.) A list of tuples, where each tuple
-        represents a range of Unicode code points to include in your
-        alphabet. RANGES ARE INCLUSIVE, unlike Python range objects.
-        If not provided, defaults to: [
+        uchar_ranges: (Optional.) A sequence of tuples, where each
+        tuple represents a range of Unicode code points to include in
+        your alphabet. RANGES ARE INCLUSIVE, unlike Python range
+        objects. If not provided, defaults to: [
             (0x0021, 0x0021), (0x0023, 0x0026), (0x0028, 0x007E),
             (0x00A1, 0x00AC), (0x00AE, 0x00FF)
         ]
@@ -72,19 +75,30 @@ class IntEmitter(BaseEmitter):
     """Class for picking and emitting random integer values.
 
     Attributes:
+        rng: Inherited from superclass. This is the random number
+            generator, a random.Random instance, for this emitter.
         mn: The minimum possible random integer to pick.
         mx: The maximum possible random integer to pick.
-        weights: (Optional.) A list of cumulative weights to use when
-            making the random selection, passed to random.choices as
-            the `cum_weights` argument. If not provided, then this
+        weights: (Optional.) A sequence of cumulative weights to use
+            when making the random selection, passed to random.choices
+            as the `cum_weights` argument. If not provided, then this
             simply calls random.randint(mn, mx) when emitting a value.
     """
 
     def __init__(self,
                  mn: int,
                  mx: int,
-                 weights: Optional[List[Union[int, float]]] = None) -> None:
-        """Inits IntEmitter with mn, mx, and weights."""
+                 weights: Optional[Sequence[Number]] = None) -> None:
+        """Inits IntEmitter with mn, mx, and weights.
+
+        Note that `weights` should be the *cumulative* weights, e.g.
+        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
+        weights to cumulative weights is with itertools.accumulate:
+            >>> import itertools
+            >>> weights = [70, 10, 20]
+            >>> list(itertools.accumulate(weights))
+            [70, 80, 100]
+        """
         super().__init__()
         self.mn = mn
         self.mx = mx
@@ -100,6 +114,79 @@ class IntEmitter(BaseEmitter):
             return self.rng.randint(self.mn, self.mx)
         return self.rng.choices(range(self.mn, self.mx + 1),
                                 cum_weights=self.weights)[0]
+
+
+class StringEmitter(BaseEmitter):
+    """Class for emitting random string values.
+
+    Strings that are emitted have a random length between a
+    configurable minimum and maximum number of characters, with
+    optional weighting for choosing a string length. Characters are
+    randomly selected from a provided alphabet, with optional weighting
+    for selecting characters.
+
+    Attributes:
+        rng: Inherited from superclass. This is the random number
+            generator, a random.Random instance, for this emitter.
+        alphabet: A sequence of characters to use when generating
+            strings.
+        alphabet_weights: (Optional.) A sequence of cumulative weights
+            controlling the chances that each alphabet character will
+            selected during string generation.
+        len_emitter: An `IntEmitter` object used internally to generate
+            a randomized string length for each call to `emit`. The
+            `len_mn`, `len_mx`, and `len_weights` values supplied to `__init__`
+            are used to initialize it.
+    """
+
+    def __init__(self,
+                 len_mn: int,
+                 len_mx: int,
+                 alphabet: Sequence[str],
+                 len_weights: Optional[Sequence[Number]] = None,
+                 alphabet_weights: Optional[Sequence[Number]] = None) -> None:
+        """Inits StringEmitter with an alphabet and len_emitter.
+        
+        The `mn`, `mx`, and `len_weights` args provided to __init__ are
+        used to instantiate an `IntEmitter` that generates randomized
+        string lengths. They are stored as attributes on that object.
+
+        Note that all weights should be the *cumulative* weights, e.g.
+        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
+        weights to cumulative weights is with itertools.accumulate:
+            >>> import itertools
+            >>> weights = [70, 10, 20]
+            >>> list(itertools.accumulate(weights))
+            [70, 80, 100]
+
+        Args:
+            len_mn: The minimum length for generated strings.
+            len_mx: The maximum length for generated strings.
+            alphabet: A sequence of characters to use when generating
+                strings.
+            len_weights: (Optional.) A sequence of cumulative weights
+                controlling the chances a string will be a certain
+                length.
+            alphabet_weights: (Optional.) A sequence of cumulative
+                weights controlling the chances that each alphabet
+                character will be selected.
+        """
+        super().__init__()
+        self.alphabet = alphabet
+        self.alphabet_weights = alphabet_weights
+        self.len_emitter = IntEmitter(len_mn, len_mx, len_weights)
+
+    def emit(self) -> str:
+        """Returns a str with random characters and a random length.
+
+        Object attributes control the min/max number of characters, the
+        alphabet used to generate the string, and weighting controlling
+        the distribution of string lengths and characters.
+        """
+        chosen = self.rng.choices(self.alphabet,
+                                  cum_weights=self.alphabet_weights, 
+                                  k=self.len_emitter())
+        return ''.join(chosen)
 
 
 # OLD CODE IS BELOW -- We want to refactor this out -------------------
