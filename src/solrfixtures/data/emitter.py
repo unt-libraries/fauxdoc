@@ -6,6 +6,8 @@ from typing import Any, Optional, List, Sequence, Union
 
 import pytz
 
+from .exceptions import ChoicesWeightsLengthMismatch
+
 
 Number = Union[int, float]
 
@@ -48,15 +50,7 @@ class BaseEmitter(ABC):
 
     The `__call__` method wraps `emit` so you can emit data values
     simply by calling the object.
-
-    Attributes:
-        rng: A random.Random object. Use this for generating random
-            values in subclasses.
     """
-
-    def __init__(self) -> None:
-        """Inits the emitter with a new RNG instance."""
-        self.rng = random.Random()
 
     def __call__(self) -> Any:
         """Wraps the `self.emit` method so that this obj is callable."""
@@ -71,7 +65,45 @@ class BaseEmitter(ABC):
         """
 
 
-class IntEmitter(BaseEmitter):
+class BaseRandomEmitter(BaseEmitter):
+    """Abstract base class for defining emitters that need RNG.
+
+    Subclass this to implement an emitter object that uses randomized
+    values. In your subclass, instead of calling the `random` module
+    directly, use the `rng` attribute.
+
+    This also adds a private utility method for validating args when
+    you need to use random.choices, which is common.
+
+    Attributes:
+        rng: A random.Random object. Use this for generating random
+            values in subclasses.
+    """
+    
+    def __init__(self) -> None:
+        """Inits the emitter with a new RNG instance."""
+        self.rng = random.Random()
+
+    @staticmethod
+    def _check_choices_against_weights(num_choices: int,
+                                       num_weights: int,
+                                       noun: str = '') -> None:
+        """Validates a number of choices against a number of weights.
+
+        When calling self.rng.choices with optional weights args, it
+        will raise an error if the number of choices and number of
+        weights don't match. Use this to validate those args ahead of
+        time, such as during __init__.
+
+        Raises:
+            solrfixtures.data.exceptions.ChoicesWeightsLengthMismatch:
+                If the number of choices and weights don't match.
+        """
+        if num_choices != num_weights:
+            raise ChoicesWeightsLengthMismatch(num_choices, num_weights, noun)
+
+
+class IntEmitter(BaseRandomEmitter):
     """Class for picking and emitting random integer values.
 
     Attributes:
@@ -101,15 +133,10 @@ class IntEmitter(BaseEmitter):
             >>> list(itertools.accumulate(weights))
             [70, 80, 100]
         """
-        if weights is not None and len(weights) != mx - mn + 1:
-            raise ValueError(
-                f'The number of weights provided does not match the total '
-                f'number of integers that may be chosen. (There are '
-                f'{mx - mn + 1} integers between {mn} and {mx}, but '
-                f'{len(weights)} weights were provided.)'
-            )
-
         super().__init__()
+        if weights is not None:
+            self._check_choices_against_weights(mx - mn + 1, len(weights),
+                                                'integer')
         self.mn = mn
         self.mx = mx
         self.weights = weights
@@ -126,7 +153,7 @@ class IntEmitter(BaseEmitter):
                                 cum_weights=self.weights)[0]
 
 
-class StringEmitter(BaseEmitter):
+class StringEmitter(BaseRandomEmitter):
     """Class for emitting random string values.
 
     Strings that are emitted have a random length between a
@@ -186,28 +213,18 @@ class StringEmitter(BaseEmitter):
             alphabet_weights: (Optional.) See attributes for this
                 class.
         """
-        try:
-            len_emitter = IntEmitter(len_mn, len_mx, weights=len_weights)
-        except ValueError:
-            raise ValueError(
-                f'The number of len_weights provided does not match the total '
-                f'number of string lengths that may be chosen. (There are '
-                f'{len_mx - len_mn + 1} total possible string lengths, but '
-                f'{len(len_weights)} weights were provided.)'
-            )
-        if alphabet_weights is not None:
-            if len(alphabet_weights) != len(alphabet):
-                raise ValueError(
-                    f'The number of alphabet_weights provided does not match '
-                    f'the number of characters in the alphabet. (For a '
-                    f'{len(alphabet)}-character alphabet you must provide '
-                    f'exactly that number of alphabet_weights.)'
-                )
-
         super().__init__()
+        try:
+            self.len_emitter = IntEmitter(len_mn, len_mx, weights=len_weights)
+        except ChoicesWeightsLengthMismatch as err:
+            noun = 'string length'
+            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
+        if alphabet_weights is not None:
+            self._check_choices_against_weights(len(alphabet),
+                                                len(alphabet_weights),
+                                                'alphabet character')
         self.alphabet = alphabet
         self.alphabet_weights = alphabet_weights
-        self.len_emitter = len_emitter
 
     def emit(self) -> str:
         """Returns a str with random characters and a random length.
