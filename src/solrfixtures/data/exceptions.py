@@ -1,5 +1,6 @@
 """Contains custom Exception classes for solrfixtures."""
 
+
 class ChoicesWeightsLengthMismatch(Exception):
     """Exception class for mismatched # of weights to # of choices.
 

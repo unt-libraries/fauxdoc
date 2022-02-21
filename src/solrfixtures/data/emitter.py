@@ -83,7 +83,7 @@ class BaseRandomEmitter(BaseEmitter):
         rng: A random.Random object. Use this for generating random
             values in subclasses.
     """
-    
+
     def __init__(self) -> None:
         """Inits the emitter with a new RNG instance."""
         self.rng = random.Random()
@@ -108,7 +108,7 @@ class BaseRandomEmitter(BaseEmitter):
 
     def seed_rngs(self, seed: Any) -> None:
         """Seeds all RNGs on this object with the given seed value.
-        
+
         Args:
             seed: Any valid seed value you'd provide to random.seed;
                 usually this is an integer.
