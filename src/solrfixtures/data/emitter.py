@@ -75,7 +75,9 @@ class BaseRandomEmitter(BaseEmitter):
     directly, use the `rng` attribute.
 
     This also adds a private utility method for validating args when
-    you need to use random.choices, which is common.
+    you need to use random.choices, which is common, and a method for
+    seeding the emitter rng, which could be more than just calling
+    `rng.seed` if you're using emitters within your emitter.
 
     Attributes:
         rng: A random.Random object. Use this for generating random
@@ -103,6 +105,15 @@ class BaseRandomEmitter(BaseEmitter):
         """
         if num_choices != num_weights:
             raise ChoicesWeightsLengthMismatch(num_choices, num_weights, noun)
+
+    def seed_rngs(self, seed: Any) -> None:
+        """Seeds all RNGs on this object with the given seed value.
+        
+        Args:
+            seed: Any valid seed value you'd provide to random.seed;
+                usually this is an integer.
+        """
+        self.rng.seed(seed)
 
 
 class IntEmitter(BaseRandomEmitter):
@@ -229,6 +240,11 @@ class StringEmitter(BaseRandomEmitter):
         self.alphabet = alphabet
         self.alphabet_weights = alphabet_weights
 
+    def seed_rngs(self, seed: Any) -> None:
+        """See base class."""
+        super().seed_rngs(seed)
+        self.len_emitter.seed_rngs(seed)
+
     def emit(self) -> str:
         """Returns a str with random characters and a random length.
 
@@ -312,6 +328,13 @@ class TextEmitter(BaseRandomEmitter):
             raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
         self.word_emitter = word_emitter
         self.word_sep_emitter = word_sep_emitter
+
+    def seed_rngs(self, seed: Any) -> None:
+        """See base class."""
+        self.word_emitter.seed_rngs(seed)
+        self.numwords_emitter.seed_rngs(seed)
+        if self.word_sep_emitter is not None:
+            self.word_sep_emitter.seed_rngs(seed)
 
     def emit(self) -> str:
         """Returns a text string with a random number of words.

@@ -31,7 +31,7 @@ def test_makealphabet(ranges, expected):
 ])
 def test_intemitter(seed, mn, mx, weights, expected):
     ie = em.IntEmitter(mn, mx, weights=weights)
-    ie.rng.seed(seed)
+    ie.seed_rngs(seed)
     assert [ie() for _ in expected] == expected
 
 
@@ -60,8 +60,7 @@ def test_intemitter_incorrect_weights(mn, mx, weights):
 def test_stringemitter(seed, mn, mx, lweights, alpha, aweights, expected):
     se = em.StringEmitter(mn, mx, alpha, len_weights=lweights,
                           alphabet_weights=aweights)
-    se.rng.seed(seed)
-    se.len_emitter.rng.seed(seed)
+    se.seed_rngs(seed)
     assert [se() for _ in expected] == expected
 
 
@@ -116,12 +115,9 @@ def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
     wse = None
     if sep_chars is not None:
         wse = em.StringEmitter(1, 1, sep_chars, alphabet_weights=sep_weights)
-        wse.rng.seed(seed)
     te = em.TextEmitter(word_emitter, word_mn, word_mx,
                         numwords_weights=word_weights, word_sep_emitter=wse)
-    te.word_emitter.rng.seed(seed)
-    te.word_emitter.len_emitter.rng.seed(seed)
-    te.numwords_emitter.rng.seed(seed)
+    te.seed_rngs(seed)
     assert [te() for _ in expected] == expected
 
 
