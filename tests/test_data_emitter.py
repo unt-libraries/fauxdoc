@@ -5,6 +5,16 @@ from solrfixtures.data import emitter as em
 from solrfixtures.data import exceptions as ex
 
 
+# Module-specific fixtures
+
+@pytest.fixture
+def word_emitter():
+    """Fixture to use as the `word_emitter` arg for TextEmitter tests."""
+    return em.StringEmitter(2, 8, 'abcde')
+
+
+# Tests
+
 @pytest.mark.parametrize('ranges, expected', [
     ([(0x0041, 0x0045), (0x0047, 0x0047)], list('ABCDEG')),
     ([(ord('a'), ord('g')), (ord('A'), ord('C'))],
@@ -69,7 +79,7 @@ def test_stringemitter_incorrect_alpha_weights(alpha, aweights):
 
 @pytest.mark.parametrize('mn, mx, lweights', [
     (1, 10, [50, 100]),
-    (1, 2, [50, 75, 100])
+    (1, 2, [50, 75, 100]),
 ])
 def test_stringemitter_incorrect_string_length_weights(mn, mx, lweights):
     with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
@@ -77,3 +87,53 @@ def test_stringemitter_incorrect_string_length_weights(mn, mx, lweights):
     assert excinfo.value.noun == 'string length'
     assert excinfo.value.num_choices == mx - mn + 1
     assert excinfo.value.num_weights == len(lweights)
+
+
+@pytest.mark.parametrize(
+    'seed, word_mn, word_mx, word_weights, sep_chars, sep_weights, expected',
+    [
+        (999, 1, 3, None, None, None,
+         ['daeccadb deaeabc db', 'eebdaabe', 'cadaec ecddad cdbaeb',
+          'dbcad caeca bdb', 'cbbceeea cdceeab bdad', 'eacdedb aeacaecc']),
+        (999, 3, 6, None, None, None,
+         ['daeccadb deaeabc db', 'eebdaabe cadaec ecddad cdbaeb dbcad caeca',
+          'bdb cbbceeea cdceeab bdad eacdedb aeacaecc',
+          'aedabce ecedbace bcbdbdcb ad', 'edcdbbd babbdbed dad ddc bced',
+          'adeeda bb bdeaecd']),
+        (999, 3, 6, None, [' ', '-', ', ', '; '], [40, 70, 90, 100],
+         ['daeccadb, deaeabc db',
+          'eebdaabe, cadaec-ecddad-cdbaeb dbcad, caeca',
+          'bdb cbbceeea, cdceeab, bdad eacdedb; aeacaecc',
+          'aedabce ecedbace bcbdbdcb-ad', 'edcdbbd, babbdbed dad, ddc; bced',
+          'adeeda bb-bdeaecd']),
+        (999, 1, 3, [60, 85, 100], None, None,
+         ['daeccadb deaeabc', 'db', 'eebdaabe cadaec ecddad', 'cdbaeb',
+          'dbcad', 'caeca']),
+    ]
+)
+def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
+                     sep_weights, expected, word_emitter):
+    wse = None
+    if sep_chars is not None:
+        wse = em.StringEmitter(1, 1, sep_chars, alphabet_weights=sep_weights)
+        wse.rng.seed(seed)
+    te = em.TextEmitter(word_emitter, word_mn, word_mx,
+                        numwords_weights=word_weights, word_sep_emitter=wse)
+    te.word_emitter.rng.seed(seed)
+    te.word_emitter.len_emitter.rng.seed(seed)
+    te.numwords_emitter.rng.seed(seed)
+    assert [te() for _ in expected] == expected
+
+
+@pytest.mark.parametrize('word_mn, word_mx, word_weights', [
+    (1, 10, [50, 100]),
+    (1, 2, [50, 75, 100]),
+])
+def test_textemitter_incorrect_word_weights(word_mn, word_mx, word_weights,
+                                            word_emitter):
+    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
+        em.TextEmitter(word_emitter, word_mn, word_mx,
+                       numwords_weights=word_weights)
+    assert excinfo.value.noun == 'text length'
+    assert excinfo.value.num_choices == word_mx - word_mn + 1
+    assert excinfo.value.num_weights == len(word_weights)

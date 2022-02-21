@@ -1,8 +1,9 @@
 """Contains functions and classes for emitting randomized data values."""
 from abc import ABC, abstractmethod
 import datetime
+import itertools
 import random
-from typing import Any, Optional, List, Sequence, Union
+from typing import Any, Optional, List, Sequence, Union, TypeVar
 
 import pytz
 
@@ -10,6 +11,7 @@ from .exceptions import ChoicesWeightsLengthMismatch
 
 
 Number = Union[int, float]
+RandomEmitterType = TypeVar('RandomEmitterType', bound='BaseRandomEmitter')
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
@@ -189,8 +191,9 @@ class StringEmitter(BaseRandomEmitter):
 
         The `len_mn`, `len_mx`, and `len_weights` args provided to
         __init__ are used to instantiate an `IntEmitter` that generates
-        randomized string lengths. They are stored as attributes on
-        that object.
+        randomized string lengths. If you need to access these values
+        later, they are stored as attributes on that object
+        (self.len_emitter).
 
         Note that all weights should be the *cumulative* weights, e.g.
         [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
@@ -203,15 +206,15 @@ class StringEmitter(BaseRandomEmitter):
         Args:
             len_mn: The minimum length for generated strings.
             len_mx: The maximum length for generated strings.
-            alphabet: See attributes for this class.
+            alphabet: See object attributes for details.
             len_weights: (Optional.) A sequence of cumulative weights
                 controlling the chances a string will be a certain
                 length. The number of weights provided here should
                 match the total number of string length possibilities.
                 If not provided, weighting is not used, and each string
                 length has an equal chance of being selected.
-            alphabet_weights: (Optional.) See attributes for this
-                class.
+            alphabet_weights: (Optional.) See object attributes for
+                details.
         """
         super().__init__()
         try:
@@ -237,6 +240,94 @@ class StringEmitter(BaseRandomEmitter):
                                   cum_weights=self.alphabet_weights,
                                   k=self.len_emitter())
         return ''.join(chosen)
+
+
+class TextEmitter(BaseRandomEmitter):
+    """Class for emitting random text.
+
+    "Text" in this case is defined very basically as a string of words,
+    each of which is separated by a separator character or string. Text
+    that this emitter produces is not formed into sentences, but you
+    can use `word_sep_emitter` to produce internal punctuation.
+
+    Attributes:
+        numwords_emitter: An `IntEmitter` object used internally to
+            generate a randomized number of words for each call to
+            `emit`. The `numwords_mn`, `numwords_mx`, and
+            `numwords_weights` values supplied to `__init__` are used
+            to initialize it.
+        word_emitter: A subtype of `BaseRandomEmitter` that generates a
+            string value when called. E.g., each call to `word_emitter`
+            generates a new word to use in the `emit` return value.
+        word_sep_emitter: (Optional.) A subtype of `BaseRandomEmitter`
+            that generates a string value when called. E.g., each call
+            to `word_sep_emitter` generates a word separator value to
+            use in the `emit` return value. If not provided, we
+            default to a static space (' ') separator value.
+    """
+
+    def __init__(self,
+                 word_emitter: RandomEmitterType,
+                 numwords_mn: int,
+                 numwords_mx: int,
+                 numwords_weights: Optional[Sequence[Number]] = None,
+                 word_sep_emitter: Optional[RandomEmitterType] = None) -> None:
+        """Inits TextEmitter with word, separator, and text settings.
+
+        The `numwords_mn`, `numwords_mx`, and `numwords_weights` args
+        provided to __init__ are used to instantiate an `IntEmitter`
+        that generates randomized text lengths, in numbers of words.
+        If you need to access these values later, they are stored as
+        attributes on that object (self.numwords_emitter).
+
+        Note that all weights should be *cumulative* weights, e.g.
+        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
+        weights to cumulative weights is with itertools.accumulate:
+            >>> import itertools
+            >>> weights = [70, 10, 20]
+            >>> list(itertools.accumulate(weights))
+            [70, 80, 100]
+
+        Args:
+            word_emitter: See object attributes for details.
+            numwords_mn: The minimum number of words in the generated
+                text.
+            numwords_mx: The maximum number of words in the generated
+                text.
+            numwords_weights: (Optional.) A sequence of cumulative
+                weights controlling the chances a text value will be a
+                certain number of words. The number of weights provided
+                here should match the total number of text length
+                possibilities. If not provided, weighting is not used,
+                and each length has an equal chance of being selected.
+            word_sep_emitter: (Optional.) See object attributes for
+                details.
+        """
+        super().__init__()
+        try:
+            self.numwords_emitter = IntEmitter(numwords_mn, numwords_mx,
+                                               weights=numwords_weights)
+        except ChoicesWeightsLengthMismatch as err:
+            noun = 'text length'
+            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
+        self.word_emitter = word_emitter
+        self.word_sep_emitter = word_sep_emitter
+
+    def emit(self) -> str:
+        """Returns a text string with a random number of words.
+
+        Object attributes control word selection, the min/max number of
+        words, and what word separators are used.
+        """
+        numwords = self.numwords_emitter()
+        words = (self.word_emitter() for _ in range(0, numwords))
+
+        if self.word_sep_emitter is None:
+            return ' '.join(words)
+
+        separators = (self.word_sep_emitter() for _ in range(0, numwords - 1))
+        text_iterable = itertools.zip_longest(words, separators, fillvalue='')
+        return ''.join(itertools.chain.from_iterable(text_iterable))
 
 
 # OLD CODE IS BELOW -- We want to refactor this out -------------------
