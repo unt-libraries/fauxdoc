@@ -25,6 +25,9 @@ def test_makealphabet(ranges, expected):
 
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
+    (999, 0, 1, None, [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
+    (999, 1, 1, None, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, 5, 5, None, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
     (999, 1, 10, None, [2, 10, 10, 9, 8, 8, 3, 6, 2, 4]),
     (999, 1, 10, [50, 70, 80, 85, 90, 91, 92, 93, 95, 100],
      [3, 1, 5, 2, 1, 1, 3, 1, 3, 4]),
@@ -48,6 +51,15 @@ def test_intemitter_incorrect_weights(mn, mx, weights):
 
 
 @pytest.mark.parametrize('seed, mn, mx, lweights, alpha, aweights, expected', [
+    (999, 0, 0, None, 'abcde', None, ['', '', '', '', '', '', '', '', '', '']),
+    (999, 1, 1, None, 'abcde', None,
+     ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
+    (999, 5, 5, None, 'abcde', None,
+     ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd', 'adcdb',
+      'aebdb', 'cadca']),
+    (999, 5, 5, None, 'a', None,
+     ['aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa',
+      'aaaaa', 'aaaaa']),
     (999, 1, 5, None, 'abcde', None,
      ['d', 'aecca', 'dbdea', 'eabcd', 'beeb', 'daab', 'ec', 'ada', 'e', 'ce']),
     (999, 1, 5, [15, 85, 90, 95, 100], 'abcde', None,

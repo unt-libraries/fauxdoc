@@ -160,6 +160,9 @@ class IntEmitter(BaseRandomEmitter):
         Object attributes control the min/max range and weighting for
         generated values.
         """
+        # No need to use the rng if it's a static number (mn == mx).
+        if self.mn == self.mx:
+            return self.mn
         if self.weights is None:
             return self.rng.randint(self.mn, self.mx)
         return self.rng.choices(range(self.mn, self.mx + 1),
@@ -252,9 +255,14 @@ class StringEmitter(BaseRandomEmitter):
         alphabet used to generate the string, and the weighting for
         the distribution of string lengths and characters.
         """
-        chosen = self.rng.choices(self.alphabet,
-                                  cum_weights=self.alphabet_weights,
-                                  k=self.len_emitter())
+        str_length = self.len_emitter()
+        # No need to use the rng if the alphabet has one element.
+        if len(self.alphabet) == 1:
+            chosen = (self.alphabet[0] for _ in range(0, str_length))
+        else:
+            chosen = self.rng.choices(self.alphabet,
+                                      cum_weights=self.alphabet_weights,
+                                      k=str_length)
         return ''.join(chosen)
 
 
