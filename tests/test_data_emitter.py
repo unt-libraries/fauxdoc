@@ -1,4 +1,7 @@
 """Contains tests for the solrfixtures.data.emitter module."""
+import datetime
+import itertools
+
 import pytest
 
 from solrfixtures.data import emitter as em
@@ -145,3 +148,84 @@ def test_textemitter_incorrect_word_weights(word_mn, word_mx, word_weights,
     assert excinfo.value.noun == 'text length'
     assert excinfo.value.num_choices == word_mx - word_mn + 1
     assert excinfo.value.num_weights == len(word_weights)
+
+
+@pytest.mark.parametrize('seed, mn, mx, weights, expected', [
+    (999, (2015, 1, 1), (2015, 1, 1), None,
+     [(2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1),
+      (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1)]),
+    (999, (2015, 1, 1), (2015, 1, 5), None,
+     [(2015, 1, 1), (2015, 1, 5), (2015, 1, 5), (2015, 1, 5), (2015, 1, 4),
+      (2015, 1, 4), (2015, 1, 2), (2015, 1, 3), (2015, 1, 1), (2015, 1, 2)]),
+    (999, (2015, 1, 1), (2015, 1, 5), [60, 80, 90, 95, 100],
+     [(2015, 1, 2), (2015, 1, 1), (2015, 1, 3), (2015, 1, 1), (2015, 1, 1),
+      (2015, 1, 1), (2015, 1, 2), (2015, 1, 1), (2015, 1, 2), (2015, 1, 3)]),
+])
+def test_dateemitter(seed, mn, mx, weights, expected):
+    mn = datetime.date(*mn)
+    mx = datetime.date(*mx)
+    de = em.DateEmitter(mn, mx, weights=weights)
+    de.seed_rngs(seed)
+    assert [de() for _ in expected] == [datetime.date(*i) for i in expected]
+
+
+@pytest.mark.parametrize('mn, mx, weights', [
+    ((2015, 1, 1), (2015, 1, 2), [60, 80, 100]),
+    ((2015, 1, 1), (2015, 12, 31), [60, 80, 100]),
+])
+def test_dateemitter_incorrect_daydelta_weights(mn, mx, weights):
+    mn = datetime.date(*mn)
+    mx = datetime.date(*mx)
+    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
+        em.DateEmitter(mn, mx, weights)
+    assert excinfo.value.noun == 'day delta'
+    assert excinfo.value.num_choices == (mx - mn).days + 1
+    assert excinfo.value.num_weights == len(weights)
+
+
+@pytest.mark.parametrize('seed, mn, mx, resolution, weights, expected', [
+    (999, None, None, 1, None,
+     [(2, 54, 54), (20, 40, 20), (20, 53, 23), (19, 25, 53), (17, 51, 38),
+      (17, 35, 58), (4, 48, 30), (23, 34, 15), (11, 34, 56), (23, 26, 12)]),
+    (999, None, None, 60, None,
+     [(23, 10), (2, 43), (19, 22), (19, 35), (18, 13), (16, 44), (16, 29),
+      (4, 30), (22, 5), (10, 51)]),
+    (999, (5, 0, 0), (5, 30, 0), 1, None,
+     [(5, 26, 40), (5, 23, 10), (5, 2, 43), (5, 29, 46), (5, 19, 22),
+      (5, 19, 35), (5, 18, 13), (5, 16, 44), (5, 16, 29), (5, 4, 30)]),
+    (999, (5, 0, 0), (11, 59, 59), 60,
+     list(itertools.accumulate([1] * 60 + [1] * 60 + [5] * 60 + [10] * 60 +
+                               [5] * 60 + [3] * 60 + [2] * 60)),
+     [(9, 49), (7, 1), (10, 31), (8, 50), (8, 37), (7, 18), (9, 54), (8, 9),
+      (9, 53), (10, 16)]),
+    (999, (6, 0, 0), (8, 59, 59), 600,
+     list(itertools.accumulate([10] * 6 + [5] * 6 + [2] * 6)),
+     [(7, 30), (6, 0), (7, 50), (6, 50), (6, 50), (6, 10), (7, 40), (6, 30),
+      (7, 40), (7, 50)]),
+    (999, (20, 0, 1), (20, 0, 59), 20, [50, 80, 100],
+     [(20, 0, 21), (20, 0, 1), (20, 0, 41), (20, 0, 21), (20, 0, 1),
+      (20, 0, 1), (20, 0, 21), (20, 0, 1), (20, 0, 21), (20, 0, 41)]),
+])
+def test_timeemitter(seed, mn, mx, resolution, weights, expected):
+    mn = mn if mn is None else datetime.time(*mn)
+    mx = mx if mx is None else datetime.time(*mx)
+    te = em.TimeEmitter(mn, mx, resolution=resolution, weights=weights)
+    te.seed_rngs(seed)
+    assert [te() for _ in expected] == [datetime.time(*i) for i in expected]
+
+
+@pytest.mark.parametrize('mn, mx, resolution, weights, exp_num_choices', [
+    ((6, 0, 0), (8, 0, 0), 60,
+     list(itertools.accumulate([5] * 60 + [10] * 60)), 121),
+    ((6, 0, 0), (6, 0, 5), 1, [10, 50, 60, 65, 76], 6),
+    ((20, 0, 1), (20, 0, 59), 10, [10, 30, 35, 40, 45, 70, 100], 6),
+])
+def test_timeemitter_incorrect_intervaldelta_weights(mn, mx, resolution,
+                                                     weights, exp_num_choices):
+    mn = datetime.time(*mn)
+    mx = datetime.time(*mx)
+    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
+        em.TimeEmitter(mn, mx, resolution=resolution, weights=weights)
+    assert excinfo.value.noun == 'time interval delta'
+    assert excinfo.value.num_choices == exp_num_choices
+    assert excinfo.value.num_weights == len(weights)

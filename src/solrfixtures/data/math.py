@@ -1,5 +1,6 @@
 """Contains math utility functions used in the data module."""
 
+import datetime
 import math
 from typing import Optional, Union
 
@@ -95,7 +96,7 @@ def gaussian_cdf(x: Number,
 def clamp(number: Number,
           mn: Optional[Number] = None,
           mx: Optional[Number] = None) -> Number:
-    """Limit a given number to a minimum and/or maximum value.
+    """Limits a given number to a minimum and/or maximum value.
 
     Examples:
         >>> clamp(35, mn=50, mx=100)
@@ -120,3 +121,42 @@ def clamp(number: Number,
     if mx is not None and number > mx:
         return mx
     return number
+
+
+def time_to_seconds(time: datetime.time) -> int:
+    """Determines the # of seconds since midnight for a datetime.time.
+
+    E.g.: 12:00:59 AM is 59 seconds since midnight, so
+    time_to_seconds(datetime.time(0, 0, 59)) returns 59.
+
+    Args:
+        time: The input datetime.time object. It may or may not be
+            timezone aware.
+
+    Returns:
+        An int representing the # of seconds since midnight.
+    """
+    return (time.hour * 3600) + (time.minute * 60) + time.second
+
+
+def seconds_to_time(seconds: int) -> datetime.time:
+    """Converts a # of seconds since midnight to a datetime.time.
+
+    E.g.: 43200 seconds after midnight is noon, so
+    seconds_to_time(43200) returns datetime.time(12, 0, 0).
+
+    Args:
+        seconds: The input integer representing seconds since midnight.
+            If a value > 86399 is provided, then the clock effectively
+            rolls over. 86400 and 0 both return midnight.
+
+    Returns:
+        A datetime.time value corresponding to the # of seconds since
+        midnight.
+    """
+    seconds %= 86400
+    hour = int(seconds / 3600)
+    minute_seconds = seconds % 3600
+    minute = int(minute_seconds / 60)
+    second = minute_seconds % 60
+    return datetime.time(hour, minute, second)

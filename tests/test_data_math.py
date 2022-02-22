@@ -1,5 +1,7 @@
 """Contains tests for the solrfixtures data.math module."""
 
+import datetime
+
 import pytest
 
 from solrfixtures.data import math as m
@@ -93,3 +95,32 @@ def test_distribution(start, end, function, kwargs, expected):
 ])
 def test_clamp(number, mn, mx, expected):
     assert m.clamp(number, mn, mx) == expected
+
+
+@pytest.mark.parametrize('time, expected', [
+    ((0, 0, 0), 0),
+    ((0, 0, 59), 59),
+    ((0, 10, 30), 630),
+    ((1, 10, 30), 4230),
+    ((12, 0, 0), 43200),
+    ((20, 8, 33), 72513),
+    ((23, 59, 59), 86399),
+])
+def test_time_to_seconds(time, expected):
+    assert m.time_to_seconds(datetime.time(*time)) == expected
+
+
+@pytest.mark.parametrize('seconds, expected', [
+    (0, (0, 0, 0)),
+    (59, (0, 0, 59)),
+    (630, (0, 10, 30)),
+    (4230, (1, 10, 30)),
+    (43200, (12, 0, 0)),
+    (72513, (20, 8, 33)),
+    (86399, (23, 59, 59)),
+    (86400, (0, 0, 0)),
+    (86459, (0, 0, 59)),
+    (172800, (0, 0, 0)),
+])
+def test_seconds_to_time(seconds, expected):
+    assert m.seconds_to_time(seconds) == datetime.time(*expected)
