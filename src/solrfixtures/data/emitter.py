@@ -1,18 +1,18 @@
 """Contains functions and classes for emitting randomized data values."""
 from abc import ABC, abstractmethod
+import collections.abc
 import datetime
 import itertools
 import random
-from typing import Any, Optional, List, Sequence, Union, TypeVar
+from typing import Any, Callable, Optional, List, Sequence, Union, TypeVar
 
 import pytz
 
 from .exceptions import ChoicesWeightsLengthMismatch
 from .math import time_to_seconds, seconds_to_time
-
-
-Number = Union[int, float]
-RandomEmitterType = TypeVar('RandomEmitterType', bound='BaseRandomEmitter')
+from solrfixtures.typing import Number, RandomStrEmitterLike,\
+                                RandomDateEmitterLike, RandomTimeEmitterLike,\
+                                TzInfoLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
@@ -281,22 +281,33 @@ class TextEmitter(BaseRandomEmitter):
             `emit`. The `numwords_mn`, `numwords_mx`, and
             `numwords_weights` values supplied to `__init__` are used
             to initialize it.
-        word_emitter: A subtype of `BaseRandomEmitter` that generates a
-            string value when called. E.g., each call to `word_emitter`
-            generates a new word to use in the `emit` return value.
-        word_sep_emitter: (Optional.) A subtype of `BaseRandomEmitter`
-            that generates a string value when called. E.g., each call
-            to `word_sep_emitter` generates a word separator value to
-            use in the `emit` return value. If not provided, we
-            default to a static space (' ') separator value.
+        word_emitter: A callable that takes no args and generates a
+            word (str value) when called. E.g., each call to
+            `word_emitter` generates a new word to use in the
+            `TextEmitter.emit` return value. *If your callable
+            generates words randomly, then it should be
+            RandomEmitter-like, in that any RNGs should be localized
+            (such as local random.Random instances), and it should have
+            a `seed_rngs` method that takes a seed value and seeds all
+            local RNGs.*
+        word_sep_emitter: (Optional.) A callable that takes no args and
+            generates a word separator (str value) when called. E.g.,
+            each call to `word_sep_emitter` generates the next word
+            separator to use in the `TextEmitter.emit` return value. If
+            not provided, we default to using a static space (' ')
+            separator value. *As with `word_emitter`, if your callable
+            generates values randomly, it should be RandomEmitter-like,
+            as described.*
     """
 
+    TextPartType = Union[RandomStrEmitterLike, Callable[[], str]]
+
     def __init__(self,
-                 word_emitter: RandomEmitterType,
+                 word_emitter: TextPartType,
                  numwords_mn: int,
                  numwords_mx: int,
                  numwords_weights: Optional[Sequence[Number]] = None,
-                 word_sep_emitter: Optional[RandomEmitterType] = None) -> None:
+                 word_sep_emitter: Optional[TextPartType] = None) -> None:
         """Inits TextEmitter with word, separator, and text settings.
 
         The `numwords_mn`, `numwords_mx`, and `numwords_weights` args
@@ -340,10 +351,15 @@ class TextEmitter(BaseRandomEmitter):
 
     def seed_rngs(self, seed: Any) -> None:
         """See base class."""
-        self.word_emitter.seed_rngs(seed)
         self.numwords_emitter.seed_rngs(seed)
-        if self.word_sep_emitter is not None:
+        try:
+            self.word_emitter.seed_rngs(seed)
+        except AttributeError:
+            pass
+        try:
             self.word_sep_emitter.seed_rngs(seed)
+        except AttributeError:
+            pass
 
     def emit(self) -> str:
         """Returns a text string with a random number of words.
@@ -442,16 +458,20 @@ class TimeEmitter(BaseRandomEmitter):
             of weights must be equal to the total number of dates that
             may be selected. If not provided, then no weighting is
             applied, and all dates are equally likely.
-        intervaldelta_emitter: An `IntEmitter` used internally to do
-            the random selection.
+        tzinfo: (Optional.) A tzinfo-compatible object to use to apply
+            a timezone to the generated time. Defaults to UTC
+            (datetime.timezone.utc).
+        intervaldelta_emitter: An `IntEmitter` used internally to
+            generate a time differential for random selection.
     """
 
     def __init__(self,
                  mn: Optional[datetime.time] = None,
                  mx: Optional[datetime.time] = None,
                  resolution: int = 1,
-                 weights: Optional[Sequence[Number]] = None) -> None:
-        """Inits TimeEmitter with mn, mx, weights, and resolution.
+                 weights: Optional[Sequence[Number]] = None,
+                 tzinfo: TzInfoLike = datetime.timezone.utc) -> None:
+        """Inits TimeEmitter with mn, mx, weights, tz, and resolution.
 
         Note that `weights` should be *cumulative* weights, e.g.
         [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
@@ -495,6 +515,7 @@ class TimeEmitter(BaseRandomEmitter):
         self.mn = mn
         self.mx = mx
         self.resolution = resolution
+        self.tzinfo = tzinfo
         self._mn_secs = mn_secs
 
     def seed_rngs(self, seed: Any) -> None:
@@ -502,14 +523,15 @@ class TimeEmitter(BaseRandomEmitter):
         self.intervaldelta_emitter.seed_rngs(seed)
 
     def emit(self) -> datetime.time:
-        """Returns a random datetime.time value.
+        """Returns a random, timezone aware datetime.time value.
 
         Object attributes control the min/max, weights, and resolution
-        values for random selection.
+        values for random selection, as well as the timezone of the
+        returned time.
         """
         secsdelta = self.intervaldelta_emitter() * self.resolution
         secs_since_midnight = self._mn_secs + secsdelta
-        return seconds_to_time(secs_since_midnight)
+        return seconds_to_time(secs_since_midnight).replace(tzinfo=self.tzinfo)
 
 
 # OLD CODE IS BELOW -- We want to refactor this out -------------------

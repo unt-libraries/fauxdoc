@@ -1,11 +1,9 @@
 """Contains math utility functions used in the data module."""
-
 import datetime
 import math
-from typing import Optional, Union
+from typing import Optional 
 
-
-Number = Union[int, float]
+from solrfixtures.typing import Number
 
 
 def poisson(x: int, mu: Optional[Number] = 1) -> float:

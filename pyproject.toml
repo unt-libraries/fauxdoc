@@ -19,6 +19,9 @@ ujson = [
     { version = ">=4.0.0", python = "~3.9" },
     { version = ">=2.0.0", python = "~3.7 || ~3.8" }
 ]
+typing_extensions = [
+    { version = "^4.1.1", python = "~3.7" }
+]
 pytest = [
     { version = "^6.2.5", python = "^3.10", optional = true },
     { version = ">=5.4.2", python = "~3.9",  optional = true },
