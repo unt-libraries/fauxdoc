@@ -36,39 +36,10 @@ def test_gaussian(x, mu, sigma, expected):
     assert round(m.gaussian(x, mu, sigma), 4) == expected
 
 
-@pytest.mark.parametrize('x, mu, expected', [
-    (0, 1, 0.3679),
-    (1, 1, 0.7358),
-    (2, 1, 0.9197),
-    (6, 1, 0.9999),
-    (10, 1, 1.0),
-    (1, 1.5, 0.5578),
-    (2, 2, 0.6767)
-])
-def test_poisson_cdf(x, mu, expected):
-    assert round(m.poisson_cdf(x, mu), 4) == expected
-
-
-@pytest.mark.parametrize('x, mu, sigma, expected', [
-    (0, 1, 1, 0.1587),
-    (1, 1, 1, 0.5),
-    (2, 1, 1, 0.8413),
-    (6, 1, 1, 1.0),
-    (10, 1, 1, 1.0),
-    (1, 1.5, 1, 0.3085),
-    (1.5, 1, 1, 0.6915),
-    (2, 2, 1, 0.5),
-    (2, 1, 5, 0.5793),
-    (2, 1, 10, 0.5398),
-])
-def test_gaussian_cdf(x, mu, sigma, expected):
-    assert round(m.gaussian_cdf(x, mu, sigma), 4) == expected
-
-
 @pytest.mark.parametrize('start, end, function, kwargs, expected', [
     (0, 4, m.poisson, {}, [0.3679, 0.3679, 0.1839, 0.0613]),
     (1, 4, m.poisson, {}, [0.3679, 0.1839, 0.0613]),
-    (0, 4, m.gaussian_cdf, {'sigma': 2}, [0.5, 0.6915, 0.8413, 0.9332]),
+    (0, 4, m.gaussian, {'sigma': 2}, [0.1995, 0.176, 0.121, 0.0648]),
 ])
 def test_distribution(start, end, function, kwargs, expected):
     """Demonstrates creating a distribution from a dist function.

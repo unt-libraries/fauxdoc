@@ -2,9 +2,12 @@
 from abc import ABC, abstractmethod
 import collections.abc
 import datetime
+import heapq
 import itertools
+import math
 import random
-from typing import Any, Callable, Optional, List, Sequence, Union, TypeVar
+from typing import Any, Callable, Optional, List, Sequence, Tuple, Union,\
+                   TypeVar
 
 import pytz
 
@@ -55,17 +58,53 @@ class BaseEmitter(ABC):
     simply by calling the object.
     """
 
-    def __call__(self) -> Any:
-        """Wraps the `self.emit` method so that this obj is callable."""
-        return self.emit()
+    T = TypeVar('T')
+
+    def reset(self) -> None:
+        """Resets state on this object.
+
+        Override this in your subclass if your emitter stores state
+        changes that may need to be reset to their initial values. (The
+        subclass is responsible for tracking the initial values.) By
+        default this is a no-op.
+        """
+
+    def __call__(self, number: int = 1) -> Union[T, List[T]]:
+        """Wraps the `self.emit` method so that this obj is callable.
+
+        Args:
+            number: (Optional.) How many data values to emit. Default
+                is 1.
+
+        Returns:
+            If `number` is 1, then it returns one data value by calling
+            `emit`. If `number` > 1, then it returns a list of data
+            values by calling `emit_multiple`.
+        """
+        return self.emit() if number == 1 else self.emit_multiple(number)
 
     @abstractmethod
-    def emit(self) -> Any:
-        """Returns an atomic data value of a certain type.
+    def emit(self) -> T:
+        """Returns one data value.
 
-        Override this in your base class. It should return whatever
-        value is appropriate given your emitter class.
+        Override this in your subclass. It should return whatever value
+        is appropriate given your emitter class.
         """
+
+    def emit_multiple(self, number: int) -> List[T]:
+        """Returns a list of data values.
+
+        Override this in your base class, if necessary. By default this
+        just calls `emit` `number` times, but sometimes there are more
+        performant ways of repeating your `emit` method. (E.g.: If you
+        use `random.choices`, passing a `k` value to choose multiple
+        items is much faster than repeating the call.)
+
+        Args:
+            number: How many data values to return (int).
+        """
+        return [self.emit() for _ in range(0, number)]
+
 
 
 class BaseRandomEmitter(BaseEmitter):
@@ -115,6 +154,94 @@ class BaseRandomEmitter(BaseEmitter):
                 usually this is an integer.
         """
         self.rng.seed(seed)
+
+
+class ChoicesEmitter(BaseRandomEmitter):
+
+    T = TypeVar('T')
+
+    def __init__(self,
+                 items: Sequence[T],
+                 weights: Optional[Sequence[Number]] = None,
+                 global_unique: bool = False,
+                 each_unique: bool = False,
+                 noun: str = '') -> None:
+        """Pass"""
+        super().__init__()
+        if weights is not None:
+            nchoices = len(items)
+            nweights = len(weights)
+            if nchoices != nweights:
+                raise ChoicesWeightsLengthMismatch(nchoices, nweights, noun)
+            if not (global_unique or each_unique):
+                weights = list(itertools.accumulate(weights))
+
+        self.items = items
+        self.weights = weights
+        self.global_unique = global_unique
+        self.each_unique = each_unique
+        self._shuffled = None
+        self._shuffled_index = None
+        self.reset()
+
+    def reset(self) -> None:
+        if self.global_unique:
+            weights = self.weights or [1] * len(self.items)
+            shuffled = self._shuffle_weights(weights, self.items)
+            self._shuffled = sorted(shuffled, reverse=True, key=lambda x: x[0])
+            self._shuffled_index = 0
+
+    def _shuffle_weights(self,
+                         weights: Sequence[Number],
+                         items: Sequence[T]) -> zip:
+        return zip((math.log(self.rng.random()) / w for w in weights), items)
+
+    def _get_next_shuffled(self, number: int = 1) -> List[T]:
+        slc_start = self._shuffled_index
+        slc = self._shuffled[slc_start:slc_start+number]
+        self._shuffled_index += number
+        return [item for _, item in slc]
+
+    def _sample_using_weights(self, number: int = 1):
+        # I adapted this algorithm from a StackOverflow answer:
+        # https://stackoverflow.com/a/20548895. Apparently, using
+        # `log(random()) / weight` gives you a proportionally weighted
+        # random value, where reverse sorting the list by these values
+        # gives you an accurate, unbiased result for selecting N unique
+        # numbers from the population. I ran several `timeit` tests to
+        # compare the various methods for generating random weighted
+        # selections without replacement, and -- although this is the
+        # most esoteric, it's by far the most efficient.
+        #
+        # (Note that, to choose the N largest vals, using
+        # `heapq.nlargest` instead of `sorted` is faster when k is less
+        # than ~4% of the total items; otherwise, `sorted` is faster.)
+        shuffled = self._shuffle_weights(self.weights, self.items)
+        if number / len(self.items) < 0.04:
+            top_n = heapq.nlargest(number, shuffled)
+        else:
+            top_n = sorted(shuffled, reverse=True, key=lambda x: x[0])[:number]
+        return [item for _, item in top_n]
+        
+    def emit(self) -> T:
+        if self.global_unique:
+            return self._get_next_shuffled()[0]
+
+        if self.weights is None:
+            return self.rng.choice(self.items)
+
+        return self.rng.choices(self.items, cum_weights=self.weights, k=1)[0]
+
+    def emit_multiple(self, number: int = 1) -> List[T]:
+        if self.global_unique:
+            return self._get_next_shuffled(number)
+
+        if self.each_unique:
+            if self.weights is None:
+                return self.rng.sample(self.items, k=number)
+            return self._sample_using_weights(number)
+
+        return self.rng.choices(self.items, cum_weights=self.weights, k=number)
 
 
 class IntEmitter(BaseRandomEmitter):

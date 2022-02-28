@@ -1,6 +1,6 @@
 """Contains constants/variables/etc. used for type hinting."""
 import datetime
-from typing import Any, Union
+from typing import Any, Union, TypeVar
 
 try:
     from typing import Protocol
@@ -11,6 +11,7 @@ except ImportError:
 # Type aliases defined here.
 
 Number = Union[int, float]
+T = TypeVar('T')
 
 
 # Protocols defined here.
