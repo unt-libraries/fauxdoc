@@ -60,6 +60,10 @@ class BaseEmitter(ABC):
 
     T = TypeVar('T')
 
+    def __init__(self) -> None:
+        """Inits the BaseEmitter instance."""
+        self.reset()
+
     def reset(self) -> None:
         """Resets state on this object.
 
@@ -68,6 +72,44 @@ class BaseEmitter(ABC):
         subclass is responsible for tracking the initial values.) By
         default this is a no-op.
         """
+
+    @property
+    def emits_unique_values(self) -> book:
+        """Returns a bool; True if an instance emits unique values.
+
+        We mean "unique" in terms of the lifetime of the instance, not
+        a given call to `emit_multiple`. This should return True if the
+        instance is guaranteed never to return a duplicate. (In which
+        case the instance may eventually exhaust all unique values.)
+        """
+        return False
+
+    @property
+    def num_unique_values(self) -> int:
+        """Returns an int, the number of unique values emittable.
+
+        This number should be relative to the next `emit` or
+        `emit_multiple` call. If your instance is one where
+        `emits_unique_values` is True, then this should return the
+        number of unique values that remain at any given time.
+        Otherwise, this should give the total number of unique values
+        that can be emitted (for instance if `emit_multiple` is called
+        with `unique` set to True).
+        """
+        return 0
+
+    def raise_uniqueness_violation(self, number: int) -> None:
+        """Raises a ValueError indicating not enough unique values.
+
+        Args:
+            number: An integer indicating how many new unique values
+                were requested.
+        """
+        raise ValueError(
+            f'Could not emit: {number} new unique value'
+            f'{' was' if number == 1 else 's were'} requested, out of '
+            f'{self.num_unique_values} possible selections.'
+        )
 
     def __call__(self, number: int = 1) -> Union[T, List[T]]:
         """Wraps the `self.emit` method so that this obj is callable.
@@ -91,7 +133,7 @@ class BaseEmitter(ABC):
         is appropriate given your emitter class.
         """
 
-    def emit_multiple(self, number: int) -> List[T]:
+    def emit_multiple(self, number: int = 1, unique: bool = False) -> List[T]:
         """Returns a list of data values.
 
         Override this in your base class, if necessary. By default this
@@ -101,10 +143,12 @@ class BaseEmitter(ABC):
         items is much faster than repeating the call.)
 
         Args:
-            number: How many data values to return (int).
+            number: (Optional.) An int for how many data values to
+                return. The default is 1.
+            unique: (Optional.) A bool; True means that each value in
+                the returned list must be unique. Default is False.
         """
         return [self.emit() for _ in range(0, number)]
-
 
 
 class BaseRandomEmitter(BaseEmitter):
@@ -114,37 +158,14 @@ class BaseRandomEmitter(BaseEmitter):
     values. In your subclass, instead of calling the `random` module
     directly, use the `rng` attribute.
 
-    This also adds a private utility method for validating args when
-    you need to use random.choices, which is common, and a method for
-    seeding the emitter rng, which could be more than just calling
-    `rng.seed` if you're using emitters within your emitter.
-
     Attributes:
         rng: A random.Random object. Use this for generating random
             values in subclasses.
     """
 
-    def __init__(self) -> None:
-        """Inits the emitter with a new RNG instance."""
+    def reset(self) -> None:
+        """Reset the emitter's RNG instance."""
         self.rng = random.Random()
-
-    @staticmethod
-    def _check_choices_against_weights(num_choices: int,
-                                       num_weights: int,
-                                       noun: str = '') -> None:
-        """Validates a number of choices against a number of weights.
-
-        When calling self.rng.choices with optional weights args, it
-        will raise an error if the number of choices and number of
-        weights don't match. Use this to validate those args ahead of
-        time, such as during __init__.
-
-        Raises:
-            solrfixtures.data.exceptions.ChoicesWeightsLengthMismatch:
-                If the number of choices and weights don't match.
-        """
-        if num_choices != num_weights:
-            raise ChoicesWeightsLengthMismatch(num_choices, num_weights, noun)
 
     def seed_rngs(self, seed: Any) -> None:
         """Seeds all RNGs on this object with the given seed value.
@@ -163,138 +184,106 @@ class ChoicesEmitter(BaseRandomEmitter):
     def __init__(self,
                  items: Sequence[T],
                  weights: Optional[Sequence[Number]] = None,
-                 global_unique: bool = False,
-                 each_unique: bool = False,
+                 unique: bool = False,
                  noun: str = '') -> None:
         """Pass"""
-        super().__init__()
+        cum_weights = None
         if weights is not None:
             nchoices = len(items)
             nweights = len(weights)
             if nchoices != nweights:
                 raise ChoicesWeightsLengthMismatch(nchoices, nweights, noun)
-            if not (global_unique or each_unique):
-                weights = list(itertools.accumulate(weights))
+            cum_weights = list(itertools.accumulate(weights))
 
         self.items = items
         self.weights = weights
-        self.global_unique = global_unique
-        self.each_unique = each_unique
+        self.cum_weights = cum_weights
+        self.unique = global_unique
         self._shuffled = None
         self._shuffled_index = None
         self.reset()
 
     def reset(self) -> None:
-        if self.global_unique:
+        super().reset()
+        if self.unique:
             weights = self.weights or [1] * len(self.items)
-            shuffled = self._shuffle_weights(weights, self.items)
-            self._shuffled = sorted(shuffled, reverse=True, key=lambda x: x[0])
+            shuffled = self._shuffle_weights(self.items, weights)
+            self._shuffled = sorted(shuffled, reverse=True, key=lambda x: x[1])
             self._shuffled_index = 0
 
     def _shuffle_weights(self,
-                         weights: Sequence[Number],
-                         items: Sequence[T]) -> zip:
-        return zip((math.log(self.rng.random()) / w for w in weights), items)
+                         items: Sequence[T],
+                         weights: Sequence[Number]) -> zip:
+        # See the `_sample_items_using_weights` method for context.
+        return zip(items, (math.log(self.rng.random()) / w for w in weights))
 
     def _get_next_shuffled(self, number: int = 1) -> List[T]:
         slc_start = self._shuffled_index
         slc = self._shuffled[slc_start:slc_start+number]
         self._shuffled_index += number
-        return [item for _, item in slc]
+        return [item for item, _ in slc]
 
-    def _sample_using_weights(self, number: int = 1):
-        # I adapted this algorithm from a StackOverflow answer:
-        # https://stackoverflow.com/a/20548895. Apparently, using
-        # `log(random()) / weight` gives you a proportionally weighted
-        # random value, where reverse sorting the list by these values
-        # gives you an accurate, unbiased result for selecting N unique
-        # numbers from the population. I ran several `timeit` tests to
-        # compare the various methods for generating random weighted
-        # selections without replacement, and -- although this is the
-        # most esoteric, it's by far the most efficient.
-        #
-        # (Note that, to choose the N largest vals, using
-        # `heapq.nlargest` instead of `sorted` is faster when k is less
-        # than ~4% of the total items; otherwise, `sorted` is faster.)
-        shuffled = self._shuffle_weights(self.weights, self.items)
-        if number / len(self.items) < 0.04:
+    def _sample_items_using_weights(self,
+                                    items: Sequence[T],
+                                    weights: Sequence[Number],
+                                    number: int = 1) -> List[T]:
+        # The `random` module lacks a way to take a unique sample (i.e.
+        # select without replacement) using weights, so I adapted this
+        # from StackOverflow: https://stackoverflow.com/a/20548895,
+        # with some improvements. This is what it does.
+        # 1. Shuffle the weights, using `log(random.random()) / weight`
+        #    to create a weighted shuffle. Zipping the items and the
+        #    resulting weights is the fastest way to associate the two.
+        #    (Implemented via the `_shuffle_weights` method.)
+        # 2. Step through the new weights from largest to smallest and
+        #    return the associated items. Here, if we're returning
+        #    fewer than 4% of the total items, it's faster to use
+        #    `heapq.nlargest` instead of sorting the full list.
+        #    Otherwise, sorting the list (`sorted`) is faster.
+        shuffled = self._shuffle_weights(items, weights)
+        if number / len(items) < 0.04:
             top_n = heapq.nlargest(number, shuffled)
         else:
-            top_n = sorted(shuffled, reverse=True, key=lambda x: x[0])[:number]
-        return [item for _, item in top_n]
-        
-    def emit(self) -> T:
-        if self.global_unique:
-            return self._get_next_shuffled()[0]
+            top_n = sorted(shuffled, reverse=True, key=lambda x: x[1])[:number]
+        return [item for item, _ in top_n]
 
+    @property
+    def emits_unique_values(self) -> bool:
+        return self.unique
+
+    @property
+    def num_unique_values(self) -> int:
+        try:
+            return len(self._shuffled) - self._shuffled_index
+        except TypeError:
+            return len(self.items)
+
+    def emit(self) -> T:
+        if self.unique:
+            if not self.num_unique_values:
+                self.raise_uniqueness_violation(1)
+            return self._get_next_shuffled()[0]
+        if len(self.items) == 1:
+            return self.items[0]
         if self.weights is None:
             return self.rng.choice(self.items)
+        return self.rng.choices(self.items, cum_weights=self.cum_weights,
+                                k=1)[0]
 
-        return self.rng.choices(self.items, cum_weights=self.weights, k=1)[0]
-
-    def emit_multiple(self, number: int = 1) -> List[T]:
-        if self.global_unique:
+    def emit_multiple(self, number: int = 1, unique: bool = False) -> List[T]:
+        if self.unique:
+            if number > self.num_unique_values:
+                self.raise_uniqueness_violation(number)
             return self._get_next_shuffled(number)
-
-        if self.each_unique:
+        if len(self.items) == 1:
+            return self.items
+        if unique:
             if self.weights is None:
                 return self.rng.sample(self.items, k=number)
-            return self._sample_using_weights(number)
-
-        return self.rng.choices(self.items, cum_weights=self.weights, k=number)
-
-
-class IntEmitter(BaseRandomEmitter):
-    """Class for picking and emitting random integer values.
-
-    Attributes:
-        rng: Inherited from superclass. This is the random number
-            generator, a random.Random instance, for this emitter.
-        mn: The minimum possible random integer to pick.
-        mx: The maximum possible random integer to pick.
-        weights: (Optional.) A sequence of cumulative weights to use
-            when making the selection, to make certain integers
-            relatively more or less likely to be picked. If provided,
-            the number of weights must be equal to the total number of
-            integers that may be selected. If not provided, then no
-            weighting is applied, and all integers are equally likely.
-    """
-
-    def __init__(self,
-                 mn: int,
-                 mx: int,
-                 weights: Optional[Sequence[Number]] = None) -> None:
-        """Inits IntEmitter with mn, mx, and weights.
-
-        Note that `weights` should be *cumulative* weights, e.g.
-        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
-        weights to cumulative weights is with itertools.accumulate:
-            >>> import itertools
-            >>> weights = [70, 10, 20]
-            >>> list(itertools.accumulate(weights))
-            [70, 80, 100]
-        """
-        super().__init__()
-        if weights is not None:
-            self._check_choices_against_weights(mx - mn + 1, len(weights),
-                                                'integer')
-        self.mn = mn
-        self.mx = mx
-        self.weights = weights
-
-    def emit(self) -> int:
-        """Returns a random integer.
-
-        Object attributes control the min/max range and weighting for
-        generated values.
-        """
-        # No need to use the rng if it's a static number (mn == mx).
-        if self.mn == self.mx:
-            return self.mn
-        if self.weights is None:
-            return self.rng.randint(self.mn, self.mx)
-        return self.rng.choices(range(self.mn, self.mx + 1),
-                                cum_weights=self.weights)[0]
+            return self._sample_items_using_weights(self.items, self.weights,
+                                                    number)
+        return self.rng.choices(self.items, cum_weights=self.cum_weights,
+                                k=number)
 
 
 class StringEmitter(BaseRandomEmitter):
@@ -309,89 +298,50 @@ class StringEmitter(BaseRandomEmitter):
     Attributes:
         rng: Inherited from superclass. This is the random number
             generator, a random.Random instance, for this emitter.
-        alphabet: A sequence of characters to use when generating
-            strings.
-        alphabet_weights: (Optional.) A sequence of cumulative weights
-            controlling the chances that each alphabet character will
-            selected during string generation. The number of weights
-            must match the number of characters in `alphabet`. If not
-            provided, weighting is not used, and each character is
-            equally likely to be selected.
-        len_emitter: An `IntEmitter` object used internally to generate
-            a randomized string length for each call to `emit`. The
-            `len_mn`, `len_mx`, and `len_weights` values supplied to
-            `__init__` are used to initialize it.
+        length_emitter: A `ChoicesEmitter` instance used to generate
+            a randomized string length for each value emitted.
+        alphabet_emitter: A `ChoicesEmitter` instance used to generate
+            random alphabet characters.
     """
 
     def __init__(self,
-                 len_mn: int,
-                 len_mx: int,
-                 alphabet: Sequence[str],
-                 len_weights: Optional[Sequence[Number]] = None,
-                 alphabet_weights: Optional[Sequence[Number]] = None) -> None:
-        """Inits StringEmitter with an alphabet and len_emitter.
-
-        The `len_mn`, `len_mx`, and `len_weights` args provided to
-        __init__ are used to instantiate an `IntEmitter` that generates
-        randomized string lengths. If you need to access these values
-        later, they are stored as attributes on that object
-        (self.len_emitter).
-
-        Note that all weights should be *cumulative* weights, e.g.
-        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
-        weights to cumulative weights is with itertools.accumulate:
-            >>> import itertools
-            >>> weights = [70, 10, 20]
-            >>> list(itertools.accumulate(weights))
-            [70, 80, 100]
-
-        Args:
-            len_mn: The minimum length for generated strings.
-            len_mx: The maximum length for generated strings.
-            alphabet: See object attributes for details.
-            len_weights: (Optional.) A sequence of cumulative weights
-                controlling the chances a string will be a certain
-                length. The number of weights provided here should
-                match the total number of string length possibilities.
-                If not provided, weighting is not used, and each string
-                length has an equal chance of being selected.
-            alphabet_weights: (Optional.) See object attributes for
-                details.
-        """
+                 length_emitter: ChoicesEmitter,
+                 alphabet_emitter: ChoicesEmitter) -> None:
+        """Inits StringEmitter with a length and alphabet emitter."""
         super().__init__()
-        try:
-            self.len_emitter = IntEmitter(len_mn, len_mx, weights=len_weights)
-        except ChoicesWeightsLengthMismatch as err:
-            noun = 'string length'
-            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
-        if alphabet_weights is not None:
-            self._check_choices_against_weights(len(alphabet),
-                                                len(alphabet_weights),
-                                                'alphabet character')
-        self.alphabet = alphabet
-        self.alphabet_weights = alphabet_weights
+        self.length_emitter = length_emitter
+        self.alphabet_emitter = alphabet_emitter
+
+    def reset(self) -> None:
+        """See base class."""
+        super().reset()
+        self.length_emitter.reset()
+        self.alphabet_emitter.reset()
 
     def seed_rngs(self, seed: Any) -> None:
         """See base class."""
         super().seed_rngs(seed)
-        self.len_emitter.seed_rngs(seed)
+        self.alphabet_emitter.seed_rngs(seed)
+        self.length_emitter.seed_rngs(seed)
 
     def emit(self) -> str:
-        """Returns a str with random characters and a random length.
+        """Returns a str with random characters and a random length."""
+        return ''.join(self.alphabet_emitter(self.length_emitter()))
 
-        Object attributes control the min/max number of characters, the
-        alphabet used to generate the string, and the weighting for
-        the distribution of string lengths and characters.
-        """
-        str_length = self.len_emitter()
-        # No need to use the rng if the alphabet has one element.
-        if len(self.alphabet) == 1:
-            chosen = (self.alphabet[0] for _ in range(0, str_length))
-        else:
-            chosen = self.rng.choices(self.alphabet,
-                                      cum_weights=self.alphabet_weights,
-                                      k=str_length)
-        return ''.join(chosen)
+    @property
+    def num_unique_values(self) -> int:
+        num_unique_lengths = self.length_emitter.num_unique_values
+        return self.alphabet_emitter.num_unique_values ** num_unique_lengths
+
+    def emit_multiple(self, number: int = 1, unique: bool = False):
+        """Returns multiple strs with random chars and length."""
+        lengths = self.length_emitter(number)
+
+        if unique:
+            return []
+        return [''.join(self.alphabet_emitter(length)) for length in lengths]
+
+
 
 
 class TextEmitter(BaseRandomEmitter):
