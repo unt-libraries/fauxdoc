@@ -2,9 +2,7 @@
 from abc import ABC, abstractmethod
 import collections.abc
 import datetime
-import heapq
 import itertools
-import math
 import random
 from typing import Any, Callable, Optional, List, Sequence, Tuple, Union,\
                    TypeVar
@@ -12,7 +10,7 @@ from typing import Any, Callable, Optional, List, Sequence, Tuple, Union,\
 import pytz
 
 from .exceptions import ChoicesWeightsLengthMismatch
-from .math import time_to_seconds, seconds_to_time
+from .math import time_to_seconds, seconds_to_time, weighted_shuffle
 from solrfixtures.typing import Number, RandomStrEmitterLike,\
                                 RandomDateEmitterLike, RandomTimeEmitterLike,\
                                 TzInfoLike
@@ -74,18 +72,17 @@ class BaseEmitter(ABC):
         """
 
     @property
-    def emits_unique_values(self) -> book:
+    def emits_unique_values(self) -> bool:
         """Returns a bool; True if an instance emits unique values.
 
         We mean "unique" in terms of the lifetime of the instance, not
         a given call to `emit_multiple`. This should return True if the
-        instance is guaranteed never to return a duplicate. (In which
-        case the instance may eventually exhaust all unique values.)
+        instance is guaranteed never to return a duplicate.
         """
         return False
 
     @property
-    def num_unique_values(self) -> int:
+    def num_unique_values(self) -> Union[None, int]:
         """Returns an int, the number of unique values emittable.
 
         This number should be relative to the next `emit` or
@@ -93,10 +90,10 @@ class BaseEmitter(ABC):
         `emits_unique_values` is True, then this should return the
         number of unique values that remain at any given time.
         Otherwise, this should give the total number of unique values
-        that can be emitted (for instance if `emit_multiple` is called
-        with `unique` set to True).
+        that can be emitted. Return None if the number is effectively
+        infinite (such as with a random text emitter).
         """
-        return 0
+        return None
 
     def raise_uniqueness_violation(self, number: int) -> None:
         """Raises a ValueError indicating not enough unique values.
@@ -106,9 +103,9 @@ class BaseEmitter(ABC):
                 were requested.
         """
         raise ValueError(
-            f'Could not emit: {number} new unique value'
-            f'{' was' if number == 1 else 's were'} requested, out of '
-            f'{self.num_unique_values} possible selections.'
+            f"Could not emit: {number} new unique value"
+            f"{' was' if number == 1 else 's were'} requested, out of "
+            f"{self.num_unique_values} possible selections."
         )
 
     def __call__(self, number: int = 1) -> Union[T, List[T]]:
@@ -133,7 +130,7 @@ class BaseEmitter(ABC):
         is appropriate given your emitter class.
         """
 
-    def emit_multiple(self, number: int = 1, unique: bool = False) -> List[T]:
+    def emit_multiple(self, number: int = 1) -> List[T]:
         """Returns a list of data values.
 
         Override this in your base class, if necessary. By default this
@@ -145,8 +142,6 @@ class BaseEmitter(ABC):
         Args:
             number: (Optional.) An int for how many data values to
                 return. The default is 1.
-            unique: (Optional.) A bool; True means that each value in
-                the returned list must be unique. Default is False.
         """
         return [self.emit() for _ in range(0, number)]
 
@@ -185,67 +180,39 @@ class ChoicesEmitter(BaseRandomEmitter):
                  items: Sequence[T],
                  weights: Optional[Sequence[Number]] = None,
                  unique: bool = False,
+                 each_unique: bool = False,
                  noun: str = '') -> None:
         """Pass"""
-        cum_weights = None
-        if weights is not None:
-            nchoices = len(items)
-            nweights = len(weights)
-            if nchoices != nweights:
-                raise ChoicesWeightsLengthMismatch(nchoices, nweights, noun)
-            cum_weights = list(itertools.accumulate(weights))
-
+        self.noun = noun
         self.items = items
         self.weights = weights
-        self.cum_weights = cum_weights
-        self.unique = global_unique
+        self.cum_weights = None
+        self.unique = unique
+        self.each_unique = each_unique
         self._shuffled = None
         self._shuffled_index = None
         self.reset()
 
     def reset(self) -> None:
         super().reset()
+        if self.weights is not None:
+            nitems = len(self.items)
+            nweights = len(self.weights)
+            if nitems != nweights:
+                raise ChoicesWeightsLengthMismatch(nitems, nweights, self.noun)
+            if not (self.unique or self.each_unique):
+                self.cum_weights = list(itertools.accumulate(self.weights))
+
         if self.unique:
             weights = self.weights or [1] * len(self.items)
-            shuffled = self._shuffle_weights(self.items, weights)
-            self._shuffled = sorted(shuffled, reverse=True, key=lambda x: x[1])
+            self._shuffled = weighted_shuffle(self.items, weights, self.rng)
             self._shuffled_index = 0
-
-    def _shuffle_weights(self,
-                         items: Sequence[T],
-                         weights: Sequence[Number]) -> zip:
-        # See the `_sample_items_using_weights` method for context.
-        return zip(items, (math.log(self.rng.random()) / w for w in weights))
 
     def _get_next_shuffled(self, number: int = 1) -> List[T]:
         slc_start = self._shuffled_index
         slc = self._shuffled[slc_start:slc_start+number]
         self._shuffled_index += number
-        return [item for item, _ in slc]
-
-    def _sample_items_using_weights(self,
-                                    items: Sequence[T],
-                                    weights: Sequence[Number],
-                                    number: int = 1) -> List[T]:
-        # The `random` module lacks a way to take a unique sample (i.e.
-        # select without replacement) using weights, so I adapted this
-        # from StackOverflow: https://stackoverflow.com/a/20548895,
-        # with some improvements. This is what it does.
-        # 1. Shuffle the weights, using `log(random.random()) / weight`
-        #    to create a weighted shuffle. Zipping the items and the
-        #    resulting weights is the fastest way to associate the two.
-        #    (Implemented via the `_shuffle_weights` method.)
-        # 2. Step through the new weights from largest to smallest and
-        #    return the associated items. Here, if we're returning
-        #    fewer than 4% of the total items, it's faster to use
-        #    `heapq.nlargest` instead of sorting the full list.
-        #    Otherwise, sorting the list (`sorted`) is faster.
-        shuffled = self._shuffle_weights(items, weights)
-        if number / len(items) < 0.04:
-            top_n = heapq.nlargest(number, shuffled)
-        else:
-            top_n = sorted(shuffled, reverse=True, key=lambda x: x[1])[:number]
-        return [item for item, _ in top_n]
+        return slc
 
     @property
     def emits_unique_values(self) -> bool:
@@ -270,18 +237,17 @@ class ChoicesEmitter(BaseRandomEmitter):
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=1)[0]
 
-    def emit_multiple(self, number: int = 1, unique: bool = False) -> List[T]:
-        if self.unique:
+    def emit_multiple(self, number: int = 1) -> List[T]:
+        if self.unique or self.each_unique:
             if number > self.num_unique_values:
                 self.raise_uniqueness_violation(number)
-            return self._get_next_shuffled(number)
-        if len(self.items) == 1:
-            return self.items
-        if unique:
+            if self.unique:
+                return self._get_next_shuffled(number)
             if self.weights is None:
                 return self.rng.sample(self.items, k=number)
-            return self._sample_items_using_weights(self.items, self.weights,
-                                                    number)
+            return weighted_shuffle(self.items, self.weights, self.rng, number)
+        if len(self.items) == 1:
+            return self.items * number
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=number)
 
@@ -333,15 +299,10 @@ class StringEmitter(BaseRandomEmitter):
         num_unique_lengths = self.length_emitter.num_unique_values
         return self.alphabet_emitter.num_unique_values ** num_unique_lengths
 
-    def emit_multiple(self, number: int = 1, unique: bool = False):
+    def emit_multiple(self, number: int = 1):
         """Returns multiple strs with random chars and length."""
         lengths = self.length_emitter(number)
-
-        if unique:
-            return []
         return [''.join(self.alphabet_emitter(length)) for length in lengths]
-
-
 
 
 class TextEmitter(BaseRandomEmitter):

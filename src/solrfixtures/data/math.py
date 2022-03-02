@@ -1,10 +1,10 @@
 """Contains math utility functions used in the data module."""
 import datetime
-import heapq
 import math
 import random
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
+from .exceptions import ChoicesWeightsLengthMismatch
 from solrfixtures.typing import Number, T
 
 
@@ -113,3 +113,68 @@ def seconds_to_time(seconds: int) -> datetime.time:
     minute = int(minute_seconds / 60)
     second = minute_seconds % 60
     return datetime.time(hour, minute, second)
+
+
+def weighted_shuffle(items: Sequence[T],
+                     weights: Sequence[Number],
+                     rng: Optional[random.Random] = random.Random(),
+                     number: Optional[int] = None) -> List[T]:
+    """Returns a list of items randomly shuffled based on weights.
+
+    Use this if you need a unique random sample (i.e., select
+    without replacement) using weights. The built-in `random` module
+    lacks this as of Python 3.10, and I don't really want numpy as a
+    dependency.
+
+    Args:
+        items: Any sequence of items you wish to randomize.
+        weights: A sequence of weights, one per item. Note these should
+            NOT be cumulative weights.
+        rng: (Optional.) A `random.Random` instance to use as the RNG.
+            Defaults to a new instance.
+        number: (Optional.) The number of items you need. Defaults to
+            the full length of `items`.
+    """
+    def _faster_for_low_k(items, weights, rng, k):
+        # I adapted this from https://stackoverflow.com/a/43649323.
+        # It is surprisingly fast for lower values of k.
+        weights = list(weights)
+        positions = range(len(items))
+        sample = []
+        while True:
+            needed = k - len(sample)
+            if not needed:
+                break
+            # Note that using random.choices *does* select duplicates.
+            # Checking weights[i] for each ensures we don't add the
+            # duplicates to our sample. Zeroing out the weights of
+            # selected items at each iteration ensures they are not
+            # reselected. 
+            for i in rng.choices(positions, weights, k=needed):
+                if weights[i]:
+                    weights[i] = 0.0
+                    sample.append(items[i])
+        return sample
+
+    def _faster_for_high_k(items, weights, rng, k):
+        # I adapted this from https://stackoverflow.com/a/20548895.
+        # First we create a score for each item based on weight.
+        scores = zip((math.log(rng.random()) / w for w in weights), items)
+
+        # To pick the highest scoring k items, reverse sorting is much
+        # faster than using heapq.nlargest, given we're using this for
+        # higher k values.
+        top_n = sorted(scores, reverse=True, key=lambda x: x[0])[:k]
+        return [item for _, item in top_n]
+
+    nitems = len(items)
+    nweights = len(weights)
+    number = nitems if number is None else number
+    if nitems != nweights:
+        raise ChoicesWeightsLengthMismatch(nitems, nweights)
+
+    # k == ~42% of the total number of items is the threshold where the
+    # second method becomes faster than the first.
+    if number <= nitems * 0.42:
+        return _faster_for_low_k(items, weights, rng, number)
+    return _faster_for_high_k(items, weights, rng, number)

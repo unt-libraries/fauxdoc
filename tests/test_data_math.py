@@ -1,10 +1,12 @@
 """Contains tests for the solrfixtures data.math module."""
 
 import datetime
+import random
 
 import pytest
 
 from solrfixtures.data import math as m
+from solrfixtures.data import exceptions as ex
 
 
 @pytest.mark.parametrize('x, mu, expected', [
@@ -95,3 +97,48 @@ def test_time_to_seconds(time, expected):
 ])
 def test_seconds_to_time(seconds, expected):
     assert m.seconds_to_time(seconds) == datetime.time(*expected)
+
+
+@pytest.mark.parametrize('seed, items, weights, k, expected', [
+    (999, range(6), [10, 5, 5, 5, 5, 1], None,
+     [[0, 2, 3, 4, 1, 5], [5, 0, 3, 2, 1, 4], [3, 2, 5, 0, 1, 4],
+      [0, 2, 1, 3, 4, 5], [0, 3, 5, 1, 2, 4], [1, 4, 0, 3, 2, 5],
+      [0, 2, 1, 5, 3, 4], [1, 3, 0, 5, 2, 4], [2, 0, 3, 4, 1, 5],
+      [0, 2, 3, 4, 1, 5]]),
+    (999, range(100), [20]*25 + [10]*25 + [5]*25 + [1]*25, 6,
+     [[45, 3, 57, 26, 22, 5], [46, 14, 52, 4, 94, 8], [11, 26, 38, 58, 86, 9],
+      [31, 3, 1, 9, 74, 22], [8, 35, 7, 59, 24, 66], [20, 37, 42, 5, 33, 44],
+      [10, 5, 51, 46, 12, 23], [1, 44, 20, 4, 64, 24], [7, 10, 46, 9, 23, 12],
+      [11, 28, 54, 60, 95, 1]]),
+    (999, range(2), [75, 25], 1,
+     [[0], [0], [0], [0], [0], [1], [0], [0], [1], [0], [0], [0], [0], [1],
+      [1], [1], [0], [0], [0], [0], [1], [1], [0], [1], [0], [0], [0], [0],
+      [0], [0], [0], [0], [0], [1], [0], [0], [0], [1], [1], [0], [0], [1],
+      [1], [1], [0], [1], [0], [0], [0], [1]]),
+    (999, range(10), [71, 21] + [1] * 8, 2,
+     [[1, 0], [1, 0], [0, 4], [0, 1], [1, 0], [9, 0], [0, 1], [0, 1], [8, 0],
+      [0, 1], [0, 6], [0, 1], [0, 1], [0, 2], [0, 2], [0, 1], [1, 0], [0, 1],
+      [0, 1], [0, 1], [1, 0], [0, 1], [0, 1], [1, 0], [0, 1], [0, 1], [1, 9],
+      [0, 3], [0, 1], [8, 0], [0, 3], [0, 7], [0, 3], [2, 0], [0, 4], [0, 1],
+      [1, 0], [0, 9], [0, 1], [0, 9], [1, 0], [6, 0], [0, 1], [1, 0], [0, 1],
+      [0, 1], [0, 1], [1, 2], [1, 0], [1, 0]]),
+    (999, ['heads', 'tails'], [25, 75], 1,
+     [['heads'], ['heads'], ['tails'], ['heads'], ['tails'], ['tails'],
+      ['tails'], ['tails'], ['tails'], ['heads']])
+])
+def test_weighted_shuffle(seed, items, weights, k, expected):
+    rng = random.Random(seed)
+    result = [m.weighted_shuffle(items, weights, rng, k) for _ in expected] 
+    assert result == expected
+
+
+@pytest.mark.parametrize('items, weights', [
+    (range(3), []),
+    (range(3), [10, 5]),
+    (range(3), [10, 5, 5, 5])
+])
+def test_weighted_shuffle_raises_error_mismatched_weights(items, weights):
+    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
+        m.weighted_shuffle(items, weights)
+    assert excinfo.value.num_choices == len(items)
+    assert excinfo.value.num_weights == len(weights)
