@@ -11,9 +11,9 @@ import pytz
 
 from .exceptions import ChoicesWeightsLengthMismatch
 from .math import time_to_seconds, seconds_to_time, weighted_shuffle
-from solrfixtures.typing import Number, RandomStrEmitterLike,\
-                                RandomDateEmitterLike, RandomTimeEmitterLike,\
-                                TzInfoLike
+from solrfixtures.typing import Number, RandomIntEmitterLike,\
+                                RandomStrEmitterLike, RandomDateEmitterLike,\
+                                RandomTimeEmitterLike, TzInfoLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
@@ -46,11 +46,12 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
 
 
 class BaseEmitter(ABC):
-    """Simple abstract base class for defining emitter objects.
+    """Abstract base class for defining emitter objects.
 
-    Subclass this to implement an emitter object. At this level all we
-    require is an `emit` method. Use `__init__` to configure whatever
-    options your emitter may need.
+    Subclass this to implement an emitter object. At this level all you
+    are required to override is the `emit` method, but you should also
+    look at `reset`, `emits_unique_values`, and `num_unique_values`.
+    Use `__init__` to configure whatever options your emitter may need.
 
     The `__call__` method wraps `emit` so you can emit data values
     simply by calling the object.
@@ -58,17 +59,13 @@ class BaseEmitter(ABC):
 
     T = TypeVar('T')
 
-    def __init__(self) -> None:
-        """Inits the BaseEmitter instance."""
-        self.reset()
-
     def reset(self) -> None:
         """Resets state on this object.
 
         Override this in your subclass if your emitter stores state
         changes that may need to be reset to their initial values. (The
-        subclass is responsible for tracking the initial values.) By
-        default this is a no-op.
+        subclass is responsible for tracking state, of course.) This is
+        a no-op by default.
         """
 
     @property
@@ -77,7 +74,8 @@ class BaseEmitter(ABC):
 
         We mean "unique" in terms of the lifetime of the instance, not
         a given call to `emit_multiple`. This should return True if the
-        instance is guaranteed never to return a duplicate.
+        instance is guaranteed never to return a duplicate until it is
+        reset.
         """
         return False
 
@@ -85,13 +83,13 @@ class BaseEmitter(ABC):
     def num_unique_values(self) -> Union[None, int]:
         """Returns an int, the number of unique values emittable.
 
-        This number should be relative to the next `emit` or
-        `emit_multiple` call. If your instance is one where
-        `emits_unique_values` is True, then this should return the
-        number of unique values that remain at any given time.
-        Otherwise, this should give the total number of unique values
-        that can be emitted. Return None if the number is effectively
-        infinite (such as with a random text emitter).
+        This number should be relative to the next `emit` call. If your
+        instance is one where `emits_unique_values` is True, then this
+        should return the number of unique values that remain at any
+        given time. Otherwise, this should give the total number of
+        unique values that can be emitted. Return None if the number is
+        so high as to be effectively infinite (such as with a random
+        text emitter).
         """
         return None
 
@@ -108,42 +106,41 @@ class BaseEmitter(ABC):
             f"{self.num_unique_values} possible selections."
         )
 
-    def __call__(self, number: int = 1) -> Union[T, List[T]]:
-        """Wraps the `self.emit` method so that this obj is callable.
+    def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
+        """Wraps the `emit` method so that this obj is callable.
+
+        You can control whether you get a single value or a list of
+        values via the `number` arg. E.g.:
+            >>> some_emitter()
+            'a val'
+            >>> some_emitter(1)
+            ['a val']
+            >>> some_emitter(2)
+            ['a val', 'another val']
 
         Args:
             number: (Optional.) How many data values to emit. Default
-                is 1.
+                is None, which causes us to return a single value
+                instead of a list.
 
         Returns:
-            If `number` is 1, then it returns one data value by calling
-            `emit`. If `number` > 1, then it returns a list of data
-            values by calling `emit_multiple`.
+            One emitted value if `number` is None, or a list of
+            emitted values if `number` is an int.
         """
-        return self.emit() if number == 1 else self.emit_multiple(number)
+        if number is None:
+            return self.emit(1)[0]
+        return self.emit(number)
 
     @abstractmethod
-    def emit(self) -> T:
-        """Returns one data value.
-
-        Override this in your subclass. It should return whatever value
-        is appropriate given your emitter class.
-        """
-
-    def emit_multiple(self, number: int = 1) -> List[T]:
+    def emit(self, number: int) -> List[T]:
         """Returns a list of data values.
 
-        Override this in your base class, if necessary. By default this
-        just calls `emit` `number` times, but sometimes there are more
-        performant ways of repeating your `emit` method. (E.g.: If you
-        use `random.choices`, passing a `k` value to choose multiple
-        items is much faster than repeating the call.)
+        You must override this in your subclass. It should return a
+        list of generated data values.
 
         Args:
-            number: (Optional.) An int for how many data values to
-                return. The default is 1.
+            number: An int; how many values to return.
         """
-        return [self.emit() for _ in range(0, number)]
 
 
 class BaseRandomEmitter(BaseEmitter):
@@ -151,12 +148,18 @@ class BaseRandomEmitter(BaseEmitter):
 
     Subclass this to implement an emitter object that uses randomized
     values. In your subclass, instead of calling the `random` module
-    directly, use the `rng` attribute.
+    directly, use the `rng` attribute. Override the `seed_rngs` method
+    if you have an emitter composed of multiple BaseRandomEmitters and
+    need to seed multiple RNGs at once.
 
     Attributes:
         rng: A random.Random object. Use this for generating random
             values in subclasses.
     """
+
+    def __init__(self) -> None:
+        """Inits a BaseRandomEmitter."""
+        self.reset()
 
     def reset(self) -> None:
         """Reset the emitter's RNG instance."""
@@ -173,6 +176,42 @@ class BaseRandomEmitter(BaseEmitter):
 
 
 class ChoicesEmitter(BaseRandomEmitter):
+    """Class for making random selections, optionally with weighting.
+
+    This covers any kind of random choice and implements the most
+    efficient algorithm available: choices with or without weights and
+    choices with or without replacement (i.e. "unique" or not). You
+    should use this to implement random selection within any kind of
+    range; e.g. the random selection here is more efficient than
+    random.randint.
+
+    Note that "uniqueness" is NOT based on value. Your sequence of
+    items may contain duplicate values; uniqueness just means that each
+    item is only selected once. E.g., with the sequence ['H', 'H', 'T']
+    -- in a "unique" selection, the value 'H' may appear twice.
+
+    Attributes:
+        rng: Random Number Generator, inherited from superclass.
+        items: A sequence of values you wish to choose from.
+        weights: (Optional.) A sequence of weights, one per item, for
+            controlling the probability of selections. This *must* be
+            the same length as `items`. Weights should *not* be
+            cumulative. Default is None.
+        cum_weights: (Optional.) Cumulative weights are calculated from
+            `weights`, if provided.
+        unique: (Optional.) A bool value, True if selections must be
+            unique until all items are exhausted or the emitter is
+            reset. Default is False.
+        each_unique: (Optional.) A bool value; True if each selection
+            requesting multiple items at once must have unique values
+            but values may be reused for each such selection. Default
+            is False. If `unique` is True, each multiple-item selection
+            is already guaranteed to be unique.
+        noun: (Optional.) A string representing a singular noun or
+            noun-phrase that describes what each item is. Used in
+            raising a more informative error if weights and items don't
+            match. Default is an empty string.
+    """
 
     T = TypeVar('T')
 
@@ -182,18 +221,33 @@ class ChoicesEmitter(BaseRandomEmitter):
                  unique: bool = False,
                  each_unique: bool = False,
                  noun: str = '') -> None:
-        """Pass"""
-        self.noun = noun
+        """Inits a ChoicesEmitter with items, weights, and settings.
+
+        Args:
+            items: See `items` attribute.
+            weights: (Optional.) See `weights` attribute.
+            unique: (Optional.) See `unique` attribute.
+            each_unique: (Optional.) See `each_unique` attribute.
+            noun: (Optional.) See `noun` attribute.
+        """
         self.items = items
         self.weights = weights
         self.cum_weights = None
         self.unique = unique
         self.each_unique = each_unique
+        self.noun = noun
         self._shuffled = None
         self._shuffled_index = None
         self.reset()
 
     def reset(self) -> None:
+        """Reset state and calculated attributes.
+
+        If `unique` is True, this resets the emitter so that it loses
+        track of what has already been emitted.
+
+        It also resets `cum_weights`.
+        """
         super().reset()
         if self.weights is not None:
             nitems = len(self.items)
@@ -204,6 +258,10 @@ class ChoicesEmitter(BaseRandomEmitter):
                 self.cum_weights = list(itertools.accumulate(self.weights))
 
         if self.unique:
+            # For globally unique emitters (with replacement), it's
+            # most efficient to pre-shuffle the items ONCE. Then you
+            # just return the values in shuffled order as they're
+            # requested. Resetting regenerates this shuffle.
             weights = self.weights or [1] * len(self.items)
             self._shuffled = weighted_shuffle(self.items, weights, self.rng)
             self._shuffled_index = 0
@@ -216,38 +274,52 @@ class ChoicesEmitter(BaseRandomEmitter):
 
     @property
     def emits_unique_values(self) -> bool:
+        """Returns True if this emitter only emits unique values."""
         return self.unique
 
     @property
     def num_unique_values(self) -> int:
+        """Returns the remaining number of unique values to be emitted.
+
+        Use this to sanity-check an `emit` call, if any uniqueness is
+        required. If `self.unique` is True, then this gives you how
+        many items remain to be selected. Otherwise, it gives you the
+        total number of unique items to be selected.
+        """
         try:
             return len(self._shuffled) - self._shuffled_index
         except TypeError:
             return len(self.items)
 
-    def emit(self) -> T:
-        if self.unique:
-            if not self.num_unique_values:
-                self.raise_uniqueness_violation(1)
-            return self._get_next_shuffled()[0]
-        if len(self.items) == 1:
-            return self.items[0]
-        if self.weights is None:
-            return self.rng.choice(self.items)
-        return self.rng.choices(self.items, cum_weights=self.cum_weights,
-                                k=1)[0]
+    def emit(self, number: int) -> List[T]:
+        """Returns a list of randomly chosen items.
 
-    def emit_multiple(self, number: int = 1) -> List[T]:
+        This uses the most efficient selection method possible given
+        the emitter configuration and checks to ensure there are enough
+        unique values available if `self.unique` or `self.each_unique`
+        is True.
+
+        Args:
+            number: An int; how many items you want to choose.
+        """
         if self.unique or self.each_unique:
             if number > self.num_unique_values:
                 self.raise_uniqueness_violation(number)
             if self.unique:
+                # Global no replacement, with/without weights.
                 return self._get_next_shuffled(number)
             if self.weights is None:
+                # Local no replacement, without weights.
                 return self.rng.sample(self.items, k=number)
+            # Local no replacement, with weights.
             return weighted_shuffle(self.items, self.weights, self.rng, number)
+        # With replacement, with/without weights.
         if len(self.items) == 1:
+            # No choice here.
             return self.items * number
+        if self.weights is None and number == 1:
+            # `choice` is faster if we just need 1.
+            return [self.rng.choice(self.items)]
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=number)
 
@@ -255,54 +327,73 @@ class ChoicesEmitter(BaseRandomEmitter):
 class StringEmitter(BaseRandomEmitter):
     """Class for emitting random string values.
 
-    Strings that are emitted have a random length between a
-    configurable minimum and maximum number of characters, with
-    optional weighting for choosing a string length. Characters are
-    randomly selected from a provided alphabet, with optional weighting
-    for selecting characters.
+    Strings that are emitted have a random variable length and
+    characters randomly selected from an alphabet. Each of these
+    types of choices are implemented via ChoicesEmitter objects that
+    you pass to __init__.
 
     Attributes:
-        rng: Inherited from superclass. This is the random number
-            generator, a random.Random instance, for this emitter.
-        length_emitter: A `ChoicesEmitter` instance used to generate
-            a randomized string length for each value emitted.
-        alphabet_emitter: A `ChoicesEmitter` instance used to generate
-            random alphabet characters.
+        rng: Random Number Generator, inherited from superclass.
+        length_emitter: A `BaseRandomEmitter`-like instance that emits
+            integers, used to generate a randomized length for each
+            emitted string.
+        alphabet_emitter: A `BaseRandomEmitter`-like instance that
+            emits chars (strings), used to generate each character for
+            each emitted string.
     """
 
     def __init__(self,
-                 length_emitter: ChoicesEmitter,
-                 alphabet_emitter: ChoicesEmitter) -> None:
-        """Inits StringEmitter with a length and alphabet emitter."""
-        super().__init__()
+                 length_emitter: RandomIntEmitterLike,
+                 alphabet_emitter: RandomStrEmitterLike) -> None:
+        """Inits StringEmitter with a length and alphabet emitter.
+
+        Args:
+            length_emitter: See `length_emitter` attribute.
+            alphabet_emitter: See `alphabet_emitter` attribute.
+        """
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
+        self.reset()
 
     def reset(self) -> None:
-        """See base class."""
+        """See superclass."""
         super().reset()
         self.length_emitter.reset()
         self.alphabet_emitter.reset()
 
     def seed_rngs(self, seed: Any) -> None:
-        """See base class."""
+        """See superclass."""
         super().seed_rngs(seed)
         self.alphabet_emitter.seed_rngs(seed)
         self.length_emitter.seed_rngs(seed)
 
-    def emit(self) -> str:
-        """Returns a str with random characters and a random length."""
-        return ''.join(self.alphabet_emitter(self.length_emitter()))
-
     @property
     def num_unique_values(self) -> int:
-        num_unique_lengths = self.length_emitter.num_unique_values
-        return self.alphabet_emitter.num_unique_values ** num_unique_lengths
+        """Returns the max number of unique strs this emitter produces."""
+        nlengths = self.length_emitter.num_unique_values
+        nchars = self.alphabet_emitter.num_unique_values
+        return sum([nchars ** i for i in range(1, nlengths + 1)])
 
-    def emit_multiple(self, number: int = 1):
-        """Returns multiple strs with random chars and length."""
+    def emit(self, number: int) -> List[str]:
+        """Returns multiple strs with random chars and length.
+
+        Args:
+            number: An int; how many strings to return.
+        """
+        if number == 1:
+            # This is faster if we just need 1.
+            return [''.join(self.alphabet_emitter(self.length_emitter()))]
+
+        # Generating all the characters at once and then partitioning
+        # them into words is faster than generating each separate word.
         lengths = self.length_emitter(number)
-        return [''.join(self.alphabet_emitter(length)) for length in lengths]
+        chars = self.alphabet_emitter(sum(lengths))
+        words = []
+        start = 0
+        for length in lengths:
+            words.append(''.join(chars[start:start+length]))
+            start = length
+        return words 
 
 
 class TextEmitter(BaseRandomEmitter):
@@ -311,105 +402,66 @@ class TextEmitter(BaseRandomEmitter):
     "Text" in this case is defined very basically as a string of words,
     each of which is separated by a separator character or string. Text
     that this emitter produces is not formed into sentences, but you
-    can use `word_sep_emitter` to produce internal punctuation.
+    can use `sep_emitter` to produce internal punctuation.
 
     Attributes:
-        numwords_emitter: An `IntEmitter` object used internally to
-            generate a randomized number of words for each call to
-            `emit`. The `numwords_mn`, `numwords_mx`, and
-            `numwords_weights` values supplied to `__init__` are used
-            to initialize it.
-        word_emitter: A callable that takes no args and generates a
-            word (str value) when called. E.g., each call to
-            `word_emitter` generates a new word to use in the
-            `TextEmitter.emit` return value. *If your callable
-            generates words randomly, then it should be
-            RandomEmitter-like, in that any RNGs should be localized
-            (such as local random.Random instances), and it should have
-            a `seed_rngs` method that takes a seed value and seeds all
-            local RNGs.*
-        word_sep_emitter: (Optional.) A callable that takes no args and
-            generates a word separator (str value) when called. E.g.,
-            each call to `word_sep_emitter` generates the next word
-            separator to use in the `TextEmitter.emit` return value. If
-            not provided, we default to using a static space (' ')
-            separator value. *As with `word_emitter`, if your callable
-            generates values randomly, it should be RandomEmitter-like,
-            as described.*
+        rng: Random Number Generator, inherited from superclass.
+        numwords_emitter: A `BaseRandomEmitter`-like instance that
+            emits integers. Used to generate the number of words for
+            each emitted text value.
+        word_emitter: A `BaseRandomEmitter`-like instance that emits
+            words (strings.) Used to generate the list of words for
+            each emitted text value.
+        sep_emitter: (Optional.) A `BaseRandomEmitter`-like instance
+            that emits word separator character strings, used to
+            generate the characters between words. If not provided,
+            words are separated by a space (' ') value.
     """
 
-    TextPartType = Union[RandomStrEmitterLike, Callable[[], str]]
-
     def __init__(self,
-                 word_emitter: TextPartType,
-                 numwords_mn: int,
-                 numwords_mx: int,
-                 numwords_weights: Optional[Sequence[Number]] = None,
-                 word_sep_emitter: Optional[TextPartType] = None) -> None:
+                 numwords_emitter: RandomIntEmitterLike,
+                 word_emitter: RandomStrEmitterLike,
+                 sep_emitter: Optional[RandomStrEmitterLike] = None) -> None:
         """Inits TextEmitter with word, separator, and text settings.
 
-        The `numwords_mn`, `numwords_mx`, and `numwords_weights` args
-        provided to __init__ are used to instantiate an `IntEmitter`
-        that generates randomized text lengths, in numbers of words.
-        If you need to access these values later, they are stored as
-        attributes on that object (self.numwords_emitter).
-
-        Note that all weights should be *cumulative* weights, e.g.
-        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
-        weights to cumulative weights is with itertools.accumulate:
-            >>> import itertools
-            >>> weights = [70, 10, 20]
-            >>> list(itertools.accumulate(weights))
-            [70, 80, 100]
-
         Args:
-            word_emitter: See object attributes for details.
-            numwords_mn: The minimum number of words in the generated
-                text.
-            numwords_mx: The maximum number of words in the generated
-                text.
-            numwords_weights: (Optional.) A sequence of cumulative
-                weights controlling the chances a text value will be a
-                certain number of words. The number of weights provided
-                here should match the total number of text length
-                possibilities. If not provided, weighting is not used,
-                and each length has an equal chance of being selected.
-            word_sep_emitter: (Optional.) See object attributes for
-                details.
+            numword_emitter: See `numword_emitter` attribute.
+            word_emitter: See `word_emitter` attribute.
+            sep_emitter: (Optional.) See `sep_emitter` attribute.
         """
-        super().__init__()
-        try:
-            self.numwords_emitter = IntEmitter(numwords_mn, numwords_mx,
-                                               weights=numwords_weights)
-        except ChoicesWeightsLengthMismatch as err:
-            noun = 'text length'
-            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
+        self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
-        self.word_sep_emitter = word_sep_emitter
+        self.sep_emitter = sep_emitter
+
+    def reset(self) -> None:
+        """See superclass."""
+        self.numwords_emitter.reset()
+        self.word_emitter.reset()
+        if self.sep_emitter is not None:
+            self.sep_emitter.reset()
 
     def seed_rngs(self, seed: Any) -> None:
-        """See base class."""
+        """See superclass."""
         self.numwords_emitter.seed_rngs(seed)
-        try:
-            self.word_emitter.seed_rngs(seed)
-        except AttributeError:
-            pass
-        try:
-            self.word_sep_emitter.seed_rngs(seed)
-        except AttributeError:
-            pass
+        self.word_emitter.seed_rngs(seed)
+        if self.sep_emitter is not None:
+            self.sep_emitter.seed_rngs(seed)
 
-    def emit(self) -> str:
+    def emit(self, number: int) -> List[str]:
         """Returns a text string with a random number of words.
 
-        Object attributes control word selection, the min/max number of
-        words, and what word separators are used.
+        Args:
+            number: An int; how many text strings to return.
         """
-        numwords = self.numwords_emitter()
-        words = (self.word_emitter() for _ in range(0, numwords))
+        numwords = self.numwords_emitter(number)
+        total_words = sum(numwords)
+        all_words = self.word_emitter(total_words)
+        try:
+            all_seps = self.sep_emitter(total_words - number)
+        except TypeError:
+            all_seps = [' '] * (total_words - number)
 
-        if self.word_sep_emitter is None:
-            return ' '.join(words)
+        # TO-DO: Finish the algorithm for compiling texts from words.
 
         separators = (self.word_sep_emitter() for _ in range(0, numwords - 1))
         text_iterable = itertools.zip_longest(words, separators, fillvalue='')
