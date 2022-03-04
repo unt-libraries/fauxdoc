@@ -26,24 +26,24 @@ class EmitterLike(Protocol):
         ...
 
 
-class RandomEmitterLike(EmitterLike, Protocol):
-    """Is like a data.emitter.BaseRandomEmitter object."""
-
-    def seed_rngs(self, seed: Any) -> None:
-        ...
-
-
-class RandomIntEmitterLike(RandomEmitterLike, Protocol):
-    """Is like a data.emitter.IntEmitter object."""
+class IntEmitterLike(EmitterLike, Protocol):
+    """A data.emitter.BaseEmitter-like object that emits integers."""
 
     def __call__(self, number: Optional[int] = None) -> Sequence[int]:
         ...
 
 
-class RandomStrEmitterLike(RandomEmitterLike, Protocol):
-    """Is like a data.emitter.StrEmitter object."""
+class StrEmitterLike(EmitterLike, Protocol):
+    """A data.emitter.BaseEmitter-like object that emits strings."""
 
     def __call__(self, number: Optional[int] = None) -> Sequence[str]:
+        ...
+
+
+class RandomEmitterLike(EmitterLike, Protocol):
+    """Is like a data.emitter.BaseRandomEmitter object."""
+
+    def seed_rngs(self, seed: Any) -> None:
         ...
 
 

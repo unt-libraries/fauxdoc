@@ -11,9 +11,9 @@ import pytz
 
 from .exceptions import ChoicesWeightsLengthMismatch
 from .math import time_to_seconds, seconds_to_time, weighted_shuffle
-from solrfixtures.typing import Number, RandomIntEmitterLike,\
-                                RandomStrEmitterLike, RandomDateEmitterLike,\
-                                RandomTimeEmitterLike, TzInfoLike
+from solrfixtures.typing import Number, IntEmitterLike, StrEmitterLike,\
+                                RandomDateEmitterLike, RandomTimeEmitterLike,\
+                                TzInfoLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
@@ -324,28 +324,27 @@ class ChoicesEmitter(BaseRandomEmitter):
                                 k=number)
 
 
-class StringEmitter(BaseRandomEmitter):
-    """Class for emitting random string values.
+class WordEmitter(BaseRandomEmitter):
+    """Class for generating and emitting randomized words.
 
-    Strings that are emitted have a random variable length and
-    characters randomly selected from an alphabet. Each of these
-    types of choices are implemented via ChoicesEmitter objects that
-    you pass to __init__.
+    Words that are emitted have a random variable length and characters
+    randomly selected from an alphabet. Each of these dimensions is
+    implemented via emitters that you pass to __init__.
 
     Attributes:
         rng: Random Number Generator, inherited from superclass.
-        length_emitter: A `BaseRandomEmitter`-like instance that emits
+        length_emitter: A `BaseEmitter`-like instance that emits
             integers, used to generate a randomized length for each
             emitted string.
-        alphabet_emitter: A `BaseRandomEmitter`-like instance that
-            emits chars (strings), used to generate each character for
+        alphabet_emitter: A `BaseEmitter`-like instance that emits
+            characters (strings), used to generate each character for
             each emitted string.
     """
 
     def __init__(self,
-                 length_emitter: RandomIntEmitterLike,
-                 alphabet_emitter: RandomStrEmitterLike) -> None:
-        """Inits StringEmitter with a length and alphabet emitter.
+                 length_emitter: IntEmitterLike,
+                 alphabet_emitter: StrEmitterLike) -> None:
+        """Inits WordEmitter with a length and alphabet emitter.
 
         Args:
             length_emitter: See `length_emitter` attribute.
@@ -364,8 +363,14 @@ class StringEmitter(BaseRandomEmitter):
     def seed_rngs(self, seed: Any) -> None:
         """See superclass."""
         super().seed_rngs(seed)
-        self.alphabet_emitter.seed_rngs(seed)
-        self.length_emitter.seed_rngs(seed)
+        try:
+            self.alphabet_emitter.seed_rngs(seed)
+        except AttributeError:
+            pass
+        try:
+            self.length_emitter.seed_rngs(seed)
+        except AttributeError:
+            pass
 
     @property
     def num_unique_values(self) -> int:
@@ -389,10 +394,10 @@ class StringEmitter(BaseRandomEmitter):
         lengths = self.length_emitter(number)
         chars = self.alphabet_emitter(sum(lengths))
         words = []
-        start = 0
+        char_index = 0
         for length in lengths:
-            words.append(''.join(chars[start:start+length]))
-            start = length
+            words.append(''.join(chars[char_index:char_index+length]))
+            char_index += length
         return words 
 
 
@@ -419,9 +424,9 @@ class TextEmitter(BaseRandomEmitter):
     """
 
     def __init__(self,
-                 numwords_emitter: RandomIntEmitterLike,
-                 word_emitter: RandomStrEmitterLike,
-                 sep_emitter: Optional[RandomStrEmitterLike] = None) -> None:
+                 numwords_emitter: IntEmitterLike,
+                 word_emitter: StrEmitterLike,
+                 sep_emitter: Optional[StrEmitterLike] = None) -> None:
         """Inits TextEmitter with word, separator, and text settings.
 
         Args:
@@ -437,15 +442,18 @@ class TextEmitter(BaseRandomEmitter):
         """See superclass."""
         self.numwords_emitter.reset()
         self.word_emitter.reset()
-        if self.sep_emitter is not None:
+        try:
             self.sep_emitter.reset()
+        except AttributeError:
+            pass
 
     def seed_rngs(self, seed: Any) -> None:
         """See superclass."""
-        self.numwords_emitter.seed_rngs(seed)
-        self.word_emitter.seed_rngs(seed)
-        if self.sep_emitter is not None:
-            self.sep_emitter.seed_rngs(seed)
+        for attr in ('numwords_emitter', 'word_emitter', 'sep_emitter'):
+            try:
+                getattr(self, attr).seed_rngs(seed)
+            except AttributeError:
+                pass
 
     def emit(self, number: int) -> List[str]:
         """Returns a text string with a random number of words.
@@ -453,27 +461,28 @@ class TextEmitter(BaseRandomEmitter):
         Args:
             number: An int; how many text strings to return.
         """
-        numwords = self.numwords_emitter(number)
-        total_words = sum(numwords)
-        all_words = self.word_emitter(total_words)
+        texts = []
+        lengths = self.numwords_emitter(number)
+        total_words = sum(lengths)
+        words = (word for word in self.word_emitter(total_words))
         try:
-            all_seps = self.sep_emitter(total_words - number)
+            seps = (sep for sep in self.sep_emitter(total_words - number))
         except TypeError:
-            all_seps = [' '] * (total_words - number)
-
-        # TO-DO: Finish the algorithm for compiling texts from words.
-
-        separators = (self.word_sep_emitter() for _ in range(0, numwords - 1))
-        text_iterable = itertools.zip_longest(words, separators, fillvalue='')
-        return ''.join(itertools.chain.from_iterable(text_iterable))
+            seps = (sep for sep in [])
+        for length in lengths:
+            if length:
+                render = [next(words)]
+                for _ in range(1, length):
+                    render.extend([next(seps, ' '), next(words)])
+                texts.append(''.join(render))
+        return texts
 
 
 class DateEmitter(BaseRandomEmitter):
     """Class for emitting random datetime.date values.
 
     Attributes:
-        rng: Inherited from superclass. This is the random number
-            generator, a random.Random instance, for this emitter.
+        rng: Random Number Generator, inherited from superclass.
         mn: The minimum possible datetime.date value.
         mx: (Optional.) The maximum possible datetime.date value.
             Default is today.
