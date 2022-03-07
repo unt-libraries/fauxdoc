@@ -103,7 +103,8 @@ class BaseEmitter(ABC):
         raise ValueError(
             f"Could not emit: {number} new unique value"
             f"{' was' if number == 1 else 's were'} requested, out of "
-            f"{self.num_unique_values} possible selections."
+            f"{self.num_unique_values} possible selection"
+            f"{'' if self.num_unique_values == 1 else 's'}."
         )
 
     def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
@@ -148,31 +149,41 @@ class BaseRandomEmitter(BaseEmitter):
 
     Subclass this to implement an emitter object that uses randomized
     values. In your subclass, instead of calling the `random` module
-    directly, use the `rng` attribute. Override the `seed_rngs` method
-    if you have an emitter composed of multiple BaseRandomEmitters and
+    directly, use the `rng` attribute. Override the `seed` method if
+    you have an emitter composed of multiple BaseRandomEmitters and
     need to seed multiple RNGs at once.
 
     Attributes:
         rng: A random.Random object. Use this for generating random
             values in subclasses.
+        rng_seed: (Optional.) Any valid seed value you'd provide to
+            random.seed. This value is used to reset the RNG when
+            `reset` is called; it can be set to something else either
+            directly or by calling `seed` and providing a new value.
+            Default is None.
     """
 
-    def __init__(self) -> None:
-        """Inits a BaseRandomEmitter."""
+    def __init__(self, rng_seed: Any = None) -> None:
+        """Inits a BaseRandomEmitter.
+
+        Args:
+            rng_seed: See `rng_seed` attribute.
+        """
+        self.rng_seed = rng_seed
         self.reset()
 
     def reset(self) -> None:
         """Reset the emitter's RNG instance."""
-        self.rng = random.Random()
+        self.rng = random.Random(self.rng_seed)
 
-    def seed_rngs(self, seed: Any) -> None:
+    def seed(self, rng_seed: Any) -> None:
         """Seeds all RNGs on this object with the given seed value.
 
         Args:
-            seed: Any valid seed value you'd provide to random.seed;
-                usually this is an integer.
+            seed: Any valid seed value you'd provide to random.seed.
         """
-        self.rng.seed(seed)
+        self.rng_seed = rng_seed
+        self.rng.seed(rng_seed)
 
 
 class ChoicesEmitter(BaseRandomEmitter):
@@ -211,6 +222,8 @@ class ChoicesEmitter(BaseRandomEmitter):
             noun-phrase that describes what each item is. Used in
             raising a more informative error if weights and items don't
             match. Default is an empty string.
+        rng_seed: (Optional.) Any valid seed value you'd provide to
+            random.seed. Default is None.
     """
 
     T = TypeVar('T')
@@ -220,7 +233,8 @@ class ChoicesEmitter(BaseRandomEmitter):
                  weights: Optional[Sequence[Number]] = None,
                  unique: bool = False,
                  each_unique: bool = False,
-                 noun: str = '') -> None:
+                 noun: str = '',
+                 rng_seed: Any = None) -> None:
         """Inits a ChoicesEmitter with items, weights, and settings.
 
         Args:
@@ -229,6 +243,7 @@ class ChoicesEmitter(BaseRandomEmitter):
             unique: (Optional.) See `unique` attribute.
             each_unique: (Optional.) See `each_unique` attribute.
             noun: (Optional.) See `noun` attribute.
+            rng_seed: (Optional.) See `rng_seed` attribute.
         """
         self.items = items
         self.weights = weights
@@ -236,6 +251,7 @@ class ChoicesEmitter(BaseRandomEmitter):
         self.unique = unique
         self.each_unique = each_unique
         self.noun = noun
+        self.rng_seed = rng_seed
         self._shuffled = None
         self._shuffled_index = None
         self.reset()
@@ -316,7 +332,7 @@ class ChoicesEmitter(BaseRandomEmitter):
         # With replacement, with/without weights.
         if len(self.items) == 1:
             # No choice here.
-            return self.items * number
+            return list(self.items) * number
         if self.weights is None and number == 1:
             # `choice` is faster if we just need 1.
             return [self.rng.choice(self.items)]
@@ -339,38 +355,46 @@ class WordEmitter(BaseRandomEmitter):
         alphabet_emitter: A `BaseEmitter`-like instance that emits
             characters (strings), used to generate each character for
             each emitted string.
+        rng_seed: (Optional.) Any valid seed value you'd provide to
+            random.seed. Default is None.
     """
 
     def __init__(self,
                  length_emitter: IntEmitterLike,
-                 alphabet_emitter: StrEmitterLike) -> None:
+                 alphabet_emitter: StrEmitterLike,
+                 rng_seed: Any = None) -> None:
         """Inits WordEmitter with a length and alphabet emitter.
 
         Args:
             length_emitter: See `length_emitter` attribute.
             alphabet_emitter: See `alphabet_emitter` attribute.
+            rng_seed (Optional.) See `rng_seed` attribute.
         """
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
+        self.rng_seed = rng_seed
         self.reset()
 
     def reset(self) -> None:
         """See superclass."""
         super().reset()
-        self.length_emitter.reset()
-        self.alphabet_emitter.reset()
+        for attr in ('length_emitter', 'alphabet_emitter'):
+            emitter = getattr(self, attr)
+            try:
+                emitter.rng_seed = self.rng_seed
+            except AttributeError:
+                pass
+            emitter.reset()
 
-    def seed_rngs(self, seed: Any) -> None:
+    def seed(self, rng_seed: Any) -> None:
         """See superclass."""
-        super().seed_rngs(seed)
-        try:
-            self.alphabet_emitter.seed_rngs(seed)
-        except AttributeError:
-            pass
-        try:
-            self.length_emitter.seed_rngs(seed)
-        except AttributeError:
-            pass
+        super().seed(rng_seed)
+        for attr in ('length_emitter', 'alphabet_emitter'):
+            emitter = getattr(self, attr)
+            try:
+                emitter.seed(rng_seed)
+            except AttributeError:
+                pass
 
     @property
     def num_unique_values(self) -> int:
@@ -421,37 +445,47 @@ class TextEmitter(BaseRandomEmitter):
             that emits word separator character strings, used to
             generate the characters between words. If not provided,
             words are separated by a space (' ') value.
+        rng_seed: (Optional.) Any valid seed value you'd provide to
+            random.seed. Default is None.
     """
 
     def __init__(self,
                  numwords_emitter: IntEmitterLike,
                  word_emitter: StrEmitterLike,
-                 sep_emitter: Optional[StrEmitterLike] = None) -> None:
+                 sep_emitter: Optional[StrEmitterLike] = None,
+                 rng_seed: Any = None) -> None:
         """Inits TextEmitter with word, separator, and text settings.
 
         Args:
             numword_emitter: See `numword_emitter` attribute.
             word_emitter: See `word_emitter` attribute.
             sep_emitter: (Optional.) See `sep_emitter` attribute.
+            rng_seed: (Optional.) See `rng_seed` attribute.
         """
         self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
         self.sep_emitter = sep_emitter
+        self.rng_seed = rng_seed
+        self.reset()
 
     def reset(self) -> None:
         """See superclass."""
-        self.numwords_emitter.reset()
-        self.word_emitter.reset()
-        try:
-            self.sep_emitter.reset()
-        except AttributeError:
-            pass
+        super().reset()
+        for attr in ('numwords_emitter', 'word_emitter', 'sep_emitter'):
+            emitter = getattr(self, attr)
+            try:
+                emitter.rng_seed = self.rng_seed
+            except AttributeError:
+                pass
+            if emitter is not None:
+                emitter.reset()
 
-    def seed_rngs(self, seed: Any) -> None:
+    def seed(self, rng_seed: Any) -> None:
         """See superclass."""
+        super().seed(rng_seed)
         for attr in ('numwords_emitter', 'word_emitter', 'sep_emitter'):
             try:
-                getattr(self, attr).seed_rngs(seed)
+                getattr(self, attr).seed(rng_seed)
             except AttributeError:
                 pass
 

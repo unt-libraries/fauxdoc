@@ -13,7 +13,10 @@ from solrfixtures.data import exceptions as ex
 @pytest.fixture
 def word_emitter():
     """Fixture to use as the `word_emitter` arg for TextEmitter tests."""
-    return em.StringEmitter(2, 8, 'abcde')
+    return em.WordEmitter(
+        em.ChoicesEmitter(range(2, 9)),
+        em.ChoicesEmitter('abcde'),
+    )
 
 
 # Tests
@@ -27,29 +30,76 @@ def test_makealphabet(ranges, expected):
     assert em.make_alphabet(ranges) == expected
 
 
-@pytest.mark.parametrize('seed, mn, mx, weights, expected', [
-    (999, 0, 1, None, [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
-    (999, 1, 1, None, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-    (999, 5, 5, None, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
-    (999, 1, 10, None, [2, 10, 10, 9, 8, 8, 3, 6, 2, 4]),
-    (999, 1, 10, [50, 70, 80, 85, 90, 91, 92, 93, 95, 100],
-     [3, 1, 5, 2, 1, 1, 3, 1, 3, 4]),
+@pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
+    (999, range(2), None, False, 10, 0, [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]),
+    (999, range(1, 2), None, False, 10, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, range(5, 6), None, False, 10, 0, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
+    (999, range(1, 11), None, False, 10, 0, [8, 1, 9, 6, 5, 2, 8, 4, 8, 9]),
+    (999, 'abcde', None, False, 10, 0,
+     ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
+    (999, ['H', 'T'], [80, 20], False, 10, 0,
+     ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
+    (999, ['H', 'T'], [20, 80], False, 10, 0,
+     ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
+    (999, 'TTHHHHHHHH', None, 'each', 10, 0,
+     ['T', 'H', 'H', 'H', 'H', 'H', 'T', 'H', 'H', 'H']),
+    (999, 'HHHHT', None, 'each', None, 10,
+     ['H', 'T', 'T', 'T', 'H', 'H', 'H', 'H', 'H', 'H']),
+    (999, 'HT', [80, 20], 'each', None, 10,
+     ['H', 'H', 'H', 'H', 'H', 'T', 'H', 'H', 'T', 'H']),
+    (999, 'HT', [20, 80], 'each', None, 10,
+     ['H', 'H', 'T', 'H', 'T', 'T', 'T', 'T', 'T', 'H']),
+    (999, range(5), [70, 20, 7, 2, 1], 'each', 3, 10,
+     [[0, 2, 1], [1, 0, 3], [1, 0, 2], [0, 3, 2], [0, 4, 1], [0, 2, 1],
+      [1, 0, 2], [1, 0, 2], [1, 0, 3], [0, 2, 1]]),
+    (999, range(5), [70, 20, 7, 2, 1], None, 3, 10,
+     [[1, 0, 1], [0, 0, 0], [1, 0, 1], [1, 0, 4], [0, 0, 0], [1, 0, 1],
+      [3, 0, 0], [0, 0, 0], [2, 0, 0], [0, 0, 1]]),
+    (999, range(25), None, True, 5, 5,
+     [[11, 18, 24, 17, 2], [9, 6, 8, 0, 15], [20, 3, 14, 4, 7],
+      [13, 16, 19, 23, 12], [5, 10, 1, 21, 22]]),
+    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, True, 5, 5,
+     [[0, 3, 7, 12, 4], [6, 1, 2, 9, 8], [22, 14, 5, 18, 11],
+      [20, 24, 13, 23, 16], [21, 17, 19, 15, 10]]),
 ])
-def test_intemitter(seed, mn, mx, weights, expected):
-    ie = em.IntEmitter(mn, mx, weights=weights)
-    ie.seed_rngs(seed)
-    assert [ie() for _ in expected] == expected
+def test_choicesemitter(seed, items, weights, unq, num, repeat, expected):
+    each_unique = unq == 'each'
+    unique = unq and not each_unique
+    ce = em.ChoicesEmitter(items, weights=weights, unique=unique,
+                           each_unique=each_unique, rng_seed=seed)
+    result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
+    assert result == expected
 
 
-@pytest.mark.parametrize('mn, mx, weights', [
-    (1, 10, [50, 100]),
-    (1, 2, [50, 75, 100])
+@pytest.mark.parametrize('items, unq, num, repeat, exp_error', [
+    (range(9), 'each', 10, 0,
+     '10 new unique values were requested, out of 9 possible selections.'),
+    (range(9), True, 10, 0,
+     '10 new unique values were requested, out of 9 possible selections.'),
+    (range(9), True, None, 10,
+     '1 new unique value was requested, out of 0 possible selections.'),
+    (range(9), True, 3, 4,
+     '3 new unique values were requested, out of 0 possible selections.'),
+    (range(10), True, 3, 4,
+     '3 new unique values were requested, out of 1 possible selection.'),
 ])
-def test_intemitter_incorrect_weights(mn, mx, weights):
+def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
+    each_unique = unq == 'each'
+    unique = unq and not each_unique
+    ce = em.ChoicesEmitter(items, unique=unique, each_unique=each_unique)
+    with pytest.raises(ValueError) as excinfo:
+        [ce(num) for _ in range(repeat)] if repeat else ce(num)
+    assert exp_error in str(excinfo.value)
+
+
+@pytest.mark.parametrize('items, weights', [
+    ([0, 1, 2, 3], [40, 50]),
+    ([0, 1], [50, 10, 2])
+])
+def test_choicesemitter_incorrect_weights(items, weights):
     with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.IntEmitter(mn, mx, weights=weights)
-    assert excinfo.value.noun == 'integer'
-    assert excinfo.value.num_choices == mx - mn + 1
+        em.ChoicesEmitter(items, weights=weights)
+    assert excinfo.value.num_choices == len(items)
     assert excinfo.value.num_weights == len(weights)
 
 
@@ -64,90 +114,57 @@ def test_intemitter_incorrect_weights(mn, mx, weights):
      ['aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa',
       'aaaaa', 'aaaaa']),
     (999, 1, 5, None, 'abcde', None,
-     ['d', 'aecca', 'dbdea', 'eabcd', 'beeb', 'daab', 'ec', 'ada', 'e', 'ce']),
-    (999, 1, 5, [15, 85, 90, 95, 100], 'abcde', None,
+     ['daec', 'c', 'adbde', 'aea', 'bcd', 'b', 'eebd', 'aa', 'beca', 'daece']),
+    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None,
      ['da', 'e', 'cca', 'db', 'de', 'a', 'ea', 'bc', 'db', 'ee']),
-    (999, 1, 5, [15, 85, 90, 95, 100], 'abcde', [20, 25, 40, 80, 100],
+    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', [20, 5, 15, 40, 20],
      ['da', 'e', 'dda', 'dc', 'de', 'a', 'ea', 'cd', 'dc', 'ee']),
-    (999, 1, 5, None, 'abcde', [20, 25, 40, 80, 100],
-     ['d', 'aedda', 'dcdea', 'eacdd', 'ceeb', 'daab', 'ed', 'ada', 'e', 'de']),
+    (999, 1, 5, None, 'abcde', [20, 5, 15, 40, 20],
+     ['daed', 'd', 'adcde', 'aea', 'cdd', 'c', 'eebd', 'aa', 'beda', 'daede']),
 ])
-def test_stringemitter(seed, mn, mx, lweights, alpha, aweights, expected):
-    se = em.StringEmitter(mn, mx, alpha, len_weights=lweights,
-                          alphabet_weights=aweights)
-    se.seed_rngs(seed)
-    assert [se() for _ in expected] == expected
-
-
-@pytest.mark.parametrize('alpha, aweights', [
-    ('abcde', [50, 100]),
-    ('abc', [50, 60, 70, 80, 100]),
-])
-def test_stringemitter_incorrect_alpha_weights(alpha, aweights):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.StringEmitter(1, 5, alpha, alphabet_weights=aweights)
-    assert excinfo.value.noun == 'alphabet character'
-    assert excinfo.value.num_choices == len(alpha)
-    assert excinfo.value.num_weights == len(aweights)
-
-
-@pytest.mark.parametrize('mn, mx, lweights', [
-    (1, 10, [50, 100]),
-    (1, 2, [50, 75, 100]),
-])
-def test_stringemitter_incorrect_string_length_weights(mn, mx, lweights):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.StringEmitter(mn, mx, 'abcde', len_weights=lweights)
-    assert excinfo.value.noun == 'string length'
-    assert excinfo.value.num_choices == mx - mn + 1
-    assert excinfo.value.num_weights == len(lweights)
+def test_wordemitter(seed, mn, mx, lweights, alpha, aweights, expected):
+    length_emitter = em.ChoicesEmitter(range(mn, mx + 1), lweights)
+    alphabet_emitter = em.ChoicesEmitter(alpha, aweights)
+    se = em.WordEmitter(length_emitter, alphabet_emitter, rng_seed=seed)
+    assert se(len(expected)) == expected
 
 
 @pytest.mark.parametrize(
     'seed, word_mn, word_mx, word_weights, sep_chars, sep_weights, expected',
     [
         (999, 1, 3, None, None, None,
-         ['daeccadb deaeabc db', 'eebdaabe', 'cadaec ecddad cdbaeb',
-          'dbcad caeca bdb', 'cbbceeea cdceeab bdad', 'eacdedb aeacaecc']),
+         ['daeccad bd eaeabcdb', 'eebdaa', 'becad ae cecddad', 'cdba ebdbcad',
+          'caecabd bc', 'bbceeeac']),
         (999, 3, 6, None, None, None,
-         ['daeccadb deaeabc db', 'eebdaabe cadaec ecddad cdbaeb dbcad caeca',
-          'bdb cbbceeea cdceeab bdad eacdedb aeacaecc',
-          'aedabce ecedbace bcbdbdcb ad', 'edcdbbd babbdbed dad ddc bced',
-          'adeeda bb bdeaecd']),
-        (999, 3, 6, None, [' ', '-', ', ', '; '], [40, 70, 90, 100],
-         ['daeccadb, deaeabc db',
-          'eebdaabe, cadaec-ecddad-cdbaeb dbcad, caeca',
-          'bdb cbbceeea, cdceeab, bdad eacdedb; aeacaecc',
-          'aedabce ecedbace bcbdbdcb-ad', 'edcdbbd, babbdbed dad, ddc; bced',
-          'adeeda bb-bdeaecd']),
-        (999, 1, 3, [60, 85, 100], None, None,
-         ['daeccadb deaeabc', 'db', 'eebdaabe cadaec ecddad', 'cdbaeb',
-          'dbcad', 'caeca']),
+         ['daeccad bd eaeabcdb eebdaa becad ae', 'cecddad cdba ebdbcad',
+          'caecabd bc bbceeeac dce eab bdade',
+          'acdedb aea caeccaed abceeced bac', 'ebcbdb dc ba ded',
+          'cdbbdbab bdbed dad']),
+        (999, 3, 6, None, [' ', '-', ', ', '; '], [40, 30, 20, 10],
+         ['daeccad, bd eaeabcdb, eebdaa-becad-ae', 'cecddad cdba, ebdbcad',
+          'caecabd bc, bbceeeac, dce eab; bdade',
+          'acdedb aea caeccaed-abceeced, bac', 'ebcbdb dc, ba; ded',
+          'cdbbdbab bdbed-dad']),
+        (999, 1, 3, [60, 25, 15], None, None,
+         ['daeccad bd', 'eaeabcdb', 'eebdaa becad ae', 'cecddad', 'cdba',
+          'ebdbcad']),
     ]
 )
 def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
                      sep_weights, expected, word_emitter):
-    wse = None
+    sep_emitter = None
     if sep_chars is not None:
-        wse = em.StringEmitter(1, 1, sep_chars, alphabet_weights=sep_weights)
-    te = em.TextEmitter(word_emitter, word_mn, word_mx,
-                        numwords_weights=word_weights, word_sep_emitter=wse)
-    te.seed_rngs(seed)
-    assert [te() for _ in expected] == expected
-
-
-@pytest.mark.parametrize('word_mn, word_mx, word_weights', [
-    (1, 10, [50, 100]),
-    (1, 2, [50, 75, 100]),
-])
-def test_textemitter_incorrect_word_weights(word_mn, word_mx, word_weights,
-                                            word_emitter):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.TextEmitter(word_emitter, word_mn, word_mx,
-                       numwords_weights=word_weights)
-    assert excinfo.value.noun == 'text length'
-    assert excinfo.value.num_choices == word_mx - word_mn + 1
-    assert excinfo.value.num_weights == len(word_weights)
+        sep_emitter = em.WordEmitter(
+            em.ChoicesEmitter(range(1, 2)),
+            em.ChoicesEmitter(sep_chars, sep_weights)
+        )
+    te = em.TextEmitter(
+        em.ChoicesEmitter(range(word_mn, word_mx + 1), word_weights),
+        word_emitter,
+        sep_emitter,
+        rng_seed=seed
+    )
+    assert te(len(expected)) == expected
 
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
@@ -167,20 +184,6 @@ def test_dateemitter(seed, mn, mx, weights, expected):
     de = em.DateEmitter(mn, mx, weights=weights)
     de.seed_rngs(seed)
     assert [de() for _ in expected] == [datetime.date(*i) for i in expected]
-
-
-@pytest.mark.parametrize('mn, mx, weights', [
-    ((2015, 1, 1), (2015, 1, 2), [60, 80, 100]),
-    ((2015, 1, 1), (2015, 12, 31), [60, 80, 100]),
-])
-def test_dateemitter_incorrect_daydelta_weights(mn, mx, weights):
-    mn = datetime.date(*mn)
-    mx = datetime.date(*mx)
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.DateEmitter(mn, mx, weights)
-    assert excinfo.value.noun == 'day delta'
-    assert excinfo.value.num_choices == (mx - mn).days + 1
-    assert excinfo.value.num_weights == len(weights)
 
 
 @pytest.mark.parametrize('seed, mn, mx, resolution, weights, expected', [
@@ -212,20 +215,3 @@ def test_timeemitter(seed, mn, mx, resolution, weights, expected):
     te = em.TimeEmitter(mn, mx, resolution=resolution, weights=weights)
     te.seed_rngs(seed)
     assert [te() for _ in expected] == [datetime.time(*i) for i in expected]
-
-
-@pytest.mark.parametrize('mn, mx, resolution, weights, exp_num_choices', [
-    ((6, 0, 0), (8, 0, 0), 60,
-     list(itertools.accumulate([5] * 60 + [10] * 60)), 121),
-    ((6, 0, 0), (6, 0, 5), 1, [10, 50, 60, 65, 76], 6),
-    ((20, 0, 1), (20, 0, 59), 10, [10, 30, 35, 40, 45, 70, 100], 6),
-])
-def test_timeemitter_incorrect_intervaldelta_weights(mn, mx, resolution,
-                                                     weights, exp_num_choices):
-    mn = datetime.time(*mn)
-    mx = datetime.time(*mx)
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.TimeEmitter(mn, mx, resolution=resolution, weights=weights)
-    assert excinfo.value.noun == 'time interval delta'
-    assert excinfo.value.num_choices == exp_num_choices
-    assert excinfo.value.num_weights == len(weights)
