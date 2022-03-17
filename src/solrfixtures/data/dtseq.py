@@ -2,38 +2,34 @@
 
 from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Optional, Tuple, TypeVar, Union
 
 from .math import time_to_seconds, seconds_to_time
-from solrfixtures.typing import DateLike, DateTimeLike, TimeLike
+from solrfixtures.typing import DateLike, DateTimeLike, Number, TimeLike
+
+
+DT = TypeVar('DT', DateLike, DateTimeLike, TimeLike)
+DTS = TypeVar('DTS', DateLike, DateTimeLike, TimeLike, str)
+
+
+def _index_to_value(index: int, start: DT, step: timedelta) -> DT:
+    return start + (step * index)
+
+
+def _value_to_index(value: date, start: DT, step: timedelta) -> Tuple[int]:
+    return divmod(value - start, step)
 
 
 class DateOrTimeRange(Sequence):
-    """Class for creating range-like objs for dates and times."""
+    """Class for representing ranges of dates and/or times."""
 
-    DT = TypeVar('DT', DateLike, DateTimeLike, TimeLike)
-
-    def __init__(self, start: DT, stop: DT, step: timedelta) -> None:
+    def __init__(self, start: DT, length: int, step: timedelta) -> None:
+        self._index_range = range(0, length)
+        self._length = length
         self._start = start
-        self._stop = stop
         self._step = step
-
-        stop_offset, rem = self._value_to_offset(stop)
-        # If the stop value is not a multiple of step, we stop the
-        # offset range on the NEXT value to ensure our range includes
-        # the last multiple of step.
-        if rem:
-            stop_offset += 1
-        self._offset_range = range(0, stop_offset)
-        self._length = len(self._offset_range)
-        desc = f'"{start}", "{stop}", step="{step}"'
-        self._str_repr = f"{type(self).__name__}({desc})"
-
-    def _offset_to_value(self, offset: int) -> date:
-        return self.start + (self.step * offset)
-
-    def _value_to_offset(self, value: date) :
-        return divmod(value - self.start, self.step)
+        self._stop = None
+        self._str_repr = None
 
     @property
     def start(self) -> DT:
@@ -41,6 +37,8 @@ class DateOrTimeRange(Sequence):
 
     @property
     def stop(self) -> DT:
+        if self._stop is None:
+            self._stop = _index_to_value(len(self), self._start, self._step)
         return self._stop
 
     @property
@@ -49,23 +47,26 @@ class DateOrTimeRange(Sequence):
 
     def __getitem__(self, index: int) -> DT:
         if isinstance(index, slice):
-            slc = self._offset_range[index]
-            start = self._offset_to_value(slc.start)
-            stop = self._offset_to_value(slc.stop)
-            return type(self)(start, stop, self.step * slc.step)
+            slc = self._index_range[index]
+            start = _index_to_value(slc.start, self._start, self._step)
+            return type(self)(start, len(slc), self._step * slc.step)
         try:
-            return self._offset_to_value(self._offset_range[index])
+            index_num = self._index_range[index]
         except IndexError:
-            pass
-        raise IndexError(f'{type(self).__name__} object index out of range')
+            raise IndexError(f'{type(self).__name__} object index out of '
+                             f'range')
+        return _index_to_value(index_num, self._start, self._step)
 
     def __len__(self) -> int:
         return self._length
 
     def __repr__(self) -> str:
+        if self._str_repr is None:
+            desc = f'"{self.start}", "{self.stop}", step="{self.step}"'
+            self._str_repr = f"{type(self).__name__}({desc})"
         return self._str_repr
 
-    def __eq__(self, other: 'OffsetRange') -> bool:
+    def __eq__(self, other: 'DateOrTimeRange') -> bool:
         my_len = len(self)
         other_len = len(other)
         if my_len != other_len:
@@ -86,9 +87,9 @@ class DateOrTimeRange(Sequence):
               value: DT,
               start: Optional[int] = None,
               stop: Optional[int] = None) -> int:
-        offset, rem = self._value_to_offset(value)
-        if not rem and offset in self._offset_range[start:stop]:
-            return offset
+        index, rem = _value_to_index(value, self._start, self._step)
+        if not rem and index in self._index_range[start:stop]:
+            return index
         raise ValueError(f'{value} is not in range')
 
     def __contains__(self, value: DT) -> bool:
@@ -102,21 +103,87 @@ class DateOrTimeRange(Sequence):
         return 1 if value in self else 0
 
 
-def parse_user_value(value: Any) -> date:
-    try:
-        return date(value.year, value.month, value.day)
-    except AttributeError:
-        try:
-            return date.fromisoformat(value)
-        except ValueError:
+def _parse_user_value(value: DTS) -> Union[date, datetime, time]:
+    if isinstance(value, (date, time, datetime)):
+        return value
+    if isinstance(value, str):
+        for dtype in (date, datetime, time):
             try:
-                value = datetime.fromisoformat(value)
+                return getattr(dtype, 'fromisoformat')(value)
             except ValueError:
                 pass
-            else:
-                return date(value.year, value.month, value.day)
-    raise ValueError(
-        '`parse_user_value` value must be a datetime.date-like object or '
-        'string that datetime.date.fromisoformat or datetime.datetime.'
-        'fromisoformat can interpret (e.g. YYYY-MM-DD format).'
+        raise ValueError
+
+    type_attributes = (
+        (datetime, ('year', 'month', 'day', 'hour', 'second', 'minute',
+                      'microsecond')),
+        (date, ('year', 'month', 'day')),
+        (time, ('hour', 'minute', 'second', 'microsecond'))
     )
+    for dtype, attrs in type_attributes:
+        try:
+            return dtype(*(getattr(value, attr) for attr in attrs))
+        except AttributeError:
+            pass
+    raise ValueError
+
+
+def dt_range(start: DTS, stop: DTS, step: Number = 1,
+             step_unit: Optional[str] = None) -> DateOrTimeRange:
+    stop_start_err_message = (
+        'Unknown argument type. It must be one of the following:\n'
+        '    - datetime.date, datetime.datetime, or datetime.time;\n'
+        '    - a string that the `fromisoformat` method of datetime.date, '
+        'datetime.datetime, or datetime.time can interpret; or,\n'
+        '    - a type like datetime.date, datetime.datetime, or datetime.time '
+        'that has the appropriate year, month, day, hour, minute, second, and '
+        'microsecond atteributes.'
+    )
+
+    try:
+        start = _parse_user_value(start)
+    except ValueError:
+        raise ValueError(f'For `start` argument: {stop_start_err_message}')
+    try:
+        stop = _parse_user_value(stop)
+    except ValueError:
+        raise ValueError(f'For `stop` argument: {stop_start_err_message}')
+
+    if type(start) != type(stop):
+        raise ValueError(
+            f'The `start` and `stop` arguments must be interpretable as the '
+            f'same datetime type. The provided arguments appear to be types '
+            f'`{type(start)}` and `{type(stop)}`.'
+        )
+
+    is_date_only = not hasattr(start, 'second')
+    is_time_only = not hasattr(start, 'day')
+
+    if step_unit is None:
+        if is_date_only:
+            step_unit = 'days'
+        else:
+            step_unit = 'seconds'
+
+    try:
+        step = timedelta(**{step_unit: step})
+    except TypeError:
+        raise ValueError(
+            'Invalid `step_unit` argument. It must be a valid kwarg for '
+            'timedelta: weeks, days, hours, minutes, seconds, or microseconds.'
+        )
+    if is_date_only and step_unit not in {'weeks', 'days'}:
+        raise ValueError(
+            f'Invalid `step_unit` argument for a range of date objects. It '
+            f'must not be a unit smaller than days. (Provided: "{step_unit}")'
+        )
+    if is_time_only and step_unit in {'weeks', 'days'}:
+        raise ValueError(
+            f'Invalid `step_unit` argument for a range of time objects. It '
+            f'must be a unit smaller than days. (Provided: "{step_unit}")'
+        )
+
+    length, rem = _value_to_index(stop, start, step)
+    length += 1 if rem else 0
+    drange = DateOrTimeRange(start, length, step)
+    return drange
