@@ -13,11 +13,36 @@ DTS = TypeVar('DTS', DateLike, DateTimeLike, TimeLike, str)
 
 
 def _index_to_value(index: int, start: DT, step: timedelta) -> DT:
-    return start + (step * index)
+    try:
+        return start + (step * index)
+    except TypeError:
+        # We can't do timedelta operations on `time` objects, so we
+        # have to fake it.
+        seconds = time_to_seconds(start) + (step.total_seconds() * index)
+        return seconds_to_time(seconds)
 
 
-def _value_to_index(value: date, start: DT, step: timedelta) -> Tuple[int]:
-    return divmod(value - start, step)
+def _value_to_index(value: DT, start: DT,
+                    step: timedelta) -> Tuple[int, timedelta]:
+    try:
+        return divmod(value - start, step)
+    except TypeError:
+        # We can't do timedelta operations on `time` objects, so we
+        # have to fake it.
+        val_secs = time_to_seconds(value)
+        start_secs = time_to_seconds(start)
+        step_secs = step.total_seconds()
+
+        # We want to wrap at midnight; a range like 11:00 PM to 4:00 AM
+        # with step +1 second is valid, as is 4:00 AM to 11:00 PM with
+        # step -1 second. We have to add a day on either side to make
+        # this work.
+        if val_secs < start_secs and step_secs > 0:
+            val_secs += 86400
+        elif val_secs > start_secs and step_secs < 0:
+            start_secs += 86400
+        index, rem = divmod(val_secs - start_secs, step_secs)
+        return int(index), timedelta(seconds=rem)
 
 
 class DateOrTimeRange(Sequence):
