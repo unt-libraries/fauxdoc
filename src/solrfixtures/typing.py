@@ -66,30 +66,3 @@ class TzInfoLike(Protocol):
 
     def utcoffset(dt: datetime) -> timedelta:
         ...
-
-
-class DateLike(Protocol):
-    """Is like a datetime.date object."""
-
-    year: int
-    month: int
-    day: int
-
-
-class TimeLike(Protocol):
-    """Is like a datetime.time object."""
-
-    hour: int
-    minute: int
-    second: int
-
-
-class DateTimeLike(Protocol):
-    """Is like a datetime.datetime object."""
-
-    year: int
-    month: int
-    day: int
-    hour: int
-    minute: int
-    second: int
