@@ -160,10 +160,20 @@ def test_dateortimerange_getitem_by_index(start, length, step, index,
         assert dtr[index] == expected
 
 
-def test_dateortimerange_string_representation():
-    dtr = dtrange.DateOrTimeRange(date(2016, 1, 1), 6, timedelta(days=1))
-    assert str(dtr) == ('DateOrTimeRange("2016-01-01", "2016-01-07", '
-                        'step="1 day, 0:00:00")')
+@pytest.mark.parametrize('start, length, step, expected', [
+    (date(2016, 1, 1), 6, timedelta(days=1),
+     'DateOrTimeRange("2016-01-01", "2016-01-07", step="1 day, 0:00:00")'),
+    (time(0, 0), 86399, timedelta(seconds=1),
+     'DateOrTimeRange("00:00:00", "23:59:59", step="0:00:01")'),
+    (time(0, 0), 86400, timedelta(seconds=1),
+     'DateOrTimeRange("00:00:00", "1 day + 00:00:00", step="0:00:01")'),
+    (time(0, 0), 86400 * 2, timedelta(seconds=1),
+     'DateOrTimeRange("00:00:00", "2 days + 00:00:00", step="0:00:01")'),
+    (time(0, 0), 1441, timedelta(minutes=1),
+     'DateOrTimeRange("00:00:00", "1 day + 00:01:00", step="0:01:00")'),
+])
+def test_dateortimerange_string_representation(start, length, step, expected):
+    assert str(dtrange.DateOrTimeRange(start, length, step)) == expected
 
 
 @pytest.mark.parametrize('range_one, range_two, expected', [
@@ -264,3 +274,26 @@ def test_dtrange_validation(start, stop, step, step_unit, exp_err_str):
 def test_dtrange_return_value(start, stop, step, step_unit, expected):
     dtr = dtrange.dtrange(start, stop, step, step_unit)
     assert list(dtr) == expected
+
+
+@pytest.mark.parametrize('start, stop, step, step_unit, exp_length', [
+    (time(0, 0), time(0, 0), 1, None, 86400),
+    (time(1, 0), time(1, 0), 1, None, 86400),
+    (time(0, 0), time(0, 0), 1, 'hours', 24),
+    (time(0, 0), time(0, 1), 1, 'minutes', 1),
+    (date(2016, 1, 1), date(2016, 1, 1), 1, None, 0),
+    (datetime(2016, 1, 1, 0, 0), datetime(2016, 1, 1, 0, 0), 1, None, 0),
+])
+def test_dtrange_start_equals_stop(start, stop, step, step_unit, exp_length):
+    """A time range where start == stop should include the full clock.
+
+    `dtrange` generally functions like `range` as much as possible,
+    such as the fact that the range 'stop' value is excluded. This
+    works, except for the edge case where you need to represent a full
+    24 hour range with `time` objects. To do this you would need, e.g.,
+    time(0, 0) to time(24, 0) -- but the latter is invalid. As a
+    workaround, this is how we interpret a range of time(0, 0) to
+    time(0, 0), instead of an empty range.
+    """
+    dtr = dtrange.dtrange(start, stop, step, step_unit)
+    assert len(dtr) == exp_length

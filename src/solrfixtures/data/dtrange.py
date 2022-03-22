@@ -185,7 +185,13 @@ class DateOrTimeRange(Sequence):
     def __repr__(self) -> str:
         """Returns the string representation of the range."""
         if not hasattr(self, '_str_repr'):
-            desc = f'"{self.start}", "{self.stop}", step="{self.step}"'
+            stop = self.stop
+            if isinstance(self.start, time):
+                days = (self.step * len(self)).days
+                if days > 0:
+                    plural = '' if days == 1 else 's'
+                    stop = f"{days} day{plural} + {self.stop}"
+            desc = f'"{self.start}", "{stop}", step="{self.step}"'
             self._str_repr = f"{type(self).__name__}({desc})"
         return self._str_repr
 
@@ -270,6 +276,15 @@ def dtrange(start: DTS, stop: DTS, step: Number = 1,
     This is the intended public factory method that makes it easy to
     create DateOrTimeRange objects.
 
+    Important note: `dtrange` is meant to function like `range`, where
+    'stop' is excluded. For `time` objects, this presents a problem
+    with the common edge case where you want a full 24-hour range: if
+    you want 00:00:00 to 23:59:59 (inclusive), you can't provide a
+    stop value of time(24, 0) because this is not a valid time. So, for
+    `time` ranges only, we'll assume if 'start' == 'stop' you want a
+    24-hour range rather than an empty range. For `date` and `datetime`
+    ranges, you get an empty range.
+
     Args:
         start: A date, time, datetime, or string object representing
             the start of your range. If you provide a string, then it
@@ -309,6 +324,15 @@ def dtrange(start: DTS, stop: DTS, step: Number = 1,
             "timedelta: weeks, days, hours, minutes, seconds, or microseconds."
         )
 
-    length, rem = _value_to_index(stop, start, step)
+    if isinstance(start, time) and start == stop:
+        # This is kind of hacky but the simplest way I could think of
+        # to accommodate the (common) edge case where you want the full
+        # 24-hour clock as a time range. E.g., midnight to midnight is
+        # a 24-hour range instead of an empty range.
+        start_refdate = datetime.combine(date(99, 1, 1), start)
+        stop_refdate = start_refdate + timedelta(days=1)
+        length, rem = _value_to_index(stop_refdate, start_refdate, step)
+    else:
+        length, rem = _value_to_index(stop, start, step)
     length += 1 if rem else 0
     return DateOrTimeRange(start, length, step)
