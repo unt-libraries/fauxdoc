@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 from typing import Any, Optional, Tuple, TypeVar, Union
 
-from .math import time_to_seconds, seconds_to_time
 from solrfixtures.typing import Number
 
 
@@ -18,9 +17,10 @@ def _index_to_value(index: int, start: DT, step: timedelta) -> DT:
         return start + (step * index)
     except TypeError:
         # We can't do timedelta operations on `time` objects, so we
-        # have to fake it.
-        seconds = time_to_seconds(start) + (step.total_seconds() * index)
-        return seconds_to_time(seconds)
+        # have to fake it by combining the time with a reference date,
+        # doing the math, then getting back the time.
+        refdate = date(99, 1, 1)
+        return (datetime.combine(refdate, start) + (step * index)).time()
 
 
 def _value_to_index(value: DT, start: DT,
@@ -30,21 +30,23 @@ def _value_to_index(value: DT, start: DT,
         return divmod(value - start, step)
     except TypeError:
         # We can't do timedelta operations on `time` objects, so we
-        # have to fake it.
-        val_secs = time_to_seconds(value)
-        start_secs = time_to_seconds(start)
+        # have to fake it by combining the time with a reference date,
+        # doing the math, then getting back the time.
+        # We also want to wrap at midnight; a range like 11:00 PM to
+        # 4:00 AM with step +1 second is valid, as is 4:00 AM to
+        # 11:00 PM with step -1 second. We have to add a day on either
+        # side to make this work.
         step_secs = step.total_seconds()
-
-        # We want to wrap at midnight; a range like 11:00 PM to 4:00 AM
-        # with step +1 second is valid, as is 4:00 AM to 11:00 PM with
-        # step -1 second. We have to add a day on either side to make
-        # this work.
-        if val_secs < start_secs and step_secs > 0:
-            val_secs += 86400
-        elif val_secs > start_secs and step_secs < 0:
-            start_secs += 86400
-        index, rem = divmod(val_secs - start_secs, step_secs)
-        return int(index), timedelta(seconds=rem)
+        startdate = date(99, 1, 2)
+        if value < start and step_secs > 0:
+            valdate = date(99, 1, 3)
+        elif value > start and step_secs < 0:
+            valdate = date(99, 1, 1)
+        else:
+            valdate = startdate
+        valdt = datetime.combine(valdate, value)
+        startdt = datetime.combine(startdate, start)
+        return divmod(valdt - startdt, step)
 
 
 class DateOrTimeRange(Sequence):
