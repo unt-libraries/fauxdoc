@@ -1,6 +1,5 @@
 """Contains tests for the solrfixtures data.math module."""
 
-import datetime
 import random
 
 import pytest
@@ -99,7 +98,7 @@ def test_clamp(number, mn, mx, expected):
 ])
 def test_weighted_shuffle(seed, items, weights, k, expected):
     rng = random.Random(seed)
-    result = [m.weighted_shuffle(items, weights, rng, k) for _ in expected] 
+    result = [m.weighted_shuffle(items, weights, rng, k) for _ in expected]
     assert result == expected
 
 

@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
-from typing import Any, Optional, Tuple, TypeVar, Union
+from typing import Optional, Tuple, TypeVar, Union
 
 from solrfixtures.typing import Number
 

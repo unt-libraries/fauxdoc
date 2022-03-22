@@ -1,6 +1,5 @@
 """Contains tests for the solrfixtures.data.emitter module."""
 import datetime
-import itertools
 
 import pytest
 

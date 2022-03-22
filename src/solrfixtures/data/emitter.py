@@ -1,11 +1,9 @@
 """Contains functions and classes for emitting randomized data values."""
 from abc import ABC, abstractmethod
-import collections.abc
 import datetime
 import itertools
 import random
-from typing import Any, Callable, Optional, List, Sequence, Tuple, Union,\
-                   TypeVar
+from typing import Any, Optional, List, Sequence, Union, TypeVar
 
 import pytz
 
@@ -425,7 +423,7 @@ class WordEmitter(BaseRandomEmitter):
         for length in lengths:
             words.append(''.join(chars[char_index:char_index+length]))
             char_index += length
-        return words 
+        return words
 
 
 class TextEmitter(BaseRandomEmitter):
