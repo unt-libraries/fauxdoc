@@ -4,6 +4,7 @@ import itertools
 
 import pytest
 
+from solrfixtures.data import dtrange
 from solrfixtures.data import emitter as em
 from solrfixtures.data import exceptions as ex
 
@@ -69,6 +70,11 @@ def test_choicesemitter(seed, items, weights, unq, num, repeat, expected):
                            each_unique=each_unique, rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert result == expected
+
+
+def test_choicesemitter_empty_items():
+    with pytest.raises(ValueError):
+        em.ChoicesEmitter(range(0))
 
 
 @pytest.mark.parametrize('items, unq, num, repeat, exp_error', [
@@ -167,51 +173,83 @@ def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
     assert te(len(expected)) == expected
 
 
+# The next few tests are an illustration to show how to implement
+# date, datetime, and time emitters using data.emitter.ChoicesEmitter
+# and data.dtrange.
+
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
-    (999, (2015, 1, 1), (2015, 1, 1), None,
+    (999, (2015, 1, 1), (2015, 1, 2), None,
      [(2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1),
       (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1), (2015, 1, 1)]),
-    (999, (2015, 1, 1), (2015, 1, 5), None,
-     [(2015, 1, 1), (2015, 1, 5), (2015, 1, 5), (2015, 1, 5), (2015, 1, 4),
-      (2015, 1, 4), (2015, 1, 2), (2015, 1, 3), (2015, 1, 1), (2015, 1, 2)]),
-    (999, (2015, 1, 1), (2015, 1, 5), [60, 80, 90, 95, 100],
+    (999, (2015, 1, 1), (2015, 1, 6), None,
+     [(2015, 1, 4), (2015, 1, 1), (2015, 1, 5), (2015, 1, 3), (2015, 1, 3),
+      (2015, 1, 1), (2015, 1, 4), (2015, 1, 2), (2015, 1, 4), (2015, 1, 5)]),
+    (999, (2015, 1, 1), (2015, 1, 6), [60, 20, 10, 5, 5],
      [(2015, 1, 2), (2015, 1, 1), (2015, 1, 3), (2015, 1, 1), (2015, 1, 1),
       (2015, 1, 1), (2015, 1, 2), (2015, 1, 1), (2015, 1, 2), (2015, 1, 3)]),
 ])
-def test_dateemitter(seed, mn, mx, weights, expected):
-    mn = datetime.date(*mn)
-    mx = datetime.date(*mx)
-    de = em.DateEmitter(mn, mx, weights=weights)
-    de.seed_rngs(seed)
-    assert [de() for _ in expected] == [datetime.date(*i) for i in expected]
+def test_choicesemitter_dates(seed, mn, mx, weights, expected):
+    dates = dtrange.dtrange(datetime.date(*mn), datetime.date(*mx))
+    de = em.ChoicesEmitter(dates, weights=weights, rng_seed=seed)
+    assert de(len(expected)) == [datetime.date(*i) for i in expected]
 
 
-@pytest.mark.parametrize('seed, mn, mx, resolution, weights, expected', [
-    (999, None, None, 1, None,
-     [(2, 54, 54), (20, 40, 20), (20, 53, 23), (19, 25, 53), (17, 51, 38),
-      (17, 35, 58), (4, 48, 30), (23, 34, 15), (11, 34, 56), (23, 26, 12)]),
-    (999, None, None, 60, None,
-     [(23, 10), (2, 43), (19, 22), (19, 35), (18, 13), (16, 44), (16, 29),
-      (4, 30), (22, 5), (10, 51)]),
-    (999, (5, 0, 0), (5, 30, 0), 1, None,
-     [(5, 26, 40), (5, 23, 10), (5, 2, 43), (5, 29, 46), (5, 19, 22),
-      (5, 19, 35), (5, 18, 13), (5, 16, 44), (5, 16, 29), (5, 4, 30)]),
-    (999, (5, 0, 0), (11, 59, 59), 60,
-     list(itertools.accumulate([1] * 60 + [1] * 60 + [5] * 60 + [10] * 60 +
-                               [5] * 60 + [3] * 60 + [2] * 60)),
+@pytest.mark.parametrize('seed, mn, mx, step, step_unit, weights, expected', [
+    (999, (0, 0, 0), (0, 0, 0), 1, 'seconds', None,
+     [(18, 45, 8), (1, 55, 17), (20, 56, 23), (13, 46, 12), (11, 46, 24),
+      (3, 10, 10), (19, 10, 4), (7, 38, 5), (19, 4, 5), (20, 17, 0)]),
+    (999, (0, 0), (0, 0), 60, 'seconds', None,
+     [(18, 45), (1, 55), (20, 56), (13, 46), (11, 46), (3, 10), (19, 10),
+      (7, 38), (19, 4), (20, 17)]),
+    (999, (5, 0, 0), (5, 30, 0), 1, 'seconds', None,
+     [(5, 23, 26), (5, 2, 24), (5, 26, 10), (5, 17, 12), (5, 14, 43),
+      (5, 3, 57), (5, 23, 57), (5, 9, 32), (5, 23, 50), (5, 25, 21)]),
+    # The next examples show weighting a time range by sub-ranges -- in
+    # these cases by hour. E.g., [1] * 60 gives each minute from 5:00
+    # to 5:59 a weight of 1, etc.
+    (999, (5, 0, 0), (12, 0, 0), 1, 'minutes',
+     [1] * 60 + [1] * 60 + [5] * 60 + [10] * 60 + [5] * 60 + [3] * 60 +
+     [2] * 60,
      [(9, 49), (7, 1), (10, 31), (8, 50), (8, 37), (7, 18), (9, 54), (8, 9),
       (9, 53), (10, 16)]),
-    (999, (6, 0, 0), (8, 59, 59), 600,
-     list(itertools.accumulate([10] * 6 + [5] * 6 + [2] * 6)),
+    (999, (6, 0, 0), (9, 0, 0), 10, 'minutes', [10] * 6 + [5] * 6 + [2] * 6,
      [(7, 30), (6, 0), (7, 50), (6, 50), (6, 50), (6, 10), (7, 40), (6, 30),
       (7, 40), (7, 50)]),
-    (999, (20, 0, 1), (20, 0, 59), 20, [50, 80, 100],
+    (999, (20, 0, 1), (20, 1, 0), 20, 'seconds', [50, 30, 20],
      [(20, 0, 21), (20, 0, 1), (20, 0, 41), (20, 0, 21), (20, 0, 1),
       (20, 0, 1), (20, 0, 21), (20, 0, 1), (20, 0, 21), (20, 0, 41)]),
 ])
-def test_timeemitter(seed, mn, mx, resolution, weights, expected):
-    mn = mn if mn is None else datetime.time(*mn)
-    mx = mx if mx is None else datetime.time(*mx)
-    te = em.TimeEmitter(mn, mx, resolution=resolution, weights=weights)
-    te.seed_rngs(seed)
-    assert [te() for _ in expected] == [datetime.time(*i) for i in expected]
+def test_timeemitter(seed, mn, mx, step, step_unit, weights, expected):
+    times = dtrange.dtrange(datetime.time(*mn), datetime.time(*mx), step,
+                            step_unit)
+    te = em.ChoicesEmitter(times, weights=weights, rng_seed=seed)
+    assert te(len(expected)) == [datetime.time(*i) for i in expected]
+
+
+@pytest.mark.parametrize('seed, mn, mx, step, step_unit, weights, expected', [
+    (999, (2016, 1, 1, 20, 0), (2016, 1, 2, 7, 0), 1, 'minutes', None,
+     [(2016, 1, 2, 4, 35, 0), (2016, 1, 1, 20, 52, 0), (2016, 1, 2, 5, 35, 0),
+      (2016, 1, 2, 2, 18, 0), (2016, 1, 2, 1, 23, 0), (2016, 1, 1, 21, 27, 0),
+      (2016, 1, 2, 4, 47, 0), (2016, 1, 1, 23, 29, 0), (2016, 1, 2, 4, 44, 0),
+      (2016, 1, 2, 5, 17, 0)]),
+    (999, (2016, 1, 1, 0, 0), (2017, 1, 1, 0, 0), 12, 'hours', None,
+     [(2016, 10, 12, 12, 0, 0), (2016, 1, 30, 0, 0, 0),
+      (2016, 11, 15, 0, 0, 0), (2016, 7, 28, 12, 0, 0),
+      (2016, 6, 28, 12, 0, 0), (2016, 2, 18, 0, 0, 0), (2016, 10, 19, 0, 0, 0),
+      (2016, 4, 26, 0, 0, 0), (2016, 10, 17, 12, 0, 0),
+      (2016, 11, 5, 0, 0, 0)]),
+    # This shows weighting a full year by sub-ranges of months.
+    (999, (2016, 1, 1, 0, 0), (2017, 1, 1, 0, 0), 1, 'hours',
+     [5] * (31 * 24) + [10] * (29 * 24) + [15] * (31 * 24) + [15] * (30 * 24) +
+     [5] * (31 * 24) + [2] * (30 * 24) + [2] * (31 * 24) + [5] * (31 * 24) +
+     [10] * (30 * 24) + [15] * (31 * 24) + [15] * (30 * 24) + [5] * (31 * 24),
+     [(2016, 10, 26, 5, 0, 0), (2016, 2, 10, 19, 0, 0),
+      (2016, 11, 14, 10, 0, 0), (2016, 9, 3, 5, 0, 0), (2016, 6, 19, 1, 0, 0),
+      (2016, 2, 27, 6, 0, 0), (2016, 10, 29, 21, 0, 0), (2016, 4, 7, 9, 0, 0),
+      (2016, 10, 29, 0, 0, 0), (2016, 11, 8, 16, 0, 0)]),
+])
+def test_datetimeemitter(seed, mn, mx, step, step_unit, weights, expected):
+    datetimes = dtrange.dtrange(datetime.datetime(*mn), datetime.datetime(*mx),
+                                step, step_unit)
+    dte = em.ChoicesEmitter(datetimes, weights=weights, rng_seed=seed)
+    assert dte(len(expected)) == [datetime.datetime(*i) for i in expected]

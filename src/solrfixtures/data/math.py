@@ -76,48 +76,6 @@ def clamp(number: Number,
     return number
 
 
-def time_to_seconds(time: datetime.time) -> float:
-    """Determines the # of seconds since midnight for a datetime.time.
-
-    E.g.: 12:00:59 AM is 59 seconds since midnight, so
-    time_to_seconds(datetime.time(0, 0, 59)) returns 59.
-
-    Args:
-        time: The input datetime.time object. It may or may not be
-            timezone aware.
-
-    Returns:
-        A float representing the # of seconds since midnight.
-    """
-    second = time.second + (time.microsecond / (10 ** 6))
-    return (time.hour * 3600) + (time.minute * 60) + second
-
-
-def seconds_to_time(seconds: Number) -> datetime.time:
-    """Converts a # of seconds since midnight to a datetime.time.
-
-    E.g.: 43200 seconds after midnight is noon, so
-    seconds_to_time(43200) returns datetime.time(12, 0, 0).
-
-    Args:
-        seconds: The input float representing seconds since midnight.
-            If a value > 86399 is provided, then the clock effectively
-            rolls over. 86400 and 0 both return midnight.
-
-    Returns:
-        A datetime.time value corresponding to the # of seconds since
-        midnight.
-    """
-    seconds %= 86400
-    hour = int(seconds / 3600)
-    minute_seconds = seconds % 3600
-    minute = int(minute_seconds / 60)
-    seconds_float = minute_seconds % 60
-    second = int(seconds_float)
-    microsecond = round((seconds_float - second) * (10 ** 6))
-    return datetime.time(hour, minute, second, microsecond)
-
-
 def weighted_shuffle(items: Sequence[T],
                      weights: Sequence[Number],
                      rng: Optional[random.Random] = random.Random(),

@@ -70,39 +70,6 @@ def test_clamp(number, mn, mx, expected):
     assert m.clamp(number, mn, mx) == expected
 
 
-@pytest.mark.parametrize('time, expected', [
-    ((0, 0, 0), 0),
-    ((0, 0, 59), 59),
-    ((0, 0, 59, 600), 59.0006),
-    ((0, 10, 30), 630),
-    ((1, 10, 30), 4230),
-    ((1, 10, 30, 9000), 4230.009),
-    ((12, 0, 0), 43200),
-    ((20, 8, 33), 72513),
-    ((23, 59, 59), 86399),
-])
-def test_time_to_seconds(time, expected):
-    assert m.time_to_seconds(datetime.time(*time)) == expected
-
-
-@pytest.mark.parametrize('seconds, expected', [
-    (0, (0, 0, 0)),
-    (59, (0, 0, 59)),
-    (59.0006, (0, 0, 59, 600)),
-    (630, (0, 10, 30)),
-    (4230, (1, 10, 30)),
-    (4230.009, (1, 10, 30, 9000)),
-    (43200, (12, 0, 0)),
-    (72513, (20, 8, 33)),
-    (86399, (23, 59, 59)),
-    (86400, (0, 0, 0)),
-    (86459, (0, 0, 59)),
-    (172800, (0, 0, 0)),
-])
-def test_seconds_to_time(seconds, expected):
-    assert m.seconds_to_time(seconds) == datetime.time(*expected)
-
-
 @pytest.mark.parametrize('seed, items, weights, k, expected', [
     (999, range(6), [10, 5, 5, 5, 5, 1], None,
      [[0, 2, 3, 4, 1, 5], [5, 0, 3, 2, 1, 4], [3, 2, 5, 0, 1, 4],

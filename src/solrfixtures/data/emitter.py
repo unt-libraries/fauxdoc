@@ -10,10 +10,8 @@ from typing import Any, Callable, Optional, List, Sequence, Tuple, Union,\
 import pytz
 
 from .exceptions import ChoicesWeightsLengthMismatch
-from .math import time_to_seconds, seconds_to_time, weighted_shuffle
-from solrfixtures.typing import Number, IntEmitterLike, StrEmitterLike,\
-                                RandomDateEmitterLike, RandomTimeEmitterLike,\
-                                TzInfoLike
+from .math import weighted_shuffle
+from solrfixtures.typing import Number, IntEmitterLike, StrEmitterLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
@@ -265,6 +263,11 @@ class ChoicesEmitter(BaseRandomEmitter):
         It also resets `cum_weights`.
         """
         super().reset()
+        if not self.items:
+            raise ValueError(
+                f"The 'items' attribute must be a non-empty sequence. "
+                f"(Provided: {self.items})"
+            )
         if self.weights is not None:
             nitems = len(self.items)
             nweights = len(self.weights)
@@ -274,7 +277,7 @@ class ChoicesEmitter(BaseRandomEmitter):
                 self.cum_weights = list(itertools.accumulate(self.weights))
 
         if self.unique:
-            # For globally unique emitters (with replacement), it's
+            # For globally unique emitters (without replacement), it's
             # most efficient to pre-shuffle the items ONCE. Then you
             # just return the values in shuffled order as they're
             # requested. Resetting regenerates this shuffle.
@@ -510,161 +513,6 @@ class TextEmitter(BaseRandomEmitter):
                     render.extend([next(seps, ' '), next(words)])
                 texts.append(''.join(render))
         return texts
-
-
-class DateEmitter(BaseRandomEmitter):
-    """Class for emitting random datetime.date values.
-
-    Attributes:
-        rng: Random Number Generator, inherited from superclass.
-        mn: The minimum possible datetime.date value.
-        mx: (Optional.) The maximum possible datetime.date value.
-            Default is today.
-        weights: (Optional.) A sequence of cumulative weights to use
-            when making the selection, to make certain dates relatively
-            more or less likely to be picked. If provided, the number
-            of weights must be equal to the total number of dates that
-            may be selected. If not provided, then no weighting is
-            applied, and all dates are equally likely.
-        daydelta_emitter: An `IntEmitter` used internally to generate
-            a random differential for date selection.
-    """
-
-    def __init__(self,
-                 mn: datetime.date,
-                 mx: Optional[datetime.date] = None,
-                 weights: Optional[Sequence[Number]] = None) -> None:
-        """Inits DateEmitter with mn, mx, and weights.
-
-        Note that `weights` should be *cumulative* weights, e.g.
-        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
-        weights to cumulative weights is with itertools.accumulate:
-            >>> import itertools
-            >>> weights = [70, 10, 20]
-            >>> list(itertools.accumulate(weights))
-            [70, 80, 100]
-        """
-        super().__init__()
-        mx = datetime.date.today() if mx is None else mx
-        mx_daydelta = (mx - mn).days
-        try:
-            self.daydelta_emitter = IntEmitter(0, mx_daydelta, weights=weights)
-        except ChoicesWeightsLengthMismatch as err:
-            noun = 'day delta'
-            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
-        self.mn = mn
-        self.mx = mx
-
-    def seed_rngs(self, seed: Any) -> None:
-        """See base class."""
-        self.daydelta_emitter.seed_rngs(seed)
-
-    def emit(self) -> datetime.date:
-        """Returns a random datetime.date value.
-
-        Object attributes control the min/max values and weights for
-        random selection.
-        """
-        return self.mn + datetime.timedelta(days=self.daydelta_emitter())
-
-
-class TimeEmitter(BaseRandomEmitter):
-    """Class for emitting random datetime.time values.
-
-    Attributes:
-        rng: Inherited from superclass. This is the random number
-            generator, a random.Random instance, for this emitter.
-        mn: (Optional.) The minimum possible datetime.time value.
-            Default is time(0, 0, 0), or midnight.
-        mx: (Optional.) The maximum possible datetime.time value.
-            Default is time(23, 59, 59), or 11:59:59 PM.
-        resolution: (Optional.) The "step" value (in seconds) between
-            adjacent selections within your time range. E.g., a value
-            of 60 would select minutes. Note that this is relative to
-            your `mn` value; if you provide mn=time(0, 0, 5) and a
-            resolution of 60, viable selections would be 1 minute + 5
-            seconds, e.g. time(0, 1, 5), time(0, 2, 5), etc. Default
-            resolution is 1, which means every second can be selected.
-        weights: (Optional.) A sequence of cumulative weights to use
-            when making the selection, to make certain dates relatively
-            more or less likely to be picked. If provided, the number
-            of weights must be equal to the total number of dates that
-            may be selected. If not provided, then no weighting is
-            applied, and all dates are equally likely.
-        tzinfo: (Optional.) A tzinfo-compatible object to use to apply
-            a timezone to the generated time. Defaults to UTC
-            (datetime.timezone.utc).
-        intervaldelta_emitter: An `IntEmitter` used internally to
-            generate a time differential for random selection.
-    """
-
-    def __init__(self,
-                 mn: Optional[datetime.time] = None,
-                 mx: Optional[datetime.time] = None,
-                 resolution: int = 1,
-                 weights: Optional[Sequence[Number]] = None,
-                 tzinfo: TzInfoLike = datetime.timezone.utc) -> None:
-        """Inits TimeEmitter with mn, mx, weights, tz, and resolution.
-
-        Note that `weights` should be *cumulative* weights, e.g.
-        [70, 80, 100] instead of [70, 10, 20]. An easy way to convert
-        weights to cumulative weights is with itertools.accumulate:
-            >>> import itertools
-            >>> weights = [70, 10, 20]
-            >>> list(itertools.accumulate(weights))
-            [70, 80, 100]
-
-        When dealing with times, if you want specific time ranges to be
-        weighted, you can use notation such as
-        `[weight1] * interval1 + [weight2] * interval2`. E.g.:
-            >>> import itertools
-            >>> from datetime import time
-            >>> mn = time(6, 0, 0)
-            >>> mx = time(8, 59, 59)
-            >>> weights = [1] * 3600 + [5] * 3600 + [20] * 3600
-            >>> cum_weights = list(itertools.accumulate(weights))
-            ...etc.
-
-        In the above, our time range is a period of 3 hours (6 AM to
-        9 AM). We've given all seconds from 6:00:00 to 6:59:59 a weight
-        of 1; all seconds from 7:00:00 to 7:59:59 a weight of 5, and
-        all seconds from 8:00:00 to 8:59:59 a weight of 20. (Adjust the
-        multiplier based on your resolution -- if your resolution is
-        60, you'd use a multiplier of 60 for each hour instead of
-        3600.)
-        """
-        super().__init__()
-        mn = mn or datetime.time(0, 0, 0)
-        mx = mx or datetime.time(23, 59, 59)
-        mn_secs = time_to_seconds(mn)
-        mx_secs = time_to_seconds(mx)
-        mx_intervaldelta = int((mx_secs - mn_secs) / resolution)
-        try:
-            self.intervaldelta_emitter = IntEmitter(0, mx_intervaldelta,
-                                                    weights=weights)
-        except ChoicesWeightsLengthMismatch as err:
-            noun = 'time interval delta'
-            raise ChoicesWeightsLengthMismatch(err.args[0], err.args[1], noun)
-        self.mn = mn
-        self.mx = mx
-        self.resolution = resolution
-        self.tzinfo = tzinfo
-        self._mn_secs = mn_secs
-
-    def seed_rngs(self, seed: Any) -> None:
-        """See base class."""
-        self.intervaldelta_emitter.seed_rngs(seed)
-
-    def emit(self) -> datetime.time:
-        """Returns a random, timezone aware datetime.time value.
-
-        Object attributes control the min/max, weights, and resolution
-        values for random selection, as well as the timezone of the
-        returned time.
-        """
-        secsdelta = self.intervaldelta_emitter() * self.resolution
-        secs_since_midnight = self._mn_secs + secsdelta
-        return seconds_to_time(secs_since_midnight).replace(tzinfo=self.tzinfo)
 
 
 # OLD CODE IS BELOW -- We want to refactor this out -------------------
