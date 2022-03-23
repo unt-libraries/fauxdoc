@@ -5,7 +5,6 @@ import random
 import pytest
 
 from solrfixtures import mathtools as m
-from solrfixtures import exceptions as ex
 
 
 @pytest.mark.parametrize('x, mu, expected', [
@@ -108,7 +107,8 @@ def test_weighted_shuffle(seed, items, weights, k, expected):
     (range(3), [10, 5, 5, 5])
 ])
 def test_weighted_shuffle_raises_error_mismatched_weights(items, weights):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
+    with pytest.raises(ValueError) as excinfo:
         m.weighted_shuffle(items, weights)
-    assert excinfo.value.num_choices == len(items)
-    assert excinfo.value.num_weights == len(weights)
+    error_msg = str(excinfo)
+    assert f"({len(items)})" in error_msg
+    assert f"({len(weights)})" in error_msg

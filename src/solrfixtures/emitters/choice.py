@@ -3,7 +3,6 @@ import itertools
 from typing import Any, Optional, List, Sequence, TypeVar
 
 from solrfixtures.emitter import RandomEmitter
-from solrfixtures.exceptions import ChoicesWeightsLengthMismatch
 from solrfixtures.mathtools import weighted_shuffle
 from solrfixtures.typing import Number
 
@@ -96,7 +95,11 @@ class ChoicesEmitter(RandomEmitter):
             nitems = len(self.items)
             nweights = len(self.weights)
             if nitems != nweights:
-                raise ChoicesWeightsLengthMismatch(nitems, nweights, self.noun)
+                noun_phr = f"{self.noun} choices" if self.noun else "choices"
+                raise ValueError(
+                    f"Mismatched number of {noun_phr} ({nitems}) to choice "
+                    f"weights ({nweights}). These amounts must match."
+                )
             if not (self.unique or self.each_unique):
                 self.cum_weights = list(itertools.accumulate(self.weights))
 
@@ -165,5 +168,3 @@ class ChoicesEmitter(RandomEmitter):
             return [self.rng.choice(self.items)]
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=number)
-
-

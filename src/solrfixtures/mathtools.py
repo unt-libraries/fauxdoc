@@ -3,7 +3,6 @@ import math
 import random
 from typing import List, Optional, Sequence
 
-from .exceptions import ChoicesWeightsLengthMismatch
 from solrfixtures.typing import Number, T
 
 
@@ -142,7 +141,10 @@ def weighted_shuffle(items: Sequence[T],
     nweights = len(weights)
     number = nitems if number is None else number
     if nitems != nweights:
-        raise ChoicesWeightsLengthMismatch(nitems, nweights)
+        raise ValueError(
+            f"Mismatched number of choices ({nitems}) to choice weights "
+            f"({nweights}). These amounts must match."
+        )
 
     # The k threshold where the `high_k` method becomes faster than the
     # `low_k` is k =~ 42% of the total number of items.

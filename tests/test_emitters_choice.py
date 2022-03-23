@@ -5,7 +5,6 @@ import pytest
 
 from solrfixtures.dtrange import dtrange
 from solrfixtures.emitters.choice import ChoicesEmitter
-from solrfixtures.exceptions import ChoicesWeightsLengthMismatch
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -80,10 +79,11 @@ def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
     ([0, 1], [50, 10, 2])
 ])
 def test_choicesemitter_incorrect_weights(items, weights):
-    with pytest.raises(ChoicesWeightsLengthMismatch) as excinfo:
+    with pytest.raises(ValueError) as excinfo:
         ChoicesEmitter(items, weights=weights)
-    assert excinfo.value.num_choices == len(items)
-    assert excinfo.value.num_weights == len(weights)
+    error_msg = str(excinfo)
+    assert f"({len(items)}" in error_msg
+    assert f"({len(weights)}" in error_msg
 
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
