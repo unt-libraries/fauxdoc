@@ -1,10 +1,9 @@
 """Contains tests for the solrfixtures data.dtrange module."""
-
 from datetime import date, datetime, time, timedelta
 
 import pytest
 
-from solrfixtures.data import dtrange
+from solrfixtures import dtrange
 
 
 def test_dateortimerange_attributes_are_readonly():

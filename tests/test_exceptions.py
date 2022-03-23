@@ -1,8 +1,8 @@
-"""Contains tests for solrfixtures.data.exceptions"""
+"""Contains tests for solrfixtures.exceptions"""
 
 import pytest
 
-from solrfixtures.data import exceptions as ex
+from solrfixtures.exceptions import ChoicesWeightsLengthMismatch
 
 
 @pytest.mark.parametrize('num_choices, num_weights, noun, exp_msg_pattern', [
@@ -13,7 +13,7 @@ from solrfixtures.data import exceptions as ex
 ])
 def test_choicesweightslengthmismatch_error_string(num_choices, num_weights,
                                                    noun, exp_msg_pattern):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        raise ex.ChoicesWeightsLengthMismatch(num_choices, num_weights, noun)
+    with pytest.raises(ChoicesWeightsLengthMismatch) as excinfo:
+        raise ChoicesWeightsLengthMismatch(num_choices, num_weights, noun)
     err_msg = str(excinfo.value)
     assert exp_msg_pattern in err_msg

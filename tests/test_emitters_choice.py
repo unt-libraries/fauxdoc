@@ -1,33 +1,11 @@
-"""Contains tests for the solrfixtures.data.emitter module."""
+"""Contains tests for the solrfixtures.emitters.choice module."""
 import datetime
 
 import pytest
 
-from solrfixtures.data import dtrange
-from solrfixtures.data import emitter as em
-from solrfixtures.data import exceptions as ex
-
-
-# Module-specific fixtures
-
-@pytest.fixture
-def word_emitter():
-    """Fixture to use as the `word_emitter` arg for TextEmitter tests."""
-    return em.WordEmitter(
-        em.ChoicesEmitter(range(2, 9)),
-        em.ChoicesEmitter('abcde'),
-    )
-
-
-# Tests
-
-@pytest.mark.parametrize('ranges, expected', [
-    ([(0x0041, 0x0045), (0x0047, 0x0047)], list('ABCDEG')),
-    ([(ord('a'), ord('g')), (ord('A'), ord('C'))],
-     list('abcdefgABC'))
-])
-def test_makealphabet(ranges, expected):
-    assert em.make_alphabet(ranges) == expected
+from solrfixtures.dtrange import dtrange
+from solrfixtures.emitters.choice import ChoicesEmitter
+from solrfixtures.exceptions import ChoicesWeightsLengthMismatch
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -65,15 +43,15 @@ def test_makealphabet(ranges, expected):
 def test_choicesemitter(seed, items, weights, unq, num, repeat, expected):
     each_unique = unq == 'each'
     unique = unq and not each_unique
-    ce = em.ChoicesEmitter(items, weights=weights, unique=unique,
-                           each_unique=each_unique, rng_seed=seed)
+    ce = ChoicesEmitter(items, weights=weights, unique=unique,
+                        each_unique=each_unique, rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert result == expected
 
 
 def test_choicesemitter_empty_items():
     with pytest.raises(ValueError):
-        em.ChoicesEmitter(range(0))
+        ChoicesEmitter(range(0))
 
 
 @pytest.mark.parametrize('items, unq, num, repeat, exp_error', [
@@ -91,7 +69,7 @@ def test_choicesemitter_empty_items():
 def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
     each_unique = unq == 'each'
     unique = unq and not each_unique
-    ce = em.ChoicesEmitter(items, unique=unique, each_unique=each_unique)
+    ce = ChoicesEmitter(items, unique=unique, each_unique=each_unique)
     with pytest.raises(ValueError) as excinfo:
         [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert exp_error in str(excinfo.value)
@@ -102,79 +80,11 @@ def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
     ([0, 1], [50, 10, 2])
 ])
 def test_choicesemitter_incorrect_weights(items, weights):
-    with pytest.raises(ex.ChoicesWeightsLengthMismatch) as excinfo:
-        em.ChoicesEmitter(items, weights=weights)
+    with pytest.raises(ChoicesWeightsLengthMismatch) as excinfo:
+        ChoicesEmitter(items, weights=weights)
     assert excinfo.value.num_choices == len(items)
     assert excinfo.value.num_weights == len(weights)
 
-
-@pytest.mark.parametrize('seed, mn, mx, lweights, alpha, aweights, expected', [
-    (999, 0, 0, None, 'abcde', None, ['', '', '', '', '', '', '', '', '', '']),
-    (999, 1, 1, None, 'abcde', None,
-     ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
-    (999, 5, 5, None, 'abcde', None,
-     ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd', 'adcdb',
-      'aebdb', 'cadca']),
-    (999, 5, 5, None, 'a', None,
-     ['aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa',
-      'aaaaa', 'aaaaa']),
-    (999, 1, 5, None, 'abcde', None,
-     ['daec', 'c', 'adbde', 'aea', 'bcd', 'b', 'eebd', 'aa', 'beca', 'daece']),
-    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None,
-     ['da', 'e', 'cca', 'db', 'de', 'a', 'ea', 'bc', 'db', 'ee']),
-    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', [20, 5, 15, 40, 20],
-     ['da', 'e', 'dda', 'dc', 'de', 'a', 'ea', 'cd', 'dc', 'ee']),
-    (999, 1, 5, None, 'abcde', [20, 5, 15, 40, 20],
-     ['daed', 'd', 'adcde', 'aea', 'cdd', 'c', 'eebd', 'aa', 'beda', 'daede']),
-])
-def test_wordemitter(seed, mn, mx, lweights, alpha, aweights, expected):
-    length_emitter = em.ChoicesEmitter(range(mn, mx + 1), lweights)
-    alphabet_emitter = em.ChoicesEmitter(alpha, aweights)
-    se = em.WordEmitter(length_emitter, alphabet_emitter, rng_seed=seed)
-    assert se(len(expected)) == expected
-
-
-@pytest.mark.parametrize(
-    'seed, word_mn, word_mx, word_weights, sep_chars, sep_weights, expected',
-    [
-        (999, 1, 3, None, None, None,
-         ['daeccad bd eaeabcdb', 'eebdaa', 'becad ae cecddad', 'cdba ebdbcad',
-          'caecabd bc', 'bbceeeac']),
-        (999, 3, 6, None, None, None,
-         ['daeccad bd eaeabcdb eebdaa becad ae', 'cecddad cdba ebdbcad',
-          'caecabd bc bbceeeac dce eab bdade',
-          'acdedb aea caeccaed abceeced bac', 'ebcbdb dc ba ded',
-          'cdbbdbab bdbed dad']),
-        (999, 3, 6, None, [' ', '-', ', ', '; '], [40, 30, 20, 10],
-         ['daeccad, bd eaeabcdb, eebdaa-becad-ae', 'cecddad cdba, ebdbcad',
-          'caecabd bc, bbceeeac, dce eab; bdade',
-          'acdedb aea caeccaed-abceeced, bac', 'ebcbdb dc, ba; ded',
-          'cdbbdbab bdbed-dad']),
-        (999, 1, 3, [60, 25, 15], None, None,
-         ['daeccad bd', 'eaeabcdb', 'eebdaa becad ae', 'cecddad', 'cdba',
-          'ebdbcad']),
-    ]
-)
-def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
-                     sep_weights, expected, word_emitter):
-    sep_emitter = None
-    if sep_chars is not None:
-        sep_emitter = em.WordEmitter(
-            em.ChoicesEmitter(range(1, 2)),
-            em.ChoicesEmitter(sep_chars, sep_weights)
-        )
-    te = em.TextEmitter(
-        em.ChoicesEmitter(range(word_mn, word_mx + 1), word_weights),
-        word_emitter,
-        sep_emitter,
-        rng_seed=seed
-    )
-    assert te(len(expected)) == expected
-
-
-# The next few tests are an illustration to show how to implement
-# date, datetime, and time emitters using data.emitter.ChoicesEmitter
-# and data.dtrange.
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
     (999, (2015, 1, 1), (2015, 1, 2), None,
@@ -188,8 +98,8 @@ def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
       (2015, 1, 1), (2015, 1, 2), (2015, 1, 1), (2015, 1, 2), (2015, 1, 3)]),
 ])
 def test_choicesemitter_dates(seed, mn, mx, weights, expected):
-    dates = dtrange.dtrange(datetime.date(*mn), datetime.date(*mx))
-    de = em.ChoicesEmitter(dates, weights=weights, rng_seed=seed)
+    dates = dtrange(datetime.date(*mn), datetime.date(*mx))
+    de = ChoicesEmitter(dates, weights=weights, rng_seed=seed)
     assert de(len(expected)) == [datetime.date(*i) for i in expected]
 
 
@@ -218,10 +128,10 @@ def test_choicesemitter_dates(seed, mn, mx, weights, expected):
      [(20, 0, 21), (20, 0, 1), (20, 0, 41), (20, 0, 21), (20, 0, 1),
       (20, 0, 1), (20, 0, 21), (20, 0, 1), (20, 0, 21), (20, 0, 41)]),
 ])
-def test_timeemitter(seed, mn, mx, step, step_unit, weights, expected):
-    times = dtrange.dtrange(datetime.time(*mn), datetime.time(*mx), step,
-                            step_unit)
-    te = em.ChoicesEmitter(times, weights=weights, rng_seed=seed)
+def test_choicesemitter_times(seed, mn, mx, step, step_unit, weights,
+                              expected):
+    times = dtrange(datetime.time(*mn), datetime.time(*mx), step, step_unit)
+    te = ChoicesEmitter(times, weights=weights, rng_seed=seed)
     assert te(len(expected)) == [datetime.time(*i) for i in expected]
 
 
@@ -247,8 +157,9 @@ def test_timeemitter(seed, mn, mx, step, step_unit, weights, expected):
       (2016, 2, 27, 6, 0, 0), (2016, 10, 29, 21, 0, 0), (2016, 4, 7, 9, 0, 0),
       (2016, 10, 29, 0, 0, 0), (2016, 11, 8, 16, 0, 0)]),
 ])
-def test_datetimeemitter(seed, mn, mx, step, step_unit, weights, expected):
-    datetimes = dtrange.dtrange(datetime.datetime(*mn), datetime.datetime(*mx),
-                                step, step_unit)
-    dte = em.ChoicesEmitter(datetimes, weights=weights, rng_seed=seed)
+def test_choicesemitter_datetimes(seed, mn, mx, step, step_unit, weights,
+                                  expected):
+    datetimes = dtrange(datetime.datetime(*mn), datetime.datetime(*mx), step,
+                        step_unit)
+    dte = ChoicesEmitter(datetimes, weights=weights, rng_seed=seed)
     assert dte(len(expected)) == [datetime.datetime(*i) for i in expected]

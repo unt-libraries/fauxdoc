@@ -4,8 +4,8 @@ import random
 
 import pytest
 
-from solrfixtures.data import math as m
-from solrfixtures.data import exceptions as ex
+from solrfixtures import mathtools as m
+from solrfixtures import exceptions as ex
 
 
 @pytest.mark.parametrize('x, mu, expected', [
