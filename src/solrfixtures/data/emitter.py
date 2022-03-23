@@ -41,7 +41,7 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     ]
 
 
-class BaseEmitter(ABC):
+class Emitter(ABC):
     """Abstract base class for defining emitter objects.
 
     Subclass this to implement an emitter object. At this level all you
@@ -69,9 +69,8 @@ class BaseEmitter(ABC):
         """Returns a bool; True if an instance emits unique values.
 
         We mean "unique" in terms of the lifetime of the instance, not
-        a given call to `emit_multiple`. This should return True if the
-        instance is guaranteed never to return a duplicate until it is
-        reset.
+        a given call to `emit`. This should return True if the instance
+        is guaranteed never to return a duplicate until it is reset.
         """
         return False
 
@@ -140,7 +139,7 @@ class BaseEmitter(ABC):
         """
 
 
-class BaseRandomEmitter(BaseEmitter):
+class RandomEmitter(Emitter):
     """Abstract base class for defining emitters that need RNG.
 
     Subclass this to implement an emitter object that uses randomized
@@ -182,7 +181,7 @@ class BaseRandomEmitter(BaseEmitter):
         self.rng.seed(rng_seed)
 
 
-class ChoicesEmitter(BaseRandomEmitter):
+class ChoicesEmitter(RandomEmitter):
     """Class for making random selections, optionally with weighting.
 
     This covers any kind of random choice and implements the most
@@ -341,7 +340,7 @@ class ChoicesEmitter(BaseRandomEmitter):
                                 k=number)
 
 
-class WordEmitter(BaseRandomEmitter):
+class WordEmitter(RandomEmitter):
     """Class for generating and emitting randomized words.
 
     Words that are emitted have a random variable length and characters
@@ -426,7 +425,7 @@ class WordEmitter(BaseRandomEmitter):
         return words
 
 
-class TextEmitter(BaseRandomEmitter):
+class TextEmitter(RandomEmitter):
     """Class for emitting random text.
 
     "Text" in this case is defined very basically as a string of words,
