@@ -34,7 +34,7 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     ]
 
 
-class WordEmitter(RandomEmitter):
+class Word(RandomEmitter):
     """Class for generating and emitting randomized words.
 
     Words that are emitted have a random variable length and characters
@@ -57,7 +57,7 @@ class WordEmitter(RandomEmitter):
                  length_emitter: IntEmitterLike,
                  alphabet_emitter: StrEmitterLike,
                  rng_seed: Any = None) -> None:
-        """Inits WordEmitter with a length and alphabet emitter.
+        """Inits Word emitter with a length and alphabet emitter.
 
         Args:
             length_emitter: See `length_emitter` attribute.
@@ -119,7 +119,7 @@ class WordEmitter(RandomEmitter):
         return words
 
 
-class TextEmitter(RandomEmitter):
+class Text(RandomEmitter):
     """Class for emitting random text.
 
     "Text" in this case is defined very basically as a string of words,

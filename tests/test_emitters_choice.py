@@ -4,7 +4,7 @@ import datetime
 import pytest
 
 from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters.choice import ChoicesEmitter
+from solrfixtures.emitters.choice import Choice
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -39,18 +39,18 @@ from solrfixtures.emitters.choice import ChoicesEmitter
      [[0, 3, 7, 12, 4], [6, 1, 2, 9, 8], [22, 14, 5, 18, 11],
       [20, 24, 13, 23, 16], [21, 17, 19, 15, 10]]),
 ])
-def test_choicesemitter(seed, items, weights, unq, num, repeat, expected):
+def test_choice(seed, items, weights, unq, num, repeat, expected):
     each_unique = unq == 'each'
     unique = unq and not each_unique
-    ce = ChoicesEmitter(items, weights=weights, unique=unique,
-                        each_unique=each_unique, rng_seed=seed)
+    ce = Choice(items, weights=weights, unique=unique, each_unique=each_unique,
+                rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert result == expected
 
 
-def test_choicesemitter_empty_items():
+def test_choice_empty_items():
     with pytest.raises(ValueError):
-        ChoicesEmitter(range(0))
+        Choice(range(0))
 
 
 @pytest.mark.parametrize('items, unq, num, repeat, exp_error', [
@@ -65,10 +65,10 @@ def test_choicesemitter_empty_items():
     (range(10), True, 3, 4,
      '3 new unique values were requested, out of 1 possible selection.'),
 ])
-def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
+def test_choice_too_many_unique(items, unq, num, repeat, exp_error):
     each_unique = unq == 'each'
     unique = unq and not each_unique
-    ce = ChoicesEmitter(items, unique=unique, each_unique=each_unique)
+    ce = Choice(items, unique=unique, each_unique=each_unique)
     with pytest.raises(ValueError) as excinfo:
         [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert exp_error in str(excinfo.value)
@@ -78,9 +78,9 @@ def test_choicesemitter_too_many_unique(items, unq, num, repeat, exp_error):
     ([0, 1, 2, 3], [40, 50]),
     ([0, 1], [50, 10, 2])
 ])
-def test_choicesemitter_incorrect_weights(items, weights):
+def test_choice_incorrect_weights(items, weights):
     with pytest.raises(ValueError) as excinfo:
-        ChoicesEmitter(items, weights=weights)
+        Choice(items, weights=weights)
     error_msg = str(excinfo)
     assert f"({len(items)}" in error_msg
     assert f"({len(weights)}" in error_msg
@@ -97,9 +97,9 @@ def test_choicesemitter_incorrect_weights(items, weights):
      [(2015, 1, 2), (2015, 1, 1), (2015, 1, 3), (2015, 1, 1), (2015, 1, 1),
       (2015, 1, 1), (2015, 1, 2), (2015, 1, 1), (2015, 1, 2), (2015, 1, 3)]),
 ])
-def test_choicesemitter_dates(seed, mn, mx, weights, expected):
+def test_choice_dates(seed, mn, mx, weights, expected):
     dates = dtrange(datetime.date(*mn), datetime.date(*mx))
-    de = ChoicesEmitter(dates, weights=weights, rng_seed=seed)
+    de = Choice(dates, weights=weights, rng_seed=seed)
     assert de(len(expected)) == [datetime.date(*i) for i in expected]
 
 
@@ -128,10 +128,9 @@ def test_choicesemitter_dates(seed, mn, mx, weights, expected):
      [(20, 0, 21), (20, 0, 1), (20, 0, 41), (20, 0, 21), (20, 0, 1),
       (20, 0, 1), (20, 0, 21), (20, 0, 1), (20, 0, 21), (20, 0, 41)]),
 ])
-def test_choicesemitter_times(seed, mn, mx, step, step_unit, weights,
-                              expected):
+def test_choice_times(seed, mn, mx, step, step_unit, weights, expected):
     times = dtrange(datetime.time(*mn), datetime.time(*mx), step, step_unit)
-    te = ChoicesEmitter(times, weights=weights, rng_seed=seed)
+    te = Choice(times, weights=weights, rng_seed=seed)
     assert te(len(expected)) == [datetime.time(*i) for i in expected]
 
 
@@ -157,9 +156,8 @@ def test_choicesemitter_times(seed, mn, mx, step, step_unit, weights,
       (2016, 2, 27, 6, 0, 0), (2016, 10, 29, 21, 0, 0), (2016, 4, 7, 9, 0, 0),
       (2016, 10, 29, 0, 0, 0), (2016, 11, 8, 16, 0, 0)]),
 ])
-def test_choicesemitter_datetimes(seed, mn, mx, step, step_unit, weights,
-                                  expected):
+def test_choice_datetimes(seed, mn, mx, step, step_unit, weights, expected):
     datetimes = dtrange(datetime.datetime(*mn), datetime.datetime(*mx), step,
                         step_unit)
-    dte = ChoicesEmitter(datetimes, weights=weights, rng_seed=seed)
+    dte = Choice(datetimes, weights=weights, rng_seed=seed)
     assert dte(len(expected)) == [datetime.datetime(*i) for i in expected]

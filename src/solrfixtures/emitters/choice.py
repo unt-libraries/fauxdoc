@@ -4,10 +4,10 @@ from typing import Any, Optional, List, Sequence, TypeVar
 
 from solrfixtures.emitter import RandomEmitter
 from solrfixtures.mathtools import weighted_shuffle
-from solrfixtures.typing import Number
+from solrfixtures.typing import Number, T
 
 
-class ChoicesEmitter(RandomEmitter):
+class Choice(RandomEmitter):
     """Class for making random selections, optionally with weighting.
 
     This covers any kind of random choice and implements the most
@@ -47,8 +47,6 @@ class ChoicesEmitter(RandomEmitter):
             random.seed. Default is None.
     """
 
-    T = TypeVar('T')
-
     def __init__(self,
                  items: Sequence[T],
                  weights: Optional[Sequence[Number]] = None,
@@ -56,7 +54,7 @@ class ChoicesEmitter(RandomEmitter):
                  each_unique: bool = False,
                  noun: str = '',
                  rng_seed: Any = None) -> None:
-        """Inits a ChoicesEmitter with items, weights, and settings.
+        """Inits a Choice emitter with items, weights, and settings.
 
         Args:
             items: See `items` attribute.

@@ -1,8 +1,8 @@
 """Contains tests for the solrfixtures.emitters.text module."""
 import pytest
 
-from solrfixtures.emitters.choice import ChoicesEmitter
-from solrfixtures.emitters.text import make_alphabet, TextEmitter, WordEmitter
+from solrfixtures.emitters.choice import Choice
+from solrfixtures.emitters.text import make_alphabet, Text, Word
 
 
 # Module-specific fixtures
@@ -10,10 +10,7 @@ from solrfixtures.emitters.text import make_alphabet, TextEmitter, WordEmitter
 @pytest.fixture
 def word_emitter():
     """Fixture to use as the `word_emitter` arg for TextEmitter tests."""
-    return WordEmitter(
-        ChoicesEmitter(range(2, 9)),
-        ChoicesEmitter('abcde'),
-    )
+    return Word(Choice(range(2, 9)), Choice('abcde'))
 
 
 # Tests
@@ -47,9 +44,9 @@ def test_makealphabet(ranges, expected):
      ['daed', 'd', 'adcde', 'aea', 'cdd', 'c', 'eebd', 'aa', 'beda', 'daede']),
 ])
 def test_wordemitter(seed, mn, mx, lweights, alpha, aweights, expected):
-    length_emitter = ChoicesEmitter(range(mn, mx + 1), lweights)
-    alphabet_emitter = ChoicesEmitter(alpha, aweights)
-    se = WordEmitter(length_emitter, alphabet_emitter, rng_seed=seed)
+    length_emitter = Choice(range(mn, mx + 1), lweights)
+    alphabet_emitter = Choice(alpha, aweights)
+    se = Word(length_emitter, alphabet_emitter, rng_seed=seed)
     assert se(len(expected)) == expected
 
 
@@ -78,12 +75,9 @@ def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
                      sep_weights, expected, word_emitter):
     sep_emitter = None
     if sep_chars is not None:
-        sep_emitter = WordEmitter(
-            ChoicesEmitter(range(1, 2)),
-            ChoicesEmitter(sep_chars, sep_weights)
-        )
-    te = TextEmitter(
-        ChoicesEmitter(range(word_mn, word_mx + 1), word_weights),
+        sep_emitter = Word(Choice(range(1, 2)), Choice(sep_chars, sep_weights))
+    te = Text(
+        Choice(range(word_mn, word_mx + 1), word_weights),
         word_emitter,
         sep_emitter,
         rng_seed=seed
