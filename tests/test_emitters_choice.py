@@ -4,7 +4,7 @@ import datetime
 import pytest
 
 from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters.choice import Choice
+from solrfixtures.emitters.choice import Choice, GaussianChoice, PoissonChoice
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -161,3 +161,60 @@ def test_choice_datetimes(seed, mn, mx, step, step_unit, weights, expected):
                         step_unit)
     dte = Choice(datetimes, weights=weights, rng_seed=seed)
     assert dte(len(expected)) == [datetime.datetime(*i) for i in expected]
+
+
+@pytest.mark.parametrize('seed, items, mu, weight_floor, expected', [
+    (999, range(1, 10), 1, 0,
+     [2, 1, 2, 1, 1, 1, 2, 1, 2, 2, 1, 5, 1, 1, 1, 2, 1, 3, 4, 1]),
+    (999, range(1, 10), 1.5, 0,
+     [3, 1, 3, 2, 2, 1, 3, 1, 3, 3, 1, 6, 1, 1, 2, 2, 1, 3, 5, 1]),
+    (999, range(1, 10), 0.1, 0,
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1]),
+    (999, range(1, 10), 2, 0,
+     [3, 1, 4, 2, 2, 1, 3, 2, 3, 4, 1, 6, 1, 1, 2, 3, 1, 4, 6, 1]),
+    (999, range(1, 10), 3, 0,
+     [4, 1, 5, 3, 3, 1, 4, 2, 4, 5, 1, 8, 2, 2, 3, 4, 2, 5, 7, 2]),
+    (999, range(1, 10), 10, 0,
+     [9, 5, 9, 8, 8, 5, 9, 7, 9, 9, 5, 9, 6, 6, 8, 8, 6, 9, 9, 6]),
+    (999, range(1, 10), 20, 0,
+     [9, 7, 9, 9, 9, 7, 9, 8, 9, 9, 7, 9, 8, 8, 9, 9, 8, 9, 9, 8]),
+    (999, range(1, 10), 1, 0.05,
+     [6, 1, 7, 2, 2, 1, 6, 1, 6, 7, 1, 9, 1, 1, 2, 4, 1, 7, 9, 1]),
+    (999, range(1, 10), 1, 0.5,
+     [8, 1, 8, 6, 5, 2, 8, 3, 8, 8, 1, 9, 2, 3, 6, 7, 3, 8, 9, 3]),
+])
+def test_poisson_choice(seed, items, mu, weight_floor, expected):
+    pce = PoissonChoice(items, mu=mu, weight_floor=weight_floor, rng_seed=seed)
+    assert pce(len(expected)) == expected
+
+
+@pytest.mark.parametrize('seed, items, mu, sigma, weight_floor, expected', [
+    (999, range(1, 10), 0, 1, 0,
+     [1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1, 2, 3, 1]),
+    (999, range(1, 10), 1, 1, 0,
+     [2, 1, 2, 2, 1, 1, 2, 1, 2, 2, 1, 4, 1, 1, 2, 2, 1, 2, 3, 1]),
+    (999, range(1, 10), 2, 1, 0,
+     [3, 1, 3, 2, 2, 1, 3, 2, 3, 3, 1, 4, 1, 2, 2, 3, 1, 3, 4, 1]),
+    (999, range(1, 10), 3, 1, 0,
+     [4, 2, 4, 3, 3, 2, 4, 3, 4, 4, 2, 5, 2, 2, 3, 4, 2, 4, 5, 2]),
+    (999, range(1, 10), 10, 1, 0,
+     [9, 8, 9, 9, 9, 8, 9, 9, 9, 9, 8, 9, 8, 9, 9, 9, 9, 9, 9, 9]),
+    (999, range(1, 10), 20, 1, 0,
+     [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]),
+    (999, range(1, 10), 1, 0.5, 0,
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1]),
+    (999, range(1, 10), 1, 1.5, 0,
+     [3, 1, 3, 2, 2, 1, 3, 1, 3, 3, 1, 5, 1, 1, 2, 2, 1, 3, 4, 1]),
+    (999, range(1, 10), 1, 2, 0,
+     [3, 1, 4, 2, 2, 1, 3, 1, 3, 4, 1, 6, 1, 1, 2, 3, 1, 4, 6, 1]),
+    (999, range(1, 10), 10, 5, 0,
+     [8, 2, 9, 7, 6, 3, 8, 5, 8, 9, 3, 9, 4, 5, 7, 8, 5, 9, 9, 4]),
+    (999, range(1, 10), 0, 1, 0.01,
+     [2, 1, 5, 1, 1, 1, 2, 1, 2, 4, 1, 9, 1, 1, 1, 2, 1, 5, 9, 1]),
+    (999, range(1, 10), 0, 1, 0.1,
+     [7, 1, 8, 5, 4, 1, 7, 2, 7, 8, 1, 9, 1, 2, 5, 6, 2, 8, 9, 1]),
+])
+def test_gaussian_choice(seed, items, mu, sigma, weight_floor, expected):
+    gce = GaussianChoice(items, mu=mu, sigma=sigma, weight_floor=weight_floor,
+                         rng_seed=seed)
+    assert gce(len(expected)) == expected

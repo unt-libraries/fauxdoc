@@ -3,7 +3,7 @@ import itertools
 from typing import Any, Optional, List, Sequence, TypeVar
 
 from solrfixtures.emitter import RandomEmitter
-from solrfixtures.mathtools import weighted_shuffle
+from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle
 from solrfixtures.typing import Number, T
 
 
@@ -166,3 +166,93 @@ class Choice(RandomEmitter):
             return [self.rng.choice(self.items)]
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=number)
+
+
+class PoissonChoice(Choice):
+    """Choice emitter that applies Poisson weighting when choosing.
+
+    Attributes:
+        See parent class.
+    """
+
+    def __init__(self,
+                 items: Sequence[T],
+                 mu: int = 1,
+                 weight_floor: Number = 0,
+                 unique: bool = False,
+                 each_unique: bool = False,
+                 noun: str = '',
+                 rng_seed: Any = None) -> None:
+        """Inits a PoissonChoice emitter.
+
+        Args:
+            items: See parent class.
+            mu: (Optional.) A positive integer or float representing
+                the average x value, or peak, of the distribution
+                curve. This controls which items are chosen most
+                frequently. Default is 1.
+            weight_floor: (Optional.) A positive integer or float
+                representing the lowest possible individual weight for
+                an item. This is most useful when you have a large
+                number of choices in 'items' -- it helps ensure you'll
+                see more of the long tail in choices that are made, at
+                the expense of comprimising the integrity of the
+                distribution. Set to 0 if you do not want a floor.
+                Default is 0.
+            unique: (Optional.) See parent class.
+            each_unique: (Optional.) See parent class.
+            noun: (Optional.) See parent class.
+            rng_seed: (Optional.) See parent class.
+        """
+        weights = [clamp(poisson(x, mu), mn=weight_floor)
+                   for x in range(1, len(items) + 1)]
+        super().__init__(items, weights, unique, each_unique, noun, rng_seed)
+
+
+class GaussianChoice(Choice):
+    """Choice emitter that applies Gaussian weighting when choosing.
+
+    Attributes:
+        See parent class.
+    """
+
+    def __init__(self,
+                 items: Sequence[T],
+                 mu: Number = 0,
+                 sigma: Number = 1,
+                 weight_floor: Number = 0,
+                 unique: bool = False,
+                 each_unique: bool = False,
+                 noun: str = '',
+                 rng_seed: Any = None) -> None:
+        """Inits a GaussianChoice emitter.
+
+        Args:
+            items: See parent class.
+            mu: (Optional.) An integer or float representing the
+                average x value, or peak, of the distribution curve.
+                This controls which items are chosen most frequently.
+                Default is 0.
+            sigma: (Optional.) A positive integer or float representing
+                the standard deviation of the distribution curve, which
+                controls the width of the curve. Default is 1. Lower
+                values create a sharper peak, decreasing the number of
+                items around the peak that are chosen frequently.
+                Higher values dull the peak, increasing how frequently
+                the items around the peak are chosen.
+            weight_floor: (Optional.) A positive integer or float
+                representing the lowest possible individual weight for
+                an item. This is most useful when you have a large
+                number of choices in 'items' -- it helps ensure you'll
+                see more of the long tail in choices that are made, at
+                the expense of comprimising the integrity of the
+                distribution. Set to 0 if you do not want a floor.
+                Default is 0.
+            unique: (Optional.) See parent class.
+            each_unique: (Optional.) See parent class.
+            noun: (Optional.) See parent class.
+            rng_seed: (Optional.) See parent class.
+        """
+        weights = [clamp(gaussian(x, mu, sigma), mn=weight_floor)
+                   for x in range(1, len(items) + 1)]
+        super().__init__(items, weights, unique, each_unique, noun, rng_seed)
