@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 import random
 from typing import Any, Optional, List, Union, TypeVar
 
+from .typing import T
+
 
 class Emitter(ABC):
     """Abstract base class for defining emitter objects.
@@ -15,8 +17,6 @@ class Emitter(ABC):
     The `__call__` method wraps `emit` so you can emit data values
     simply by calling the object.
     """
-
-    T = TypeVar('T')
 
     def reset(self) -> None:
         """Resets state on this object.
@@ -142,3 +142,38 @@ class RandomEmitter(Emitter):
         """
         self.rng_seed = rng_seed
         self.rng.seed(rng_seed)
+
+
+class StaticEmitter(Emitter):
+    """Class for defining emitters that emit a static value."""
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def emit(self, number: int) -> List[T]:
+        return [self.value] * number
+
+
+def check_emitter(emitter: T) -> T:
+    """Raises a ValueError if the given object is not Emitter-like."""
+    valid = True
+    try:
+        check_single = emitter()
+        check_multi = emitter(number=1)
+        emitter.reset()
+    except (TypeError, AttributeError):
+        pass
+    else:
+        try:
+            valid = type(check_multi[0]) == type(check_single)
+        except TypeError:
+            pass
+    if not valid:
+        raise TypeError(
+            "An emitter.Emitter-like object should have the following "
+            "qualities: 1. It must be callable, returning a single value if "
+            "called with no arguments and a list of values if called with a "
+            "`number` kwarg. 2. It must have a `reset` method that takes no "
+            "args and resets emitter state when called."
+        )
+    return emitter
