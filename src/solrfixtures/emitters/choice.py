@@ -256,3 +256,23 @@ class GaussianChoice(Choice):
         weights = [clamp(gaussian(x, mu, sigma), mn=weight_floor)
                    for x in range(1, len(items) + 1)]
         super().__init__(items, weights, unique, each_unique, noun, rng_seed)
+
+
+class Chance(Choice):
+    """Choice emitter that emits True/False based on chance percentage.
+
+    Attributes:
+        See superclass.
+    """
+
+    def __init__(self, percent_chance: Number, rng_seed: Any = None) -> None:
+        """Inits a Chance emitter with the given percentage.
+
+        Args:
+            percent_chance: A number representing the percent chance
+                this will emit True. Always emits False if chance <= 0,
+                and always emits True if chance >= 100.
+            rng_seed: See superclass.
+        """
+        super().__init__([True, False], [percent_chance, 100 - percent_chance],
+                         rng_seed=rng_seed)

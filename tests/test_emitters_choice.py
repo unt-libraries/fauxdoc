@@ -4,7 +4,8 @@ import datetime
 import pytest
 
 from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters.choice import Choice, GaussianChoice, PoissonChoice
+from solrfixtures.emitters.choice import Chance, Choice, GaussianChoice,\
+                                         PoissonChoice
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -218,3 +219,24 @@ def test_gaussian_choice(seed, items, mu, sigma, weight_floor, expected):
     gce = GaussianChoice(items, mu=mu, sigma=sigma, weight_floor=weight_floor,
                          rng_seed=seed)
     assert gce(len(expected)) == expected
+
+
+@pytest.mark.parametrize('seed, chance, expected', [
+    (999, -10,
+     [False, False, False, False, False, False, False, False, False, False]),
+    (999, 0,
+     [False, False, False, False, False, False, False, False, False, False]),
+    (999, 25,
+     [False, True, False, False, False, True, False, False, False, False]),
+    (999, 45.5,
+     [False, True, False, False, False, True, False, True, False, False]),
+    (999, 80,
+     [True, True, False, True, True, True, True, True, True, False]),
+    (999, 100,
+     [True, True, True, True, True, True, True, True, True, True]),
+    (999, 10000,
+     [True, True, True, True, True, True, True, True, True, True]),
+])
+def test_chance(seed, chance, expected):
+    chance_em = Chance(chance, rng_seed=seed)
+    assert chance_em(len(expected)) == expected
