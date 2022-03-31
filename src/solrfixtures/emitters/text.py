@@ -1,7 +1,7 @@
 """Contains functions and emitters for emitting text data."""
 from typing import Any, List, Optional, Sequence
 
-from solrfixtures.emitter import RandomEmitter
+from solrfixtures.emitter import EmitterGroup, RandomEmitter
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
 
 
@@ -66,29 +66,20 @@ class Word(RandomEmitter):
         """
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
+        self.emitter_group = EmitterGroup(length_emitter, alphabet_emitter)
         self.rng_seed = rng_seed
         self.reset()
 
     def reset(self) -> None:
         """See superclass."""
         super().reset()
-        for attr in ('length_emitter', 'alphabet_emitter'):
-            emitter = getattr(self, attr)
-            try:
-                emitter.rng_seed = self.rng_seed
-            except AttributeError:
-                pass
-            emitter.reset()
+        self.emitter_group.setattr('rng_seed', self.rng_seed)
+        self.emitter_group.do_method('reset')
 
     def seed(self, rng_seed: Any) -> None:
         """See superclass."""
         super().seed(rng_seed)
-        for attr in ('length_emitter', 'alphabet_emitter'):
-            emitter = getattr(self, attr)
-            try:
-                emitter.seed(rng_seed)
-            except AttributeError:
-                pass
+        self.emitter_group.do_method('seed', self.rng_seed)
 
     @property
     def num_unique_values(self) -> int:
@@ -159,29 +150,21 @@ class Text(RandomEmitter):
         self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
         self.sep_emitter = sep_emitter
+        self.emitter_group = EmitterGroup(numwords_emitter, word_emitter,
+                                          sep_emitter)
         self.rng_seed = rng_seed
         self.reset()
 
     def reset(self) -> None:
         """See superclass."""
         super().reset()
-        for attr in ('numwords_emitter', 'word_emitter', 'sep_emitter'):
-            emitter = getattr(self, attr)
-            try:
-                emitter.rng_seed = self.rng_seed
-            except AttributeError:
-                pass
-            if emitter is not None:
-                emitter.reset()
+        self.emitter_group.setattr('rng_seed', self.rng_seed)
+        self.emitter_group.do_method('reset')
 
     def seed(self, rng_seed: Any) -> None:
         """See superclass."""
         super().seed(rng_seed)
-        for attr in ('numwords_emitter', 'word_emitter', 'sep_emitter'):
-            try:
-                getattr(self, attr).seed(rng_seed)
-            except AttributeError:
-                pass
+        self.emitter_group.do_method('seed', self.rng_seed)
 
     def emit(self, number: int) -> List[str]:
         """Returns a text string with a random number of words.

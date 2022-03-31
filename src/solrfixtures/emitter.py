@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import random
 from typing import Any, List, Optional, Sequence, Union, TypeVar
 
-from .typing import T
+from .typing import EmitterLike, T
 
 
 class Emitter(ABC):
@@ -151,9 +151,67 @@ class StaticEmitter(Emitter):
     """
 
     def __init__(self, value: T) -> None:
-        """Inits a StaticEmitter instance with the given value."""
+        """Inits a StaticEmitter instance with the given value.
+
+        Args:
+            value: See `value` attribute.
+        """
         self.value = value
 
     def emit(self, number: int) -> List[T]:
-        """Returns a list with the static val repeated `number` times."""
+        """Returns a list with the static val repeated `number` times.
+
+        Args:
+            number: See superclass.
+        """
         return [self.value] * number
+
+
+class EmitterGroup:
+    """Class for doing batch operations on groups of emitters.
+
+    Attributes:
+        emitters: Sequence of emitter-like objects composing the group.
+    """
+
+    def __init__(self, *emitters: Optional[EmitterLike]) -> None:
+        """Inits an emitter group with the given emitters.
+
+        Args:
+            *emitters: See `emitters` attribute. Note this is a star
+                argument, so provide as multiple positional arguments.
+        """
+        self.emitters = emitters
+
+    def setattr(self, attr_name: str, attr_value: Any) -> None:
+        """Sets an attribute for all emitters in the group.
+
+        The attribute is only set if that attribute already exists on
+        the member emitter. Otherwise that emitter is skipped.
+        
+        Args:
+            attr_name: The name of the attribute to set.
+            attr_value: The value to set.
+        """
+        for emitter in self.emitters:
+            if emitter is not None and hasattr(emitter, attr_name):
+                setattr(emitter, attr_name, attr_value)
+
+    def do_method(self, method_name: str, *args: Any, **kwargs: Any) -> None:
+        """Runs a method of all emitters in the group.
+
+        If the method doesn't exist on any of the member emitters, the
+        AttributeError is ignored, and that emitter is skipped. Return
+        values are ignored.
+
+        Args:
+            method_name: The name of the method to run.
+            *args: Positional args to pass to the method.
+            **kwargs: Keyword args to pass to the method.
+        """
+        for emitter in self.emitters:
+            if emitter is not None:
+                try:
+                    getattr(emitter, method_name)(*args, **kwargs)
+                except AttributeError:
+                    pass
