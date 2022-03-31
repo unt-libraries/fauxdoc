@@ -16,7 +16,7 @@ T = TypeVar('T')
 # Protocols defined here.
 
 class EmitterLike(Protocol):
-    """Is like a data.emitter.BaseEmitter object."""
+    """Is like an emitter.Emitter object."""
 
     def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
         ...
@@ -25,22 +25,30 @@ class EmitterLike(Protocol):
         ...
 
 
+class BoolEmitterLike(EmitterLike, Protocol):
+    """An emitter.Emitter-like object that emits booleans."""
+
+    def __call__(self,
+                 number: Optional[int] = None) -> Union[bool, List[bool]]:
+        ...
+
+
 class IntEmitterLike(EmitterLike, Protocol):
-    """A data.emitter.BaseEmitter-like object that emits integers."""
+    """An emitter.Emitter-like object that emits integers."""
 
     def __call__(self, number: Optional[int] = None) -> Union[int, List[int]]:
         ...
 
 
 class StrEmitterLike(EmitterLike, Protocol):
-    """A data.emitter.BaseEmitter-like object that emits strings."""
+    """An emitter.Emitter-like object that emits strings."""
 
     def __call__(self, number: Optional[int] = None) -> Union[str, List[str]]:
         ...
 
 
 class RandomEmitterLike(EmitterLike, Protocol):
-    """Is like a data.emitter.BaseRandomEmitter object."""
+    """Is like an emitter.RandomEmitter object."""
 
     def seed(self, rng_seed: Any) -> None:
         ...

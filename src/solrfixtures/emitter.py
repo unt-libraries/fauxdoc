@@ -1,6 +1,5 @@
 """Contains base Emitter classes, for emitting data values."""
 from abc import ABC, abstractmethod
-from copy import deepcopy
 import random
 from typing import Any, List, Optional, Sequence, Union, TypeVar
 
@@ -17,24 +16,7 @@ class Emitter(ABC):
 
     The `__call__` method wraps `emit` so you can emit data values
     simply by calling the object.
-
-    Attributes:
-        interface_name: A string representing the most specific
-            interface that this class implements. It should correspond
-            with the interface_description.
-        interface_description: A verbose description of what's required
-            for an object to use the interface named in interface_name.
-            This should be operationalized via the 
-            `_check_object_interface` method.
     """
-
-    interface_name = 'Emitter'
-    interface_description = (
-        "To be Emitter-like, an object must 1. Be callable, returning a "
-        "single value if called with no args and a list or tuple of values if "
-        "called with a 'number' kwarg. And, 2. Have a `reset` method that "
-        "resets state when called and takes no args."
-    )
 
     def reset(self) -> None:
         """Resets state on this object.
@@ -119,122 +101,6 @@ class Emitter(ABC):
             number: An int; how many values to return.
         """
 
-    @classmethod
-    def _check_object_interface(cls, emitter: T) -> Any:
-        """Raises a TypeError if the given object fails a type check.
-
-        This method implements duck-typing checks to see if a given
-        object conforms to the necessary interface for this class.
-        Override as needed in base classes, e.g. to implement checks
-        for subtypes. Note that this method is private; users should
-        never call this directly but instead use `check_object`, which
-        creates a deep copy of the object first.
-
-        If you override this method, you probably need to override the
-        `interface_name` and `interface_description` attributes also.
-        
-        Args:
-            emitter: The object you want to check.
-
-        Returns:
-            The value that the emitter emitted during the type checks,
-            if all checks pass.
-        """
-        err_msg = f"Object is not {cls.interface_name}-like"
-        try:
-            emitted_value = emitter()
-        except TypeError:
-            raise TypeError(f'{err_msg} (it is not callable).') from None
-        try:
-            multi_value = emitter(number=1)
-        except TypeError:
-            raise TypeError(
-                f"{err_msg} (it does not take a 'number' kwarg when called)."
-            ) from None
-        if not isinstance(multi_value, (list, tuple)):
-            raise TypeError (
-                f"{err_msg} (it does not return a list or tuple when called "
-                f"with a 'number' kwarg)."
-            ) from None
-        try:
-            emitter.reset()
-        except AttributeError:
-            raise TypeError(
-                f'{err_msg} (it lacks a `reset` method).'
-            ) from None
-        except TypeError:
-            raise TypeError(
-                f'{err_msg} (its `reset` method takes the incorrect number of '
-                f'arguments).'
-            ) from None
-        return emitted_value
-
-    @staticmethod
-    def check_emitted_val_types(em_val: T, val_types: Sequence[type]) -> None:
-        """Raises a TypeError if an emitted val is not a certain type.
-
-        Args:
-            em_val: A sample value from the emitter whose output value
-                type you want to check.
-
-        Returns:
-            None, if all checks pass.
-        """
-        if not isinstance(em_val, val_types):
-            type_strs = [f"`{vtype.__name__}`" for vtype in val_types]
-            if len(val_types) == 1:
-                type_str = type_strs[0]
-            elif len(val_types) == 2:
-                type_str = ' or '.join(type_strs)
-            else:
-                type_str = f"{', '.join(type_strs[:-1])}, or {type_strs[-1]}"
-            raise TypeError(
-                f"Object appears to emit values that are "
-                f"`{type(em_val).__name__}`-type, not {type_str}-type."
-            )
-
-    @classmethod
-    def check_object(cls,
-                     emitter: T,
-                     val_types: Optional[Sequence[type]] = None) -> T:
-        """Raises a TypeError if the given object fails checks.
-
-        This is a utility method to check that a given object conforms
-        to the interface for this class. Optionally, it also checks
-        that it emits the right type(s) of values, if the 'val_types'
-        arg is provided.
-
-        In subclasses, you should override `_check_object_interface`
-        instead of this method if you need additional checks. If you do
-        need to override this, be sure to make a deep copy of the
-        emitter first before doing checks (assuming your checks may
-        activate the object and could disturb saved state).
-
-        Arguments:
-            emitter: The object you want to check.
-            val_types: (Optional.) A type, or a list/tuple of types, that
-                you want to check the emitter output against. That
-                check is skipped if not provided.
-        """
-        obj_to_check = deepcopy(emitter)
-        try:
-            emitted_value = cls._check_object_interface(obj_to_check)
-        except TypeError as e:
-            raise TypeError(
-                f"{e} {cls.interface_description}"
-            ) from None
-
-        if val_types is not None:
-            try:
-                cls.check_emitted_val_types(emitted_value, val_types)
-            except TypeError as e:
-                raise TypeError(
-                    f"Object is {cls.interface_name}-like but emits the wrong "
-                    f"type of values. {e}"
-                ) from None
-        return emitter
-
-
 class RandomEmitter(Emitter):
     """Abstract base class for defining emitters that need RNG.
 
@@ -253,16 +119,6 @@ class RandomEmitter(Emitter):
             directly or by calling `seed` and providing a new value.
             Default is None.
     """
-
-    interface_name = 'RandomEmitter'
-    interface_description = (
-        "To be RandomEmitter-like, an object must 1. Be callable, returning "
-        "one value if called with no args and a list or tuple of values if "
-        "called with a 'number' kwarg. 2. Have a `reset` method that resets "
-        "state and takes no args. And, 3. Have a `seed` method that takes an "
-        "`rng_seed` arg, which it uses to seed all applicable RNGs on the "
-        "object."
-    )
 
     def __init__(self, rng_seed: Any = None) -> None:
         """Inits a BaseRandomEmitter.
@@ -285,32 +141,6 @@ class RandomEmitter(Emitter):
         """
         self.rng_seed = rng_seed
         self.rng.seed(rng_seed)
-
-    @classmethod
-    def _check_object_interface(cls, emitter: T) -> Any:
-        """Raises a TypeError if the given object fails a type check.
-
-        This implements additional RandomEmitter-like checks.
-
-        Args:
-            emitter: The object you want to check.
-
-        Returns:
-            The value that the emitter emitted during the type checks,
-            if all checks pass.
-        """
-        err_msg = f"Object is not {cls.interface_name}-like"
-        emitted_value = super()._check_object_interface(emitter)
-        try:
-            emitter.seed(12345679)
-        except AttributeError:
-            raise TypeError(f'{err_msg} (it lacks a `seed` method).') from None
-        except TypeError:
-            raise TypeError(
-                f'{err_msg} (its `seed` method takes the incorrect number of '
-                f'arguments).'
-            ) from None
-        return emitted_value
 
 
 class StaticEmitter(Emitter):
