@@ -84,7 +84,7 @@ CallableSeed = make_callable_class(
     (Emitter, StaticEmitter(1), (int,), None),
     (Emitter, StaticEmitter(1), (int, float, bool), None),
 ])
-def test_emitter_check_object(em_cls, obj, val_types, exp_error_patterns):
+def test_base_emitters_checkobject(em_cls, obj, val_types, exp_error_patterns):
     if exp_error_patterns:
         with pytest.raises(TypeError) as excinfo:
             em_cls.check_object(obj, val_types)
@@ -93,3 +93,16 @@ def test_emitter_check_object(em_cls, obj, val_types, exp_error_patterns):
             assert exp_pattern in msg
     else:
         assert Emitter.check_object(obj, val_types) is not None
+
+
+@pytest.mark.parametrize('value', [
+    None,
+    10,
+    'my value',
+    True,
+    ['one', 'two'],
+])
+def test_staticemitter(value):
+    em = StaticEmitter(value)
+    assert em() == value
+    assert em(5) == [value] * 5
