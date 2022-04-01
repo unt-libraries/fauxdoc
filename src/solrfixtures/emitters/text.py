@@ -1,7 +1,8 @@
 """Contains functions and emitters for emitting text data."""
 from typing import Any, List, Optional, Sequence
 
-from solrfixtures.emitter import EmitterGroup, RandomEmitter
+from solrfixtures.group import ObjectGroup
+from solrfixtures.emitter import RandomEmitter
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
 
 
@@ -66,7 +67,7 @@ class Word(RandomEmitter):
         """
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
-        self.emitter_group = EmitterGroup(length_emitter, alphabet_emitter)
+        self.emitter_group = ObjectGroup(length_emitter, alphabet_emitter)
         self.rng_seed = rng_seed
         self.reset()
 
@@ -150,8 +151,8 @@ class Text(RandomEmitter):
         self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
         self.sep_emitter = sep_emitter
-        self.emitter_group = EmitterGroup(numwords_emitter, word_emitter,
-                                          sep_emitter)
+        self.emitter_group = ObjectGroup(numwords_emitter, word_emitter,
+                                         sep_emitter)
         self.rng_seed = rng_seed
         self.reset()
 

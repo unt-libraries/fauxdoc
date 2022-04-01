@@ -148,7 +148,7 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field.reset()
     assert field.emitter.num_unique_values == 12
     assert field.repeat_emitter.num_unique_values == 12
-    assert all([em.rng_seed == 999 for em in field.emitter_group.emitters])
+    assert all([em.rng_seed == 999 for em in field.emitter_group])
 
 
 def test_field_seed_reseeds_all_emitters(emitter):
@@ -158,7 +158,7 @@ def test_field_seed_reseeds_all_emitters(emitter):
     field.repeat_emitter.seed(12345)
     field.gate_emitter.seed(54321)
     field.seed(999)
-    assert all([em.rng_seed == 999 for em in field.emitter_group.emitters])
+    assert all([em.rng_seed == 999 for em in field.emitter_group])
 
 
 @pytest.mark.parametrize('seed, repeat, gate, expected', [

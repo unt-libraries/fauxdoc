@@ -4,7 +4,8 @@ Contains classes for creating faux-data-generation profiles.
 from collections import OrderedDict
 from typing import Any, Callable, Optional, Union
 
-from solrfixtures.emitter import Emitter, EmitterGroup, StaticEmitter
+from solrfixtures.group import ObjectGroup
+from solrfixtures.emitter import Emitter, StaticEmitter
 from solrfixtures.emitters.choice import Choice
 from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
 
@@ -54,7 +55,7 @@ class Field:
             False if no.) E.g., for a field in your schema that is
             populated in ~10 percent of records or docs, a Chance(10)
             emitter instance would do the trick.
-        emitter_group: An EmitterGroup instance that wraps/contains the
+        emitter_group: An ObjectGroup instance that wraps/contains the
             three emitter instances associated with this field.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. This value is used to reset any RNGs on the
@@ -94,8 +95,8 @@ class Field:
         self.emitter = emitter
         self.repeat_emitter = StaticEmitter(None) if repeat is None else repeat
         self.gate_emitter = StaticEmitter(True) if gate is None else gate
-        self.emitter_group = EmitterGroup(self.emitter, self.repeat_emitter,
-                                          self.gate_emitter)
+        self.emitter_group = ObjectGroup(self.emitter, self.repeat_emitter,
+                                         self.gate_emitter)
         self.rng_seed = rng_seed
         self.reset()
 
