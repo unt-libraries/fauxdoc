@@ -3,6 +3,7 @@ from typing import Any, List, Optional, Sequence
 
 from solrfixtures.group import ObjectGroup
 from solrfixtures.emitter import RandomEmitter
+from solrfixtures.mathtools import clamp
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
 
 
@@ -167,6 +168,39 @@ class Text(RandomEmitter):
         super().seed(rng_seed)
         self.emitter_group.do_method('seed', self.rng_seed)
 
+    def _get_words_generator(self, total):
+        """Creates a generator object for generating words."""
+
+        # This addresses the edge case where the word_emitter for this
+        # is a list of words (e.g. implemented via a Choice object),
+        # where `each_unique` is True -- the expectation is that each
+        # set of words emitted will contain unique words, but each word
+        # can appear in multiple sets. (Each text value is essentially
+        # a set of words.) If we generated text values one at a time,
+        # this would be trivial. But, instead, we generate all words at
+        # once and then divide them out into text values they belong
+        # to, because this is way more performant. In order to address
+        # the each_unique edge case, we create a generator that resets
+        # the word_emitter each time it runs out of words; thus, words
+        # are reused, but each word appears only after all words have
+        # been emitted. Text values generated that way don't guarantee
+        # totally unique sets of words, since words might repeat if a
+        # `reset` call happens in the middle of a set of words, but
+        # this is about the best we can do I think.
+
+        unique = self.word_emitter.num_unique_values
+        if getattr(self.word_emitter, 'each_unique', False) and total > unique:
+            def generator():
+                remainder = total
+                while remainder > 0:
+                    needed = clamp(unique, mx=remainder)
+                    for word in self.word_emitter(needed):
+                        yield word
+                    self.word_emitter.reset()
+                    remainder -= needed
+            return generator()
+        return (word for word in self.word_emitter(total))
+
     def emit(self, number: int) -> List[str]:
         """Returns a text string with a random number of words.
 
@@ -176,7 +210,7 @@ class Text(RandomEmitter):
         texts = []
         lengths = self.numwords_emitter(number)
         total_words = sum(lengths)
-        words = (word for word in self.word_emitter(total_words))
+        words = self._get_words_generator(total_words)
         try:
             seps = (sep for sep in self.sep_emitter(total_words - number))
         except TypeError:

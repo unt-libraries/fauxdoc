@@ -8,9 +8,20 @@ from solrfixtures.emitters.text import make_alphabet, Text, Word
 # Module-specific fixtures
 
 @pytest.fixture
-def word_emitter():
+def auto_word_emitter():
     """Fixture to use as the `word_emitter` arg for TextEmitter tests."""
     return Word(Choice(range(2, 9)), Choice('abcde'))
+
+
+@pytest.fixture
+def make_wordlist_emitter():
+    words = ('red', 'cat', 'sappy', 'blooming', 'flower', 'isolated', 'runway',
+             'refrigerator', 'truck', 'of', 'the', 'a', 'baseless', 'bird',
+             'on', 'clapping')
+    weights = (5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 5, 5, 10, 5)
+    def _make_wordlist_emitter(each_unique=False):
+        return Choice(words, weights, each_unique=each_unique)
+    return _make_wordlist_emitter
 
 
 # Tests
@@ -71,14 +82,50 @@ def test_wordemitter(seed, mn, mx, lweights, alpha, aweights, expected):
           'ebdbcad']),
     ]
 )
-def test_textemitter(seed, word_mn, word_mx, word_weights, sep_chars,
-                     sep_weights, expected, word_emitter):
+def test_textemitter_generated_words(seed, word_mn, word_mx, word_weights,
+                                     sep_chars, sep_weights, expected,
+                                     auto_word_emitter):
     sep_emitter = None
     if sep_chars is not None:
-        sep_emitter = Word(Choice(range(1, 2)), Choice(sep_chars, sep_weights))
+        sep_emitter = Choice(sep_chars, sep_weights)
     te = Text(
         Choice(range(word_mn, word_mx + 1), word_weights),
-        word_emitter,
+        auto_word_emitter,
+        sep_emitter,
+        rng_seed=seed
+    )
+    assert te(len(expected)) == expected
+
+
+@pytest.mark.parametrize('seed, word_mn, word_mx, unique, expected', [
+    (999, 1, 3, False,
+     ['baseless cat on', 'the', 'of, sappy baseless', 'runway baseless',
+      'bird cat', 'clapping', 'blooming isolated the', 'a',
+      'isolated on-clapping', 'flower the: cat']),
+    (999, 3, 6, False,
+     ['baseless cat on, the of sappy', 'baseless runway baseless',
+      'bird cat clapping-blooming isolated: the',
+      'a isolated on clapping flower', 'the cat, red: flower',
+      'clapping of blooming', 'a blooming on the; on of', 'a a sappy a',
+      'of, a flower, sappy bird flower',
+      'baseless isolated of red baseless of']),
+    (999, 3, 10, True,
+     ['a of sappy, runway truck red on clapping blooming',
+      'flower refrigerator-the',
+      'bird baseless: isolated cat a of sappy runway, truck',
+      'red: on clapping blooming flower refrigerator the',
+      'bird; baseless isolated cat a of', 'sappy, runway truck, red',
+      'on clapping blooming flower refrigerator the bird baseless isolated',
+      'cat a-of sappy runway',
+      'truck red on clapping blooming flower refrigerator, the bird',
+      'baseless isolated cat baseless cat on the of sappy']),
+])
+def test_textemitter_words_list(seed, word_mn, word_mx, unique, expected,
+                                make_wordlist_emitter):
+    sep_emitter = Choice((' ', '-', ', ', '; ', ': '), [80, 5, 10, 3, 2])
+    te = Text(
+        Choice(range(word_mn, word_mx + 1)),
+        make_wordlist_emitter(unique),
         sep_emitter,
         rng_seed=seed
     )
