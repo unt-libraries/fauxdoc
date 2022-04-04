@@ -105,10 +105,38 @@ class Choice(RandomEmitter):
             # For globally unique emitters (without replacement), it's
             # most efficient to pre-shuffle the items ONCE. Then you
             # just return the values in shuffled order as they're
-            # requested. Resetting regenerates this shuffle.
-            weights = self.weights or [1] * len(self.items)
-            self._shuffled = weighted_shuffle(self.items, weights, self.rng)
-            self._shuffled_index = 0
+            # requested. Resetting and reseeding both regenerate this
+            # shuffle.
+            self._global_shuffle()
+
+    def seed(self, rng_seed: Any) -> None:
+        """See superclass.
+
+        WARNING: Reseeding a globally unique emitter (`unique` is True)
+        resets the random shuffle, losing track of what has already
+        been emitted, if anything. I think this is what would be
+        expected.
+        """
+        super().seed(rng_seed)
+        if self.unique:
+            # For unique emitters: the new seed isn't applied to what
+            # we emit until we regenerate the shuffle, losing track of
+            # what has already been emitted. If it turns out that this
+            # is confusing, it would be possible to allow for a partial
+            # reshuffle -- e.g., only reshuffle
+            # self._shuffled[self.shuffled_index:]. However, we would
+            # have to implement a version of the `weighted_shuffle`
+            # algorithm that lets us get the corresponding weights
+            # along with the shuffled items whenever we do a global
+            # shuffle. (Right now we lose what weights go with what
+            # items when they get shuffled.) I'm leaving this as a
+            # possible future TODO if turns out to be needed.
+            self._global_shuffle()
+
+    def _global_shuffle(self):
+        weights = self.weights or [1] * len(self.items)
+        self._shuffled = weighted_shuffle(self.items, weights, self.rng)
+        self._shuffled_index = 0
 
     def _get_next_shuffled(self, number: int = 1) -> List[T]:
         slc_start = self._shuffled_index
