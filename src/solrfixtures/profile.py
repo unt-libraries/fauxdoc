@@ -1,10 +1,9 @@
 """
 Contains classes for creating faux-data-generation profiles.
 """
-from collections import OrderedDict
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
-from solrfixtures.group import ObjectGroup
+from solrfixtures.group import ObjectGroup, ObjectMap
 from solrfixtures.emitter import Emitter, StaticEmitter
 from solrfixtures.emitters.choice import Choice
 from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
@@ -125,15 +124,77 @@ class Field:
     def __call__(self) -> T:
         """Generates one field value via the emitter.
 
-        If `gate_emitter` returns False, then this returns None.
-        
-        For multi-valued fields (e.g. where `repeat_emitter` generates
-        an integer), this generates a list of values of the appropriate
-        length. For single-valued fields (e.g. where `repeat_emitter`
-        generates None), this just generates the one value.
+        Returns:
+            None, one value, or a list of values. For multi-valued
+            fields (e.g. where `repeat_emitter` generates an integer),
+            this returns a list of values. For single-valued fields
+            (e.g. where `repeat_emitter` generates None), this just
+            generates the one value. If `gate_emitter` returns False,
+            then this returns None.
         """
         if self.gate_emitter():
             self._cache = self.emitter(self.repeat_emitter())
         else:
             self._cache = None
         return self._cache
+
+
+class Schema:
+    """Class to define schemas, for generating full records/docs.
+
+    Pass the field objects you want in your schema to __init__, add
+    them via `add_fields`, or modify `fields` directly. Call the object
+    to generate the next record.
+
+    Attributes:
+        fields: An ObjectMap that maps field names (field.name) to
+            field objects. Note that fields are stored in the order
+            they're assigned, and output is generated in that same
+            order. (If you have a field with an emitter that uses the
+            cached data values from other fields, be sure it appears
+            after the fields it copies data from.)
+    """
+
+    def __init__(self, *fields: Field) -> None:
+        """Inits a Schema instance with the provided fields.
+
+        Args:
+            *fields: The Field instances that compose your schema. Note
+                this is a star argument, so provide your fields as
+                args. The `fields` attribute is generated from this.
+                Your field names become keys.
+        """
+        self.fields = ObjectMap({})
+        self.add_fields(*fields)
+
+    def add_fields(self, *fields: Field) -> None:
+        """Adds fields to your schema, in the order provided.
+
+        Args:
+            *fields: The Field instances to add. Note this is a star
+                argument, so provided your fields as args.
+        """
+        self.fields.update({field.name: field for field in fields})
+
+    def reset_fields(self) -> None:
+        """Resets state on all schema fields."""
+        self.fields.do_method('reset')
+
+    def seed_fields(self, rng_seed: Any) -> None:
+        """Seeds all RNGs on all schema fields.
+
+        Args:
+            rng_seed: The new seed you want to set. Ultimately this is
+                passed to a random.Random instance, so it should be any
+                value valid for seeding random.Random.
+        """
+        self.fields.do_method('seed', rng_seed)
+
+    def __call__(self) -> Dict[str, Any]:
+        """Generates field values for one record or doc.
+
+        Returns:
+            A dict, where field names are keys and field values are
+            values.
+        """
+        return {fname: field() for fname, field in self.fields.items()}
