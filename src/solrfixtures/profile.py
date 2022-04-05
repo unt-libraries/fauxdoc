@@ -54,8 +54,8 @@ class Field:
             False if no.) E.g., for a field in your schema that is
             populated in ~10 percent of records or docs, a Chance(10)
             emitter instance would do the trick.
-        emitter_group: An ObjectGroup instance that wraps/contains the
-            three emitter instances associated with this field.
+        multi_valued: True if this Field can emit multiple values at
+            once; False if it only emits one at a time.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. This value is used to reset any RNGs on the
             three emitter instances attached to this field. Pass the
@@ -90,25 +90,62 @@ class Field:
                 (None).
             rng_seed: See `rng_seed` attribute.
         """
+        self._emitters = ObjectMap({})
         self.name = name
         self.emitter = emitter
         self.repeat_emitter = StaticEmitter(None) if repeat is None else repeat
         self.gate_emitter = StaticEmitter(True) if gate is None else gate
-        self.emitter_group = ObjectGroup(self.emitter, self.repeat_emitter,
-                                         self.gate_emitter)
         self.rng_seed = rng_seed
         self.reset()
 
     @property
-    def previous(self):
+    def previous(self) -> Any:
         """Read-only attribute to access the last generated value."""
         return self._cache
+
+    @property
+    def emitter(self) -> EmitterLike:
+        """Returns the 'emitter' attribute."""
+        return self._emitters['emitter']
+
+    @emitter.setter
+    def emitter(self, emitter: EmitterLike) -> None:
+        """Sets the 'emitter' attribute."""
+        self._emitters['emitter'] = emitter
+
+    @property
+    def repeat_emitter(self) -> EmitterLike:
+        """Returns the 'repeat_emitter' attribute."""
+        return self._emitters['repeat']
+
+    @repeat_emitter.setter
+    def repeat_emitter(self, repeat_emitter: EmitterLike) -> None:
+        """Sets the 'repeat_emitter' attribute.
+
+        Also sets the 'multi_valued' attribute; False if the
+        repeat_emitter only emits None, otherwise True.
+        """
+        self._emitters['repeat'] = repeat_emitter
+        try:
+            self.multi_valued = repeat_emitter.value is not None
+        except AttributeError:
+            self.multi_valued = True
+
+    @property
+    def gate_emitter(self) -> EmitterLike:
+        """Returns the 'gate_emitter' attribute."""
+        return self._emitters['gate']
+
+    @gate_emitter.setter
+    def gate_emitter(self, gate_emitter: EmitterLike) -> None:
+        """Sets the 'gate_emitter' attribute."""
+        self._emitters['gate'] = gate_emitter
 
     def reset(self) -> None:
         """Resets state on this field, including attached emitters."""
         self._cache = None
-        self.emitter_group.setattr('rng_seed', self.rng_seed)
-        self.emitter_group.do_method('reset')
+        self._emitters.setattr('rng_seed', self.rng_seed)
+        self._emitters.do_method('reset')
 
     def seed(self, rng_seed: Any) -> None:
         """Seeds all RNGs associated with emitters on this field.
@@ -119,7 +156,7 @@ class Field:
                 value valid for seeding random.Random.
         """
         self.rng_seed = rng_seed
-        self.emitter_group.do_method('seed', self.rng_seed)
+        self._emitters.do_method('seed', self.rng_seed)
 
     def __call__(self) -> T:
         """Generates one field value via the emitter.
@@ -132,8 +169,8 @@ class Field:
             generates the one value. If `gate_emitter` returns False,
             then this returns None.
         """
-        if self.gate_emitter():
-            self._cache = self.emitter(self.repeat_emitter())
+        if self._emitters['gate']():
+            self._cache = self._emitters['emitter'](self._emitters['repeat']())
         else:
             self._cache = None
         return self._cache

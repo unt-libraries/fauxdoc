@@ -52,3 +52,19 @@ class RandomEmitterLike(EmitterLike, Protocol):
 
     def seed(self, rng_seed: Any) -> None:
         ...
+
+
+class FieldLike(Protocol):
+    """Is like a profile.Field object."""
+
+    multi_valued: bool
+
+    def __call__(self) -> T:
+        ...
+
+    def reset(self) -> None:
+        ...
+
+    @property
+    def previous(self):
+        ...

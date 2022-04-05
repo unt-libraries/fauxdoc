@@ -169,6 +169,20 @@ def test_field_multi_value_each_unique_violation(emitter_each_unique):
         field2()
 
 
+@pytest.mark.parametrize('field, expected', [
+    (Field('test', StaticEmitter('test')), False),
+    (Field('test', StaticEmitter('test'), repeat=None), False),
+    (Field('test', StaticEmitter('test'), repeat=StaticEmitter(None)), False),
+    (Field('test', StaticEmitter('test'), repeat=StaticEmitter(1)), True),
+    (Field('test', StaticEmitter('test'), repeat=choice.Choice(range(1))),
+     True),
+    (Field('test', StaticEmitter('test'), repeat=choice.Choice(range(1, 5))),
+     True),
+])
+def test_field_multivalued_attribute(field, expected):
+    assert field.multi_valued == expected
+
+
 def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field = Field('test', emitter_unique(),
                   repeat=choice.Choice([1] * 12, unique=True),
@@ -183,7 +197,7 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field.reset()
     assert field.emitter.num_unique_values == 12
     assert field.repeat_emitter.num_unique_values == 12
-    assert all([em.rng_seed == 999 for em in field.emitter_group])
+    assert all([em.rng_seed == 999 for em in field._emitters.values()])
 
 
 def test_field_seed_reseeds_all_emitters(emitter):
@@ -193,7 +207,7 @@ def test_field_seed_reseeds_all_emitters(emitter):
     field.repeat_emitter.seed(12345)
     field.gate_emitter.seed(54321)
     field.seed(999)
-    assert all([em.rng_seed == 999 for em in field.emitter_group])
+    assert all([em.rng_seed == 999 for em in field._emitters.values()])
 
 
 @pytest.mark.parametrize('seed, repeat, gate, expected', [
@@ -318,4 +332,4 @@ def test_field_seedfields_reseeds_all_fields(emitter):
     schema.seed_fields(999)
     for field in schema.fields.values():
         assert field.rng_seed == 999
-        assert all([em.rng_seed == 999 for em in field.emitter_group])
+        assert all([em.rng_seed == 999 for em in field._emitters.values()])
