@@ -1,7 +1,7 @@
 """Contains functions and emitters for emitting text data."""
 from typing import Any, List, Optional, Sequence
 
-from solrfixtures.group import ObjectGroup
+from solrfixtures.group import ObjectMap
 from solrfixtures.emitter import RandomEmitter
 from solrfixtures.mathtools import clamp
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
@@ -66,29 +66,59 @@ class Word(RandomEmitter):
             alphabet_emitter: See `alphabet_emitter` attribute.
             rng_seed (Optional.) See `rng_seed` attribute.
         """
+        self._emitters = ObjectMap({})
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
-        self.emitter_group = ObjectGroup(length_emitter, alphabet_emitter)
         self.rng_seed = rng_seed
         self.reset()
+
+    @property
+    def length_emitter(self) -> IntEmitterLike:
+        """Returns the 'length_emitter' attribute."""
+        return self._emitters['length']
+
+    @length_emitter.setter
+    def length_emitter(self, length_emitter: IntEmitterLike) -> None:
+        """Sets the 'length_emitter' attribute."""
+        self._emitters['length'] = length_emitter
+        self._update_num_unique_vals()
+
+    @property
+    def alphabet_emitter(self) -> None:
+        """Returns the 'alphabet_emitter' attribute."""
+        return self._emitters['alphabet']
+
+    @alphabet_emitter.setter
+    def alphabet_emitter(self, alphabet_emitter: StrEmitterLike) -> None:
+        """Sets the 'alphabet_emitter' attribute."""
+        self._emitters['alphabet'] = alphabet_emitter
+        self._update_num_unique_vals()
+
+    def _update_num_unique_vals(self) -> None:
+        """Updates """
+        alpha = self._emitters.get('alphabet')
+        length = self._emitters.get('length')
+        if alpha and length:
+            nchars = alpha.num_unique_values
+            nlengths = length.num_unique_values
+            number = sum([nchars ** i for i in range(1, nlengths + 1)])
+            self._num_unique_values = number
 
     def reset(self) -> None:
         """See superclass."""
         super().reset()
-        self.emitter_group.setattr('rng_seed', self.rng_seed)
-        self.emitter_group.do_method('reset')
+        self._emitters.setattr('rng_seed', self.rng_seed)
+        self._emitters.do_method('reset')
 
     def seed(self, rng_seed: Any) -> None:
         """See superclass."""
         super().seed(rng_seed)
-        self.emitter_group.do_method('seed', self.rng_seed)
+        self._emitters.do_method('seed', self.rng_seed)
 
     @property
     def num_unique_values(self) -> int:
         """Returns the max number of unique strs this emitter produces."""
-        nlengths = self.length_emitter.num_unique_values
-        nchars = self.alphabet_emitter.num_unique_values
-        return sum([nchars ** i for i in range(1, nlengths + 1)])
+        return self._num_unique_values
 
     def emit(self, number: int) -> List[str]:
         """Returns multiple strs with random chars and length.
@@ -98,12 +128,14 @@ class Word(RandomEmitter):
         """
         if number == 1:
             # This is faster if we just need 1.
-            return [''.join(self.alphabet_emitter(self.length_emitter()))]
+            return [
+                ''.join(self._emitters['alphabet'](self._emitters['length']()))
+            ]
 
         # Generating all the characters at once and then partitioning
         # them into words is faster than generating each separate word.
-        lengths = self.length_emitter(number)
-        chars = self.alphabet_emitter(sum(lengths))
+        lengths = self._emitters['length'](number)
+        chars = self._emitters['alphabet'](sum(lengths))
         words = []
         char_index = 0
         for length in lengths:
@@ -149,24 +181,53 @@ class Text(RandomEmitter):
             sep_emitter: (Optional.) See `sep_emitter` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
+        self._emitters = ObjectMap({})
         self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
         self.sep_emitter = sep_emitter
-        self.emitter_group = ObjectGroup(numwords_emitter, word_emitter,
-                                         sep_emitter)
         self.rng_seed = rng_seed
         self.reset()
+
+    @property
+    def numwords_emitter(self) -> IntEmitterLike:
+        """Returns the 'numwords_emitter' attribute."""
+        return self._emitters['numwords']
+
+    @numwords_emitter.setter
+    def numwords_emitter(self, numwords_emitter: IntEmitterLike):
+        """Sets the 'numwords_emitter' attribute."""
+        self._emitters['numwords'] = numwords_emitter
+
+    @property
+    def word_emitter(self) -> StrEmitterLike:
+        """Returns the 'word_emitter' attribute."""
+        return self._emitters['word']
+
+    @word_emitter.setter
+    def word_emitter(self, word_emitter: StrEmitterLike):
+        """Sets the 'word_emitter' attribute."""
+        self._emitters['word'] = word_emitter
+
+    @property
+    def sep_emitter(self) -> StrEmitterLike:
+        """Returns the 'sep_emitter' attribute."""
+        return self._emitters['sep']
+
+    @sep_emitter.setter
+    def sep_emitter(self, sep_emitter: StrEmitterLike):
+        """Sets the 'sep_emitter' attribute."""
+        self._emitters['sep'] = sep_emitter
 
     def reset(self) -> None:
         """See superclass."""
         super().reset()
-        self.emitter_group.setattr('rng_seed', self.rng_seed)
-        self.emitter_group.do_method('reset')
+        self._emitters.setattr('rng_seed', self.rng_seed)
+        self._emitters.do_method('reset')
 
     def seed(self, rng_seed: Any) -> None:
         """See superclass."""
         super().seed(rng_seed)
-        self.emitter_group.do_method('seed', self.rng_seed)
+        self._emitters.do_method('seed', self.rng_seed)
 
     def _get_words_generator(self, total):
         """Creates a generator object for generating words."""
@@ -188,18 +249,19 @@ class Text(RandomEmitter):
         # `reset` call happens in the middle of a set of words, but
         # this is about the best we can do I think.
 
-        unique = self.word_emitter.num_unique_values
-        if getattr(self.word_emitter, 'each_unique', False) and total > unique:
+        num_unique = self._emitters['word'].num_unique_values
+        each_unique = getattr(self._emitters['word'], 'each_unique', False)
+        if each_unique and total > num_unique:
             def generator():
                 remainder = total
                 while remainder > 0:
-                    needed = clamp(unique, mx=remainder)
-                    for word in self.word_emitter(needed):
+                    needed = clamp(num_unique, mx=remainder)
+                    for word in self._emitters['word'](needed):
                         yield word
-                    self.word_emitter.reset()
+                    self._emitters['word'].reset()
                     remainder -= needed
             return generator()
-        return (word for word in self.word_emitter(total))
+        return (word for word in self._emitters['word'](total))
 
     def emit(self, number: int) -> List[str]:
         """Returns a text string with a random number of words.
@@ -208,11 +270,11 @@ class Text(RandomEmitter):
             number: An int; how many text strings to return.
         """
         texts = []
-        lengths = self.numwords_emitter(number)
+        lengths = self._emitters['numwords'](number)
         total_words = sum(lengths)
         words = self._get_words_generator(total_words)
         try:
-            seps = (sep for sep in self.sep_emitter(total_words - number))
+            seps = (sep for sep in self._emitters['sep'](total_words - number))
         except TypeError:
             seps = (sep for sep in [])
         for length in lengths:
