@@ -98,8 +98,7 @@ class Choice(RandomEmitter):
                     f"Mismatched number of {noun_phr} ({nitems}) to choice "
                     f"weights ({nweights}). These amounts must match."
                 )
-            if not (self.unique or self.each_unique):
-                self.cum_weights = list(itertools.accumulate(self.weights))
+            self.cum_weights = list(itertools.accumulate(self.weights))
 
         if self.unique:
             # For globally unique emitters (without replacement), it's
@@ -174,7 +173,7 @@ class Choice(RandomEmitter):
         Args:
             number: An int; how many items you want to choose.
         """
-        if self.unique or self.each_unique:
+        if self.unique or (self.each_unique and number > 1):
             if number > self.num_unique_values:
                 self.raise_uniqueness_violation(number)
             if self.unique:
