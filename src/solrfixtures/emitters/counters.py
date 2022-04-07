@@ -1,9 +1,34 @@
 """Contains functions and classes for implementing counter emitters."""
 import itertools
-from typing import List, Optional, Union
+from typing import Callable, Iterable, Iterator, List, Optional, Union
 
 from solrfixtures.emitter import Emitter
-from solrfixtures.typing import Number
+from solrfixtures.typing import Number, T
+
+
+class Sequential(Emitter):
+    """Emitter class for emitting values in a sequence."""
+
+    def __init__(self, iterator_factory: Callable[[], Iterator]) -> None:
+        """Inits a Sequential emitter."""
+        self.iterator_factory = iterator_factory
+        self.reset()
+
+    @classmethod
+    def from_iterable(cls, iterable: Iterable) -> 'Sequential':
+        return cls(lambda: iter(iterable))
+
+    def reset(self) -> None:
+        self.iterator = self.iterator_factory()
+
+    def emit(self, number: int) -> List[T]:
+        result = list(itertools.islice(self.iterator, 0, number))
+        n_result = len(result)
+        if n_result == number:
+            return result
+        self.reset()
+        result.extend(self.emit(number - n_result))
+        return result
 
 
 class AutoIncrementNumber(Emitter):
