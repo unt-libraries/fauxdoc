@@ -1,5 +1,5 @@
 """Contains constants/variables/etc. used for type hinting."""
-from typing import Any, Optional, List, TypeVar, Union
+from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
 
 try:
     from typing import Protocol
@@ -11,6 +11,7 @@ except ImportError:
 
 Number = Union[int, float]
 T = TypeVar('T')
+EmitterLikeCallable = Union[Callable[[int], Sequence[T]], 'EmitterLike']
 
 
 # Protocols defined here.
