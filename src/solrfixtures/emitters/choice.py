@@ -1,6 +1,6 @@
 """Contains emitters for choosing random data values."""
 import itertools
-from typing import Any, Optional, List, Sequence, TypeVar
+from typing import Any, Optional, List, Sequence, TypeVar, Union
 
 from solrfixtures.emitter import RandomEmitter
 from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle
@@ -72,7 +72,6 @@ class Choice(RandomEmitter):
         self.noun = noun
         self.rng_seed = rng_seed
         self._shuffled = None
-        self._shuffled_index = None
         self.reset()
 
     def reset(self) -> None:
@@ -89,6 +88,7 @@ class Choice(RandomEmitter):
                 f"The 'items' attribute must be a non-empty sequence. "
                 f"(Provided: {self.items})"
             )
+        self._num_unique_values = len(self.items)
         if self.weights is not None:
             nitems = len(self.items)
             nweights = len(self.weights)
@@ -120,28 +120,12 @@ class Choice(RandomEmitter):
         if self.unique:
             # For unique emitters: the new seed isn't applied to what
             # we emit until we regenerate the shuffle, losing track of
-            # what has already been emitted. If it turns out that this
-            # is confusing, it would be possible to allow for a partial
-            # reshuffle -- e.g., only reshuffle
-            # self._shuffled[self.shuffled_index:]. However, we would
-            # have to implement a version of the `weighted_shuffle`
-            # algorithm that lets us get the corresponding weights
-            # along with the shuffled items whenever we do a global
-            # shuffle. (Right now we lose what weights go with what
-            # items when they get shuffled.) I'm leaving this as a
-            # possible future TODO if turns out to be needed.
+            # what has already been emitted.
             self._global_shuffle()
 
     def _global_shuffle(self):
         weights = self.weights or [1] * len(self.items)
-        self._shuffled = weighted_shuffle(self.items, weights, self.rng)
-        self._shuffled_index = 0
-
-    def _get_next_shuffled(self, number: int = 1) -> List[T]:
-        slc_start = self._shuffled_index
-        slc = self._shuffled[slc_start:slc_start+number]
-        self._shuffled_index += number
-        return slc
+        self._shuffled = iter(weighted_shuffle(self.items, weights, self.rng))
 
     @property
     def emits_unique_values(self) -> bool:
@@ -157,42 +141,51 @@ class Choice(RandomEmitter):
         many items remain to be selected. Otherwise, it gives you the
         total number of unique items to be selected.
         """
-        try:
-            return len(self._shuffled) - self._shuffled_index
-        except TypeError:
-            return len(self.items)
+        return self._num_unique_values
 
-    def emit(self, number: int) -> List[T]:
-        """Returns a list of randomly chosen items.
+    def _choice_without_replacement(self, number: int):
+        """Makes unique choices (without replacement)."""
+        if number > self.num_unique_values:
+            self.raise_uniqueness_violation(number)
+        if self.unique:
+            # Global no replacement, with/without weights.
+            self._num_unique_values -= number
+            if number == 1:
+                return [next(self._shuffled)]
+            return list(itertools.islice(self._shuffled, 0, number))
+        if self.weights is None:
+            # Local no replacement, without weights.
+            return self.rng.sample(self.items, k=number)
+        # Local no replacement, with weights.
+        return weighted_shuffle(self.items, self.weights, self.rng, number)
 
-        This uses the most efficient selection method possible given
-        the emitter configuration and checks to ensure there are enough
-        unique values available if `self.unique` or `self.each_unique`
-        is True.
-
-        Args:
-            number: An int; how many items you want to choose.
-        """
-        if self.unique or (self.each_unique and number > 1):
-            if number > self.num_unique_values:
-                self.raise_uniqueness_violation(number)
-            if self.unique:
-                # Global no replacement, with/without weights.
-                return self._get_next_shuffled(number)
-            if self.weights is None:
-                # Local no replacement, without weights.
-                return self.rng.sample(self.items, k=number)
-            # Local no replacement, with weights.
-            return weighted_shuffle(self.items, self.weights, self.rng, number)
-        # With replacement, with/without weights.
+    def _choice_with_replacement(self, number: int):
+        """Makes non-unique choices (with replacement)."""
         if len(self.items) == 1:
             # No choice here.
             return list(self.items) * number
         if self.weights is None and number == 1:
-            # `choice` is faster if we just need 1.
+            # `choice` is fastest if there are no weights and we just
+            # need 1.
             return [self.rng.choice(self.items)]
         return self.rng.choices(self.items, cum_weights=self.cum_weights,
                                 k=number)
+
+    def emit(self) -> T:
+        """Returns one randomly chosen value."""
+        if self.unique:
+            return self._choice_without_replacement(1)[0]
+        return self._choice_with_replacement(1)[0]
+
+    def emit_many(self, number: int) -> List[T]:
+        """Returns 'number' randomly chosen values.
+
+        Args:
+            number: See superclass.
+        """
+        if self.unique or (self.each_unique and number > 1):
+            return self._choice_without_replacement(number)
+        return self._choice_with_replacement(number)
 
 
 class PoissonChoice(Choice):

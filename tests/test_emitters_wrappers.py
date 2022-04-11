@@ -22,13 +22,25 @@ class MockEmitter(Emitter):
         self.seed_called = True
         self.seed_called_with = rng_seed
 
-    def emit(self, number):
-        return []
+    def emit(self):
+        pass
+
+    def emit_many(self, number):
+        pass
 
 
 class NumberEmitter(Emitter):
-    def emit(self, number):
-        return list(range(number))
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.counter = iter(range(9999))
+
+    def emit(self):
+        return next(self.counter)
+
+    def emit_many(self, number):
+        return [next(self.counter) for _ in range(number)]
 
 
 # Tests
@@ -44,11 +56,13 @@ class NumberEmitter(Emitter):
      ['Friday, January 1, 2016 @ 11:30:05 PM']),
     (StaticEmitter('Susan'), lambda n: f'{n} says, "Hello!"',
      ['Susan says, "Hello!"']),
-    (lambda n: ['Susan'] * n, lambda n: f'{n} says, "Hello!"',
-     ['Susan says, "Hello!"']),
+    (lambda number=None: (['Susan'] * number) if number else 'Susan',
+     lambda n: f'{n} says, "Hello!"', ['Susan says, "Hello!"']),
 ])
 def test_wrap_emit(source, wrapper, expected):
     em = Wrap(source, wrapper)
+    assert [em() for _ in range(len(expected))] == expected
+    em.reset()
     assert em(len(expected)) == expected
 
 
@@ -80,6 +94,8 @@ def test_wrap_seed_seeds_source_emitter():
 ])
 def test_wrapmany_emit(sources, wrapper, expected):
     em = WrapMany(sources, wrapper)
+    assert [em() for _ in range(len(expected))] == expected
+    em.reset()
     assert em(len(expected)) == expected
 
 

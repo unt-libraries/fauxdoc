@@ -66,10 +66,10 @@ class Emitter(ABC):
         )
 
     def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
-        """Wraps the `emit` method so that this obj is callable.
+        """Emits one data value or a list of multiple values.
 
-        You can control whether you get a single value or a list of
-        values via the `number` arg. E.g.:
+        Use the 'number' kwarg to control whether you get a single
+        value or a list. E.g.:
             >>> some_emitter()
             'a val'
             >>> some_emitter(1)
@@ -77,29 +77,32 @@ class Emitter(ABC):
             >>> some_emitter(2)
             ['a val', 'another val']
 
+        Implementation note: Subclasses should override `emit` and
+        `emit_many` to define how to generate one and multiple values,
+        respectively.
+
         Args:
             number: (Optional.) How many data values to emit. Default
-                is None, which causes us to return a single value
-                instead of a list.
+                is None, which returns a one value instead of a list.
 
         Returns:
             One emitted value if `number` is None, or a list of
             emitted values if `number` is an int.
         """
         if number is None:
-            return self.emit(1)[0]
-        return self.emit(number)
+            return self.emit()
+        if number == 1:
+            return [self.emit()]
+        return self.emit_many(number)
 
     @abstractmethod
-    def emit(self, number: int) -> List[T]:
-        """Returns a list of data values.
+    def emit(self) -> T:
+        """Return one data value."""
 
-        You must override this in your subclass. It should return a
-        list of generated data values.
+    @abstractmethod
+    def emit_many(self, number: int) -> List[T]:
+        """Return multiple data values, as a list."""
 
-        Args:
-            number: An int; how many values to return.
-        """
 
 class RandomEmitter(Emitter):
     """Abstract base class for defining emitters that need RNG.
@@ -158,10 +161,8 @@ class StaticEmitter(Emitter):
         """
         self.value = value
 
-    def emit(self, number: int) -> List[T]:
-        """Returns a list with the static val repeated `number` times.
+    def emit(self) -> T:
+        return self.value
 
-        Args:
-            number: See superclass.
-        """
+    def emit_many(self, number: int) -> List[T]:
         return [self.value] * number

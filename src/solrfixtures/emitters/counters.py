@@ -70,11 +70,15 @@ class AutoIncrementNumber(Emitter):
         """Returns True; all AutoIncrement instances emit unique vals."""
         return True
 
-    def emit(self, number: int) -> List[Union[str, int]]:
+    def emit(self) -> T:
+        """Return an emitted value."""
+        return self.emit_many(1)[0]
+
+    def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted values.
 
         Args:
-            number: How many values to return (int).
+            number: See superclass.
         """
         if self.template is None:
             data = list(range(self._count, self._count + number))

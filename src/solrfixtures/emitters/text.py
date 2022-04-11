@@ -1,5 +1,5 @@
 """Contains functions and emitters for emitting text data."""
-from typing import Any, List, Optional, Sequence
+from typing import Any, Iterator, List, Optional, Sequence, Union
 
 from solrfixtures.group import ObjectMap
 from solrfixtures.emitter import RandomEmitter
@@ -120,18 +120,15 @@ class Word(RandomEmitter):
         """Returns the max number of unique strs this emitter produces."""
         return self._num_unique_values
 
-    def emit(self, number: int) -> List[str]:
-        """Returns multiple strs with random chars and length.
+    def emit(self) -> str:
+        """Returns one str with random chars and length."""
+        return ''.join(self._emitters['alphabet'](self._emitters['length']()))
 
+    def emit_many(self, number: int) -> List[str]:
+        """Returns a list of strs, ecah with random chars and length.
         Args:
-            number: An int; how many strings to return.
+            number: See superclass.
         """
-        if number == 1:
-            # This is faster if we just need 1.
-            return [
-                ''.join(self._emitters['alphabet'](self._emitters['length']()))
-            ]
-
         # Generating all the characters at once and then partitioning
         # them into words is faster than generating each separate word.
         lengths = self._emitters['length'](number)
@@ -229,8 +226,8 @@ class Text(RandomEmitter):
         super().seed(rng_seed)
         self._emitters.do_method('seed', self.rng_seed)
 
-    def _get_words_generator(self, total):
-        """Creates a generator object for generating words."""
+    def _get_words_iterator(self, total: int) -> Iterator:
+        """Creates an iterator/generator for generating words."""
 
         # This addresses the edge case where the word_emitter for this
         # is a list of words (e.g. implemented via a Choice object),
@@ -261,22 +258,26 @@ class Text(RandomEmitter):
                     self._emitters['word'].reset()
                     remainder -= needed
             return generator()
-        return (word for word in self._emitters['word'](total))
+        return iter(self._emitters['word'](total))
 
-    def emit(self, number: int) -> List[str]:
-        """Returns a text string with a random number of words.
+    def emit(self) -> str:
+        """Returns one text str with a random # of words."""
+        return self.emit_many(1)[0]
+
+    def emit_many(self, number: int) -> List[str]:
+        """Returns a list of text strs with random #s of words.
 
         Args:
-            number: An int; how many text strings to return.
+            number: See superclass.
         """
         texts = []
         lengths = self._emitters['numwords'](number)
         total_words = sum(lengths)
-        words = self._get_words_generator(total_words)
+        words = self._get_words_iterator(total_words)
         try:
-            seps = (sep for sep in self._emitters['sep'](total_words - number))
+            seps = iter(self._emitters['sep'](total_words - number))
         except TypeError:
-            seps = (sep for sep in [])
+            seps = iter([])
         for length in lengths:
             if length:
                 render = [next(words)]

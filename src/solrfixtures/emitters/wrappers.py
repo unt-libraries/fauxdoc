@@ -1,5 +1,5 @@
 """Contains emitters that wrap other emitters."""
-from typing import Any, Callable, List, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 from solrfixtures.emitter import Emitter
 from solrfixtures.group import ObjectGroup
@@ -75,11 +75,15 @@ class Wrap(Emitter):
         except AttributeError:
             pass
 
-    def emit(self, number: int) -> List[T]:
-        """Returns wrapped values.
-        
+    def emit(self) -> T:
+        """Returns an emitted value, run through `self.wrapper`."""
+        return self.wrapper(self.source())
+
+    def emit_many(self, number: int) -> List[T]:
+        """Returns a list of emitted, wrapped values.
+
         Args:
-            number: An int; how many values to emit.
+            number: See superclass.
         """
         return [self.wrapper(v) for v in self.source(number)]
 
@@ -149,11 +153,15 @@ class WrapMany(Emitter):
         """
         self._sources.do_method('seed', rng_seed)
 
-    def emit(self, number: int) -> List[T]:
-        """Returns wrapped values.
-        
+    def emit(self) -> T:
+        """Returns emitted values, run through `self.wrapper`."""
+        return self.wrapper(*(s() for s in self._sources))
+
+    def emit_many(self, number: int) -> List[T]:
+        """Returns a list of emitted, wrapped values.
+
         Args:
-            number: An int; how many values to emit.
+            number: See superclass.
         """
         return [self.wrapper(*args)
                 for args in list(zip(*(s(number) for s in self._sources)))]

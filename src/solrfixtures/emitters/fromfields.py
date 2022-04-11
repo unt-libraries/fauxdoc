@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Sequence, Union
 
 from solrfixtures.group import ObjectGroup
 from solrfixtures.emitter import Emitter
-from solrfixtures.typing import FieldLike
+from solrfixtures.typing import FieldLike, T
 
 
 class CopyFields(Emitter):
@@ -72,31 +72,25 @@ class CopyFields(Emitter):
             self._source = ObjectGroup(source)
             self._single_valued = not source.multi_valued
 
-    def emit(self, number: int) -> List[Any]:
+    def emit(self) -> T:
+        """Returns one emitted value."""
+        if self._single_valued:
+            return self._source[0].previous
+        vals = []
+        for field in self._source:
+            val = field.previous
+            if val is not None:
+                if not isinstance(val, (list, tuple)):
+                    val = [val]
+                vals.extend(val)
+        if self.separator is None:
+            return vals or None
+        return self.separator.join([str(v) for v in vals])
+
+    def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted values.
 
-        Each emitted value is a full copy of the source field(s). If
-        'number' > 1, it emits multiple full copies.
-        
         Args:
-            number: How many values to return (int).
+            number: See superclass.
         """
-        if self._single_valued:
-            data = self._source[0].previous
-        else:
-            vals = []
-            for field in self._source:
-                val = field.previous
-                if val is not None:
-                    if not isinstance(val, (list, tuple)):
-                        val = [val]
-                    vals.extend(val)
-            if self.separator is not None:
-                data = self.separator.join([str(v) for v in vals])
-            else:
-                data = vals or None
-
-        # This is a bit weird, but is done to satisfy the requirement
-        # that each Emitter can emit multiple values depending on the
-        # 'number' argument.
-        return [data] * number
+        return [self.emit()] * number
