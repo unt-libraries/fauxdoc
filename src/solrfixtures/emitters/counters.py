@@ -21,13 +21,26 @@ class Sequential(Emitter):
     def reset(self) -> None:
         self.iterator = self.iterator_factory()
 
-    def emit(self, number: int) -> List[T]:
+    def emit(self) -> T:
+        """Returns one emitted value."""
+        try:
+            return next(self.iterator)
+        except StopIteration:
+            self.reset()
+            return next(self.iterator)
+
+    def emit_many(self, number: int) -> List[T]:
+        """Returns a list of emitted values.
+
+        Args:
+            number: See superclass.
+        """
         result = list(itertools.islice(self.iterator, 0, number))
         n_result = len(result)
         if n_result == number:
             return result
         self.reset()
-        result.extend(self.emit(number - n_result))
+        result.extend(self(number - n_result))
         return result
 
 
