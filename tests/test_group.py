@@ -93,7 +93,7 @@ def test_objectmap_setattr(emitters):
     {'first': MockEmitter('foo'), 'second': Static('foo'),
      'third': None, 'fourth': MockEmitter('foo')},
 ])
-def test_objectgroup_domethod(emitters):
+def test_objectmap_domethod(emitters):
     group = ObjectMap(emitters)
     group.do_method('mock_method', 'test_arg', kwarg='test_kwarg')
     for obj in group.values():

@@ -1,12 +1,10 @@
 """
 Contains classes for creating faux-data-generation profiles.
 """
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
-from solrfixtures.group import ObjectGroup, ObjectMap
-from solrfixtures.emitter import Emitter
+from solrfixtures.group import ObjectMap
 from solrfixtures.emitters.fixed import Static
-from solrfixtures.emitters.choice import Choice
 from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
 
 
@@ -150,7 +148,7 @@ class Field:
 
     def seed(self, rng_seed: Any) -> None:
         """Seeds all RNGs associated with emitters on this field.
-        
+
         Args:
             rng_seed: The new seed you want to set. Ultimately this is
                 passed to a random.Random instance, so it should be any

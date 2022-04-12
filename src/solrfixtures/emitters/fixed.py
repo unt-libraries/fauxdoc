@@ -1,9 +1,9 @@
 """Contains functions and classes for implementing counter emitters."""
 import itertools
-from typing import Callable, Iterable, Iterator, List, Optional, Union
+from typing import Callable, Iterable, Iterator, List
 
 from solrfixtures.emitter import Emitter
-from solrfixtures.typing import Number, T
+from solrfixtures.typing import T
 
 
 class Static(Emitter):

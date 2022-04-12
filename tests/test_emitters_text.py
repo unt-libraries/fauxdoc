@@ -19,6 +19,7 @@ def make_wordlist_emitter():
              'refrigerator', 'truck', 'of', 'the', 'a', 'baseless', 'bird',
              'on', 'clapping')
     weights = (5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 5, 5, 10, 5)
+
     def _make_wordlist_emitter(each_unique=False):
         return Choice(words, weights, each_unique=each_unique)
     return _make_wordlist_emitter
@@ -37,30 +38,33 @@ def test_makealphabet(ranges, expected):
 
 @pytest.mark.parametrize(
     'seed, mn, mx, lweights, alpha, aweights, num, repeat, expected', [
-    (999, 0, 0, None, 'abcde', None, 10, 0,
-     ['', '', '', '', '', '', '', '', '', '']),
-    (999, 1, 1, None, 'abcde', None, 10, 0,
-     ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
-    (999, 5, 5, None, 'abcde', None, 10, 0,
-     ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd', 'adcdb',
-      'aebdb', 'cadca']),
-    (999, 5, 5, None, 'abcde', None, None, 10,
-     ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd', 'adcdb',
-      'aebdb', 'cadca']),
-    (999, 5, 5, None, 'a', None, 10, 0,
-     ['aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa',
-      'aaaaa', 'aaaaa']),
-    (999, 1, 5, None, 'abcde', None, 10, 0,
-     ['daec', 'c', 'adbde', 'aea', 'bcd', 'b', 'eebd', 'aa', 'beca', 'daece']),
-    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None, 10, 0,
-     ['da', 'e', 'cca', 'db', 'de', 'a', 'ea', 'bc', 'db', 'ee']),
-    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None, None, 10,
-     ['da', 'e', 'cca', 'db', 'de', 'a', 'de', 'ae', 'ad', 'bd']),
-    (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', [20, 5, 15, 40, 20], 10, 0,
-     ['da', 'e', 'dda', 'dc', 'de', 'a', 'ea', 'cd', 'dc', 'ee']),
-    (999, 1, 5, None, 'abcde', [20, 5, 15, 40, 20], 10, 0,
-     ['daed', 'd', 'adcde', 'aea', 'cdd', 'c', 'eebd', 'aa', 'beda', 'daede']),
-])
+        (999, 0, 0, None, 'abcde', None, 10, 0,
+         ['', '', '', '', '', '', '', '', '', '']),
+        (999, 1, 1, None, 'abcde', None, 10, 0,
+         ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
+        (999, 5, 5, None, 'abcde', None, 10, 0,
+         ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd',
+          'adcdb', 'aebdb', 'cadca']),
+        (999, 5, 5, None, 'abcde', None, None, 10,
+         ['daecc', 'adbde', 'aeabc', 'dbeeb', 'daabe', 'cadae', 'cecdd',
+          'adcdb', 'aebdb', 'cadca']),
+        (999, 5, 5, None, 'a', None, 10, 0,
+         ['aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa', 'aaaaa',
+          'aaaaa', 'aaaaa', 'aaaaa']),
+        (999, 1, 5, None, 'abcde', None, 10, 0,
+         ['daec', 'c', 'adbde', 'aea', 'bcd', 'b', 'eebd', 'aa', 'beca',
+          'daece']),
+        (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None, 10, 0,
+         ['da', 'e', 'cca', 'db', 'de', 'a', 'ea', 'bc', 'db', 'ee']),
+        (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', None, None, 10,
+         ['da', 'e', 'cca', 'db', 'de', 'a', 'de', 'ae', 'ad', 'bd']),
+        (999, 1, 5, [15, 70, 5, 5, 5], 'abcde', [20, 5, 15, 40, 20], 10, 0,
+         ['da', 'e', 'dda', 'dc', 'de', 'a', 'ea', 'cd', 'dc', 'ee']),
+        (999, 1, 5, None, 'abcde', [20, 5, 15, 40, 20], 10, 0,
+         ['daed', 'd', 'adcde', 'aea', 'cdd', 'c', 'eebd', 'aa', 'beda',
+          'daede']),
+    ]
+)
 def test_word_emit(seed, mn, mx, lweights, alpha, aweights, num, repeat,
                    expected):
     length_emitter = Choice(range(mn, mx + 1), lweights)
@@ -117,32 +121,34 @@ def test_text_emit_generated_words(seed, word_mn, word_mx, word_weights,
 
 @pytest.mark.parametrize(
     'seed, word_mn, word_mx, unique, num, repeat, expected', [
-    (999, 1, 3, False, 10, 0,
-     ['baseless cat on', 'the', 'of, sappy baseless', 'runway baseless',
-      'bird cat', 'clapping', 'blooming isolated the', 'a',
-      'isolated on-clapping', 'flower the: cat']),
-    (999, 1, 3, False, None, 10,
-     ['baseless cat on', 'the', 'of, sappy baseless', 'runway baseless bird',
-      'cat clapping blooming', 'isolated the', 'a-isolated', 'on',
-      'clapping flower: the', 'cat red']),
-    (999, 3, 6, False, 10, 0,
-     ['baseless cat on, the of sappy', 'baseless runway baseless',
-      'bird cat clapping-blooming isolated: the',
-      'a isolated on clapping flower', 'the cat, red: flower',
-      'clapping of blooming', 'a blooming on the; on of', 'a a sappy a',
-      'of, a flower, sappy bird flower',
-      'baseless isolated of red baseless of']),
-    (999, 3, 10, True, 10, 0,
-     ['a of sappy, runway truck red on clapping blooming',
-      'flower refrigerator-the',
-      'bird baseless: isolated cat a of sappy runway, truck',
-      'red: on clapping blooming flower refrigerator the',
-      'bird; baseless isolated cat a of', 'sappy, runway truck, red',
-      'on clapping blooming flower refrigerator the bird baseless isolated',
-      'cat a-of sappy runway',
-      'truck red on clapping blooming flower refrigerator, the bird',
-      'baseless isolated cat baseless cat on the of sappy']),
-])
+        (999, 1, 3, False, 10, 0,
+         ['baseless cat on', 'the', 'of, sappy baseless', 'runway baseless',
+          'bird cat', 'clapping', 'blooming isolated the', 'a',
+          'isolated on-clapping', 'flower the: cat']),
+        (999, 1, 3, False, None, 10,
+         ['baseless cat on', 'the', 'of, sappy baseless',
+          'runway baseless bird', 'cat clapping blooming', 'isolated the',
+          'a-isolated', 'on', 'clapping flower: the', 'cat red']),
+        (999, 3, 6, False, 10, 0,
+         ['baseless cat on, the of sappy', 'baseless runway baseless',
+          'bird cat clapping-blooming isolated: the',
+          'a isolated on clapping flower', 'the cat, red: flower',
+          'clapping of blooming', 'a blooming on the; on of', 'a a sappy a',
+          'of, a flower, sappy bird flower',
+          'baseless isolated of red baseless of']),
+        (999, 3, 10, True, 10, 0,
+         ['a of sappy, runway truck red on clapping blooming',
+          'flower refrigerator-the',
+          'bird baseless: isolated cat a of sappy runway, truck',
+          'red: on clapping blooming flower refrigerator the',
+          'bird; baseless isolated cat a of', 'sappy, runway truck, red',
+          'on clapping blooming flower refrigerator the bird baseless '
+          'isolated',
+          'cat a-of sappy runway',
+          'truck red on clapping blooming flower refrigerator, the bird',
+          'baseless isolated cat baseless cat on the of sappy']),
+    ]
+)
 def test_text_emit_words_list(seed, word_mn, word_mx, unique, num, repeat,
                               expected, make_wordlist_emitter):
     sep_emitter = Choice((' ', '-', ', ', '; ', ': '), [80, 5, 10, 3, 2])

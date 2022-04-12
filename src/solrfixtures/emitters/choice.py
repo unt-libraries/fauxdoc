@@ -1,6 +1,6 @@
 """Contains emitters for choosing random data values."""
 import itertools
-from typing import Any, Optional, List, Sequence, TypeVar, Union
+from typing import Any, Optional, List, Sequence
 
 from solrfixtures.emitter import RandomEmitter
 from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle

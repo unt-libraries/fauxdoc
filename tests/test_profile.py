@@ -72,7 +72,7 @@ def phrase_emitter():
 
 @pytest.mark.parametrize('seed, repeat, gate, expected', [
     # Single-valued fields + always emit (no repeat, no gate)
-    (999, None, None, 
+    (999, None, None,
      ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
       'crazy', 'flautist']),
 
@@ -121,7 +121,7 @@ def phrase_emitter():
     (999, choice.poisson_choice(range(1, 6), mu=2), choice.chance(0),
      [None, None, None, None, None, None, None, None, None, None]),
     (999, choice.Choice((0, 1), weights=[25, 75]), choice.chance(50),
-      [None, ['crazy'], None, None, [], ['warm'], None, ['eat'], None, None]),
+     [None, ['crazy'], None, None, [], ['warm'], None, ['eat'], None, None]),
     (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(75),
      [None, ['eat', 'bicycle'], None, ['eat'], ['yellow', 'flautist'],
       ['snowstorm'], None, ['crazy'], None, None]),
@@ -184,7 +184,7 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field = Field('test', emitter_unique(),
                   repeat=choice.Choice([1] * 12, unique=True),
                   gate=choice.chance(100), rng_seed=999)
-    output = [field() for _ in range(12)]
+    [field() for _ in range(12)]
     assert field.emitter.num_unique_values == 0
     assert field.repeat_emitter.num_unique_values == 0
 
@@ -208,7 +208,7 @@ def test_field_seed_reseeds_all_emitters(emitter):
 
 
 @pytest.mark.parametrize('seed, repeat, gate, expected', [
-    (999, None, None, 
+    (999, None, None,
      ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
       'crazy', 'flautist']),
     (999, choice.poisson_choice(range(1, 6), mu=2), None,
@@ -308,7 +308,7 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
               repeat=choice.Choice([1] * 12, unique=True),
               gate=choice.chance(100))
     )
-    output = [schema() for _ in range(12)]
+    [schema() for _ in range(12)]
     for field in schema.fields.values():
         assert field.emitter.num_unique_values == 0
         assert field.repeat_emitter.num_unique_values == 0

@@ -1,5 +1,5 @@
 """Contains tests for solrfixtures.emitters.wrappers."""
-from datetime import date, time, datetime
+from datetime import date, datetime
 import pytest
 
 from solrfixtures.emitter import Emitter
@@ -112,7 +112,7 @@ def test_wrapmany_seed_seeds_all_source_emitters():
     mock_ems = [MockEmitter(), MockEmitter()]
     wrapped_em = WrapMany(mock_ems, lambda n: None)
     assert all([not m.seed_called for m in mock_ems])
-    assert all([m.seed_called_with is None for m in mock_ems]) 
+    assert all([m.seed_called_with is None for m in mock_ems])
     wrapped_em.seed(999)
     assert all([m.seed_called for m in mock_ems])
     assert all([m.seed_called_with == 999 for m in mock_ems])

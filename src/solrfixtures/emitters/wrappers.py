@@ -1,5 +1,5 @@
 """Contains emitters that wrap other emitters."""
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Sequence
 
 from solrfixtures.emitter import Emitter
 from solrfixtures.group import ObjectGroup

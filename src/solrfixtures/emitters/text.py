@@ -1,5 +1,5 @@
 """Contains functions and emitters for emitting text data."""
-from typing import Any, Iterator, List, Optional, Sequence, Union
+from typing import Any, Iterator, List, Optional, Sequence
 
 from solrfixtures.group import ObjectMap
 from solrfixtures.emitter import RandomEmitter

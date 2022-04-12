@@ -1,5 +1,5 @@
 """Contains emitters that use Field data to generate output."""
-from typing import Any, List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 
 from solrfixtures.group import ObjectGroup
 from solrfixtures.emitter import Emitter
@@ -40,7 +40,7 @@ class CopyFields(Emitter):
                  source: Union[FieldLike, Sequence[FieldLike]],
                  separator: Optional[str] = None) -> None:
         """Inits a CopyFields obj with source fields and separator.
-        
+
         Args:
             source: Provide either one Field instance or a sequence of
                 Field instances (to copy data from).
@@ -60,7 +60,7 @@ class CopyFields(Emitter):
 
         Also sets a private '_single_valued' attribute, True if this
         emitter has one source field that emits single values.
-        
+
         Args:
             source: One Field instance or a sequence of Field instances
                 (to copy data from).

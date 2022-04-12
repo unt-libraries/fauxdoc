@@ -26,7 +26,7 @@ class GroupMixin(ABC):
 
         The attribute is only set if that attribute already exists on
         the member object. Otherwise that object is skipped silently.
-        
+
         Args:
             attr_name: The name of the attribute to set.
             attr_value: The value to set.
@@ -64,7 +64,7 @@ class ObjectGroup(GroupMixin, UserList):
     This provides a shorthand way to set the same attribute or call the
     same method on a group of objects, where some objects in the group
     may not have that attribute or method and that's fine -- we just
-    skip them. 
+    skip them.
     """
 
     def __init__(self, *objects: Any) -> None:
@@ -92,7 +92,7 @@ class ObjectMap(GroupMixin, OrderedDict):
     This provides a shorthand way to set the same attribute or call the
     same method on a group of objects, where some objects in the group
     may not have that attribute or method and that's fine -- we just
-    skip them. 
+    skip them.
     """
 
     def __init__(self, objects: Mapping) -> None:

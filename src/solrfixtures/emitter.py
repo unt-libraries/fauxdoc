@@ -1,9 +1,9 @@
 """Contains base Emitter classes, for emitting data values."""
 from abc import ABC, abstractmethod
 import random
-from typing import Any, List, Optional, Sequence, Union, TypeVar
+from typing import Any, List, Optional, Union
 
-from .typing import EmitterLike, T
+from .typing import T
 
 
 class Emitter(ABC):
