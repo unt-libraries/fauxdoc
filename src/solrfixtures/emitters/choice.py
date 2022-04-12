@@ -188,111 +188,79 @@ class Choice(RandomEmitter):
         return self._choice_with_replacement(number)
 
 
-class PoissonChoice(Choice):
-    """Choice emitter that applies Poisson weighting when choosing.
+def poisson_choice(items: Sequence[T],
+                   mu: int = 1,
+                   weight_floor: Number = 0,
+                   unique: bool = False,
+                   each_unique: bool = False,
+                   noun: str = '',
+                   rng_seed: Any = None) -> Choice:
+    """Returns a Choice emitter with a Poisson weight distribution.
 
-    Attributes:
-        See parent class.
+    Args:
+        items: A list / sequence of all available choices.
+        mu: (Optional.) A positive integer or float representing the
+            average x value, or peak, of the distribution curve --
+            i.e., which items are chosen most frequently. Default is 1.
+        weight_floor: (Optional.) A positive integer or float
+            representing the lowest possible individual weight for an
+            item. This is most useful when you have a large number of
+            'items' -- it helps ensure you'll see more of the long tail
+            in choices that are made. Set to 0 (default) for no floor.
+        unique: (Optional.) 'unique' kwarg to pass to Choice.
+        each_unique: (Optional.) 'each_unique' kwarg to pass to Choice.
+        noun: (Optional.) 'noun' kwarg to pass to Choice.
+        rng_seed: (Optional.) 'rng_seed' kwarg to pass to Choice.
     """
-
-    def __init__(self,
-                 items: Sequence[T],
-                 mu: int = 1,
-                 weight_floor: Number = 0,
-                 unique: bool = False,
-                 each_unique: bool = False,
-                 noun: str = '',
-                 rng_seed: Any = None) -> None:
-        """Inits a PoissonChoice emitter.
-
-        Args:
-            items: See parent class.
-            mu: (Optional.) A positive integer or float representing
-                the average x value, or peak, of the distribution
-                curve. This controls which items are chosen most
-                frequently. Default is 1.
-            weight_floor: (Optional.) A positive integer or float
-                representing the lowest possible individual weight for
-                an item. This is most useful when you have a large
-                number of choices in 'items' -- it helps ensure you'll
-                see more of the long tail in choices that are made, at
-                the expense of comprimising the integrity of the
-                distribution. Set to 0 if you do not want a floor.
-                Default is 0.
-            unique: (Optional.) See parent class.
-            each_unique: (Optional.) See parent class.
-            noun: (Optional.) See parent class.
-            rng_seed: (Optional.) See parent class.
-        """
-        weights = [clamp(poisson(x, mu), mn=weight_floor)
-                   for x in range(1, len(items) + 1)]
-        super().__init__(items, weights, unique, each_unique, noun, rng_seed)
+    weights = [clamp(poisson(x, mu), mn=weight_floor)
+               for x in range(1, len(items) + 1)]
+    return Choice(items, weights, unique, each_unique, noun, rng_seed)
 
 
-class GaussianChoice(Choice):
-    """Choice emitter that applies Gaussian weighting when choosing.
+def gaussian_choice(items: Sequence[T],
+                    mu: Number = 0,
+                    sigma: Number = 1,
+                    weight_floor: Number = 0,
+                    unique: bool = False,
+                    each_unique: bool = False,
+                    noun: str = '',
+                    rng_seed: Any = None) -> None:
+    """Returns a Choice emitter with a Gaussian weight distribution.
 
-    Attributes:
-        See parent class.
+    Args:
+        items: A list / sequence of all available choices.
+        mu: (Optional.) An integer or float representing the average x
+            value, or peak, of the distribution curve -- i.e., which
+            items are chosen most frequently. Default is 0.
+        sigma: (Optional.) A positive integer or float representing the
+            standard deviation of the distribution curve -- i.e., the
+            width of the curve. Default is 1. Note: lower values create
+            a sharper peak, decreasing the number of items around it
+            that are chosen frequently. Higher values dull the peak,
+            increasing how frequently the items around it are chosen.
+        weight_floor: (Optional.) A positive integer or float
+            representing the lowest possible individual weight for an
+            item. This is most useful when you have a large number of
+            'items' -- it helps ensure you'll see more of the long tail
+            in choices that are made. Set to 0 (default) for no floor.
+        unique: (Optional.) 'unique' kwarg to pass to Choice.
+        each_unique: (Optional.) 'each_unique' kwarg to pass to Choice.
+        noun: (Optional.) 'noun' kwarg to pass to Choice.
+        rng_seed: (Optional.) 'rng_seed' kwarg to pass to Choice.
     """
-
-    def __init__(self,
-                 items: Sequence[T],
-                 mu: Number = 0,
-                 sigma: Number = 1,
-                 weight_floor: Number = 0,
-                 unique: bool = False,
-                 each_unique: bool = False,
-                 noun: str = '',
-                 rng_seed: Any = None) -> None:
-        """Inits a GaussianChoice emitter.
-
-        Args:
-            items: See parent class.
-            mu: (Optional.) An integer or float representing the
-                average x value, or peak, of the distribution curve.
-                This controls which items are chosen most frequently.
-                Default is 0.
-            sigma: (Optional.) A positive integer or float representing
-                the standard deviation of the distribution curve, which
-                controls the width of the curve. Default is 1. Lower
-                values create a sharper peak, decreasing the number of
-                items around the peak that are chosen frequently.
-                Higher values dull the peak, increasing how frequently
-                the items around the peak are chosen.
-            weight_floor: (Optional.) A positive integer or float
-                representing the lowest possible individual weight for
-                an item. This is most useful when you have a large
-                number of choices in 'items' -- it helps ensure you'll
-                see more of the long tail in choices that are made, at
-                the expense of comprimising the integrity of the
-                distribution. Set to 0 if you do not want a floor.
-                Default is 0.
-            unique: (Optional.) See parent class.
-            each_unique: (Optional.) See parent class.
-            noun: (Optional.) See parent class.
-            rng_seed: (Optional.) See parent class.
-        """
-        weights = [clamp(gaussian(x, mu, sigma), mn=weight_floor)
-                   for x in range(1, len(items) + 1)]
-        super().__init__(items, weights, unique, each_unique, noun, rng_seed)
+    weights = [clamp(gaussian(x, mu, sigma), mn=weight_floor)
+               for x in range(1, len(items) + 1)]
+    return Choice(items, weights, unique, each_unique, noun, rng_seed)
 
 
-class Chance(Choice):
-    """Choice emitter that emits True/False based on chance percentage.
+def chance(percent_chance: Number, rng_seed: Any = None) -> None:
+    """Returns a Choice emitter with a percent_chance of emitting True.
 
-    Attributes:
-        See superclass.
+    Args:
+        percent_chance: A number representing the percent chance this
+            emits True. Always emits False if chance <= 0; always emits
+            True if chance >= 100.
+        rng_seed: (Optional.) 'rng_seed' kwarg to pass to Choice.
     """
-
-    def __init__(self, percent_chance: Number, rng_seed: Any = None) -> None:
-        """Inits a Chance emitter with the given percentage.
-
-        Args:
-            percent_chance: A number representing the percent chance
-                this will emit True. Always emits False if chance <= 0,
-                and always emits True if chance >= 100.
-            rng_seed: See superclass.
-        """
-        super().__init__([True, False], [percent_chance, 100 - percent_chance],
-                         rng_seed=rng_seed)
+    return Choice([True, False], [percent_chance, 100 - percent_chance],
+                  rng_seed=rng_seed)

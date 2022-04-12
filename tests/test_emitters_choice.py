@@ -4,8 +4,8 @@ import datetime
 import pytest
 
 from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters.choice import Chance, Choice, GaussianChoice,\
-                                         PoissonChoice
+from solrfixtures.emitters.choice import chance, Choice, gaussian_choice,\
+                                         poisson_choice
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
@@ -195,8 +195,8 @@ def test_choice_datetimes(seed, mn, mx, step, step_unit, weights, expected):
      [8, 1, 8, 6, 5, 2, 8, 3, 8, 8, 1, 9, 2, 3, 6, 7, 3, 8, 9, 3]),
 ])
 def test_poisson_choice(seed, items, mu, weight_floor, expected):
-    pce = PoissonChoice(items, mu=mu, weight_floor=weight_floor, rng_seed=seed)
-    assert pce(len(expected)) == expected
+    em = poisson_choice(items, mu=mu, weight_floor=weight_floor, rng_seed=seed)
+    assert em(len(expected)) == expected
 
 
 @pytest.mark.parametrize('seed, items, mu, sigma, weight_floor, expected', [
@@ -226,12 +226,12 @@ def test_poisson_choice(seed, items, mu, weight_floor, expected):
      [7, 1, 8, 5, 4, 1, 7, 2, 7, 8, 1, 9, 1, 2, 5, 6, 2, 8, 9, 1]),
 ])
 def test_gaussian_choice(seed, items, mu, sigma, weight_floor, expected):
-    gce = GaussianChoice(items, mu=mu, sigma=sigma, weight_floor=weight_floor,
-                         rng_seed=seed)
+    gce = gaussian_choice(items, mu=mu, sigma=sigma, weight_floor=weight_floor,
+                          rng_seed=seed)
     assert gce(len(expected)) == expected
 
 
-@pytest.mark.parametrize('seed, chance, expected', [
+@pytest.mark.parametrize('seed, percent_chance, expected', [
     (999, -10,
      [False, False, False, False, False, False, False, False, False, False]),
     (999, 0,
@@ -247,6 +247,6 @@ def test_gaussian_choice(seed, items, mu, sigma, weight_floor, expected):
     (999, 10000,
      [True, True, True, True, True, True, True, True, True, True]),
 ])
-def test_chance(seed, chance, expected):
-    chance_em = Chance(chance, rng_seed=seed)
+def test_chance(seed, percent_chance, expected):
+    chance_em = chance(percent_chance, rng_seed=seed)
     assert chance_em(len(expected)) == expected

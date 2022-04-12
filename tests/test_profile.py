@@ -87,7 +87,7 @@ def phrase_emitter():
       ['eat', 'zebra'], ['eat', 'crazy'], ['warm', 'chairs'],
       ['snowstorm', 'zebra'], ['yellow', 'sluggish'], ['zebra', 'crazy'],
       ['chairs', 'snowstorm']]),
-    (999, choice.PoissonChoice(range(1, 6), mu=2), None,
+    (999, choice.poisson_choice(range(1, 6), mu=2), None,
      [['eat', 'bicycle', 'crazy'], ['eat'],
       ['yellow', 'flautist', 'crazy', 'happy'], ['happy', 'happy'],
       ['eat', 'happy'], ['zebra'], ['warm', 'chairs', 'bicycle'], ['sympathy'],
@@ -96,34 +96,34 @@ def phrase_emitter():
     # the output (which gives an empty list instead of None), but
     # generally keeping "how many to output" separate from "output or
     # or don't" makes it a bit easier to assign weighting/chances.
-    (999, choice.PoissonChoice(range(0, 10), mu=1), None,
+    (999, choice.poisson_choice(range(0, 10), mu=1), None,
      [['crazy'], [], ['warm'], [], [], [], ['eat'], [], ['eat'],
       ['sluggish']]),
-    (999, choice.PoissonChoice(range(1, 6), mu=1), None,
+    (999, choice.poisson_choice(range(1, 6), mu=1), None,
      [['eat', 'bicycle'], ['eat'], ['yellow', 'flautist'], ['snowstorm'],
       ['crazy'], ['flautist'], ['happy', 'happy'], ['warm'],
       ['happy', 'crazy'], ['warm', 'chairs']]),
 
     # Single-valued fields + chance to emit (no repeat, gate)
-    (999, None, choice.Chance(0),
+    (999, None, choice.chance(0),
      [None, None, None, None, None, None, None, None, None, None]),
-    (999, None, choice.Chance(10),
+    (999, None, choice.chance(10),
      [None, 'crazy', None, None, None, None, None, None, None, None]),
-    (999, None, choice.Chance(50),
+    (999, None, choice.chance(50),
      [None, 'crazy', None, None, 'warm', 'eat', None, 'eat', None, None]),
-    (999, None, choice.Chance(85),
+    (999, None, choice.chance(85),
      ['crazy', 'warm', None, 'eat', 'eat', 'sluggish', 'happy', 'happy',
       'snowstorm', 'crazy']),
-    (999, None, choice.Chance(100),
+    (999, None, choice.chance(100),
      ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
       'crazy', 'flautist']),
 
     # Multi-valued fields + chance to emit (repeat, gate)
-    (999, choice.PoissonChoice(range(1, 6), mu=2), choice.Chance(0),
+    (999, choice.poisson_choice(range(1, 6), mu=2), choice.chance(0),
      [None, None, None, None, None, None, None, None, None, None]),
-    (999, choice.Choice((0, 1), weights=[25, 75]), choice.Chance(50),
+    (999, choice.Choice((0, 1), weights=[25, 75]), choice.chance(50),
       [None, ['crazy'], None, None, [], ['warm'], None, ['eat'], None, None]),
-    (999, choice.PoissonChoice(range(1, 4), mu=1), choice.Chance(75),
+    (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(75),
      [None, ['eat', 'bicycle'], None, ['eat'], ['yellow', 'flautist'],
       ['snowstorm'], None, ['crazy'], None, None]),
 ])
@@ -186,7 +186,7 @@ def test_field_multivalued_attribute(field, expected):
 def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field = Field('test', emitter_unique(),
                   repeat=choice.Choice([1] * 12, unique=True),
-                  gate=choice.Chance(100), rng_seed=999)
+                  gate=choice.chance(100), rng_seed=999)
     output = [field() for _ in range(12)]
     assert field.emitter.num_unique_values == 0
     assert field.repeat_emitter.num_unique_values == 0
@@ -202,7 +202,7 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
 
 def test_field_seed_reseeds_all_emitters(emitter):
     field = Field('test', emitter(), repeat=choice.Choice(range(1, 13)),
-                  gate=choice.Chance(75))
+                  gate=choice.chance(75))
     field.emitter.seed(101010)
     field.repeat_emitter.seed(12345)
     field.gate_emitter.seed(54321)
@@ -214,14 +214,14 @@ def test_field_seed_reseeds_all_emitters(emitter):
     (999, None, None, 
      ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
       'crazy', 'flautist']),
-    (999, choice.PoissonChoice(range(1, 6), mu=2), None,
+    (999, choice.poisson_choice(range(1, 6), mu=2), None,
      [['eat', 'bicycle', 'crazy'], ['eat'],
       ['yellow', 'flautist', 'crazy', 'happy'], ['happy', 'happy'],
       ['eat', 'happy'], ['zebra'], ['warm', 'chairs', 'bicycle'], ['sympathy'],
       ['sympathy', 'eat', 'chairs'], ['crazy', 'sympathy', 'zebra']]),
-    (999, None, choice.Chance(50),
+    (999, None, choice.chance(50),
      [None, 'crazy', None, None, 'warm', 'eat', None, 'eat', None, None]),
-    (999, choice.PoissonChoice(range(1, 4), mu=1), choice.Chance(75),
+    (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(75),
      [None, ['eat', 'bicycle'], None, ['eat'], ['yellow', 'flautist'],
       ['snowstorm'], None, ['crazy'], None, None]),
 ])
@@ -241,11 +241,11 @@ def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
         Field('title', phrase_emitter()),
         Field('author', name_emitter()),
         Field('contributors', name_emitter(),
-              repeat=choice.PoissonChoice(range(1, 6), mu=2),
-              gate=choice.Chance(66)),
+              repeat=choice.poisson_choice(range(1, 6), mu=2),
+              gate=choice.chance(66)),
         Field('subjects', phrase_emitter(),
-              repeat=choice.PoissonChoice(range(1, 6), mu=1),
-              gate=choice.Chance(90)),
+              repeat=choice.poisson_choice(range(1, 6), mu=1),
+              gate=choice.chance(90)),
         Field('creation_date', date_emitter())
     )
     test_schema.seed_fields(999)
@@ -306,10 +306,10 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
     schema = Schema(
         Field('test', emitter_unique(),
               repeat=choice.Choice([1] * 12, unique=True),
-              gate=choice.Chance(100)),
+              gate=choice.chance(100)),
         Field('test2', emitter_unique(),
               repeat=choice.Choice([1] * 12, unique=True),
-              gate=choice.Chance(100))
+              gate=choice.chance(100))
     )
     output = [schema() for _ in range(12)]
     for field in schema.fields.values():
@@ -325,9 +325,9 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
 def test_field_seedfields_reseeds_all_fields(emitter):
     schema = Schema(
         Field('test', emitter(), repeat=choice.Choice(range(1, 13)),
-              gate=choice.Chance(75), rng_seed=12345),
+              gate=choice.chance(75), rng_seed=12345),
         Field('test2', emitter(), repeat=choice.Choice(range(1, 13)),
-              gate=choice.Chance(75), rng_seed=54321),
+              gate=choice.chance(75), rng_seed=54321),
     )
     schema.seed_fields(999)
     for field in schema.fields.values():

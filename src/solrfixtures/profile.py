@@ -27,8 +27,8 @@ class Field:
     and 5 values. And you can even control the chances of a 0 selection
     using weights. However, having a separate `gate` value makes it
     easier to determine what weights to assign for each behavior --
-    especially if you want to use a PoissonChoice or GaussianChoice
-    emitter for repeat values, where 0 may not fall along the same
+    especially if you are using a poisson or gaussian weight
+    distribution for repeat values, where 0 may not fall along the same
     probability curve. Generally, my rule-of-thumb is never to use
     `repeat` to control gating. (If you do, also be aware that a 0
     repeat value will emit an empty list while a False gate value will
@@ -52,8 +52,8 @@ class Field:
             the field generates data, used to determine whether to
             generate a value at all for a given call. (True if yes,
             False if no.) E.g., for a field in your schema that is
-            populated in ~10 percent of records or docs, a Chance(10)
-            emitter instance would do the trick.
+            populated in ~10 percent of records or docs, an emitter
+            instance like emitters.choice.chance(10) would work.
         multi_valued: True if this Field can emit multiple values at
             once; False if it only emits one at a time.
         rng_seed: (Optional.) Any valid seed value you'd provide to

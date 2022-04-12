@@ -2,7 +2,7 @@
 import pytest
 
 from solrfixtures.emitter import StaticEmitter
-from solrfixtures.emitters.choice import Chance
+from solrfixtures.emitters.choice import chance
 from solrfixtures.emitters.fromfields import CopyFields
 from solrfixtures.profile import Field
 
@@ -16,7 +16,7 @@ from solrfixtures.profile import Field
     (Field('test', StaticEmitter('one'), repeat=StaticEmitter(3)), '; ',
      'one; one; one'),
     (Field('test', StaticEmitter('one'), repeat=StaticEmitter(3),
-           gate=Chance(0)), None, None),
+           gate=chance(0)), None, None),
     (Field('test', StaticEmitter('one'), repeat=StaticEmitter(0)), None, None),
 
     # Multi-field tests
@@ -35,27 +35,27 @@ from solrfixtures.profile import Field
       Field('test3', StaticEmitter('three'), repeat=StaticEmitter(1))], '-',
      'one-one-one-two-three'),
     ([Field('test1', StaticEmitter('one'), repeat=StaticEmitter(3)),
-      Field('test2', StaticEmitter('two'), gate=Chance(0)),
+      Field('test2', StaticEmitter('two'), gate=chance(0)),
       Field('test3', StaticEmitter('three'))], None,
      ['one', 'one', 'one', 'three']),
     ([Field('test1', StaticEmitter('one'), repeat=StaticEmitter(3),
-            gate=Chance(0)),
-      Field('test2', StaticEmitter('two'), gate=Chance(0)),
+            gate=chance(0)),
+      Field('test2', StaticEmitter('two'), gate=chance(0)),
       Field('test3', StaticEmitter('three'))], None, ['three']),
     ([Field('test1', StaticEmitter('one'), repeat=StaticEmitter(3),
-            gate=Chance(0)),
-      Field('test2', StaticEmitter('two'), gate=Chance(0)),
+            gate=chance(0)),
+      Field('test2', StaticEmitter('two'), gate=chance(0)),
       Field('test3', StaticEmitter('three'), repeat=StaticEmitter(2))], None,
      ['three', 'three']),
     ([Field('test1', StaticEmitter('one'), repeat=StaticEmitter(3),
-            gate=Chance(0)),
-      Field('test2', StaticEmitter('two'), gate=Chance(0)),
+            gate=chance(0)),
+      Field('test2', StaticEmitter('two'), gate=chance(0)),
       Field('test3', StaticEmitter('three'), repeat=StaticEmitter(2),
-            gate=Chance(0))], None, None),
+            gate=chance(0))], None, None),
     ([Field('test1', StaticEmitter('one'), repeat=StaticEmitter(0)),
-      Field('test2', StaticEmitter('two'), gate=Chance(0)),
+      Field('test2', StaticEmitter('two'), gate=chance(0)),
       Field('test3', StaticEmitter('three'), repeat=StaticEmitter(2),
-            gate=Chance(0))], None, None),
+            gate=chance(0))], None, None),
 ])
 def test_copyfields_emit(source, separator, expected):
     em = CopyFields(source, separator)
