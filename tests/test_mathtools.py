@@ -109,6 +109,6 @@ def test_weighted_shuffle(seed, items, weights, k, expected):
 def test_weighted_shuffle_raises_error_mismatched_weights(items, weights):
     with pytest.raises(ValueError) as excinfo:
         m.weighted_shuffle(items, weights)
-    error_msg = str(excinfo)
+    error_msg = str(excinfo.value)
     assert f"({len(items)})" in error_msg
     assert f"({len(weights)})" in error_msg

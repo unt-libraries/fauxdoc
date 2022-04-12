@@ -92,7 +92,7 @@ def test_choice_too_many_unique(items, unq, num, repeat, exp_error):
 def test_choice_incorrect_weights(items, weights):
     with pytest.raises(ValueError) as excinfo:
         Choice(items, weights=weights)
-    error_msg = str(excinfo)
+    error_msg = str(excinfo.value)
     assert f"({len(items)}" in error_msg
     assert f"({len(weights)}" in error_msg
 
