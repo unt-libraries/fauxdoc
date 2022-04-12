@@ -144,25 +144,3 @@ class RandomEmitter(Emitter):
         """
         self.rng_seed = rng_seed
         self.rng.seed(rng_seed)
-
-
-class StaticEmitter(Emitter):
-    """Class for defining emitters that emit a static value.
-
-    Attributes:
-        value: The static value that is emitted.
-    """
-
-    def __init__(self, value: T) -> None:
-        """Inits a StaticEmitter instance with the given value.
-
-        Args:
-            value: See `value` attribute.
-        """
-        self.value = value
-
-    def emit(self) -> T:
-        return self.value
-
-    def emit_many(self, number: int) -> List[T]:
-        return [self.value] * number

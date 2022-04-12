@@ -4,8 +4,8 @@ import datetime
 import pytest
 
 from solrfixtures.dtrange import dtrange
-from solrfixtures.emitter import StaticEmitter
 from solrfixtures.emitters import choice, text
+from solrfixtures.emitters.fixed import Static
 from solrfixtures.profile import Field, Schema
 
 
@@ -77,12 +77,11 @@ def phrase_emitter():
       'crazy', 'flautist']),
 
     # Multi-valued fields + always emit (repeat, no gate)
-    (999, StaticEmitter(0), None,
-     [[], [], [], [], [], [], [], [], [], []]),
-    (999, StaticEmitter(1), None,
+    (999, Static(0), None, [[], [], [], [], [], [], [], [], [], []]),
+    (999, Static(1), None,
      [['crazy'], ['warm'], ['eat'], ['eat'], ['sluggish'], ['happy'],
       ['happy'], ['snowstorm'], ['crazy'], ['flautist']]),
-    (999, StaticEmitter(2), None,
+    (999, Static(2), None,
      [['eat', 'bicycle'], ['crazy', 'yellow'], ['flautist', 'warm'],
       ['eat', 'zebra'], ['eat', 'crazy'], ['warm', 'chairs'],
       ['snowstorm', 'zebra'], ['yellow', 'sluggish'], ['zebra', 'crazy'],
@@ -144,7 +143,7 @@ def test_field_single_value_global_unique_violation(emitter_unique):
 
 
 def test_field_multi_value_global_unique_violation(emitter_unique):
-    field = Field('unique_subjects', emitter_unique(), repeat=StaticEmitter(5),
+    field = Field('unique_subjects', emitter_unique(), repeat=Static(5),
                   rng_seed=999)
     assert [field() for _ in range(2)] == [
         ['chairs', 'snowstorm', 'eat', 'yellow', 'sluggish'],
@@ -156,9 +155,9 @@ def test_field_multi_value_global_unique_violation(emitter_unique):
 
 def test_field_multi_value_each_unique_violation(emitter_each_unique):
     field1 = Field('unique_subjects_12', emitter_each_unique(),
-                   repeat=StaticEmitter(12), rng_seed=999)
+                   repeat=Static(12), rng_seed=999)
     field2 = Field('unique_subjects_13', emitter_each_unique(),
-                   repeat=StaticEmitter(13), rng_seed=999)
+                   repeat=Static(13), rng_seed=999)
     assert [field1() for _ in range(2)] == [
         ['crazy', 'warm', 'eat', 'sluggish', 'happy', 'zebra', 'chairs',
          'snowstorm', 'bicycle', 'sympathy', 'yellow', 'flautist'],
@@ -170,14 +169,12 @@ def test_field_multi_value_each_unique_violation(emitter_each_unique):
 
 
 @pytest.mark.parametrize('field, expected', [
-    (Field('test', StaticEmitter('test')), False),
-    (Field('test', StaticEmitter('test'), repeat=None), False),
-    (Field('test', StaticEmitter('test'), repeat=StaticEmitter(None)), False),
-    (Field('test', StaticEmitter('test'), repeat=StaticEmitter(1)), True),
-    (Field('test', StaticEmitter('test'), repeat=choice.Choice(range(1))),
-     True),
-    (Field('test', StaticEmitter('test'), repeat=choice.Choice(range(1, 5))),
-     True),
+    (Field('test', Static('test')), False),
+    (Field('test', Static('test'), repeat=None), False),
+    (Field('test', Static('test'), repeat=Static(None)), False),
+    (Field('test', Static('test'), repeat=Static(1)), True),
+    (Field('test', Static('test'), repeat=choice.Choice(range(1))), True),
+    (Field('test', Static('test'), repeat=choice.Choice(range(1, 5))), True),
 ])
 def test_field_multivalued_attribute(field, expected):
     assert field.multi_valued == expected

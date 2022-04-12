@@ -4,7 +4,8 @@ Contains classes for creating faux-data-generation profiles.
 from typing import Any, Callable, Dict, Optional, Union
 
 from solrfixtures.group import ObjectGroup, ObjectMap
-from solrfixtures.emitter import Emitter, StaticEmitter
+from solrfixtures.emitter import Emitter
+from solrfixtures.emitters.fixed import Static
 from solrfixtures.emitters.choice import Choice
 from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
 
@@ -46,8 +47,8 @@ class Field:
             should return an appropriate integer for how many values to
             generate for a given call. (Some kind of Choice emitter
             would give you a randomized number for each call.) For a
-            single-valued field, it should just be a StaticEmitter that
-            emits None.
+            single-valued field, it should just be a Static emitter
+            that emits None.
         gate_emitter: An emitter-like object that is called each time
             the field generates data, used to determine whether to
             generate a value at all for a given call. (True if yes,
@@ -93,8 +94,8 @@ class Field:
         self._emitters = ObjectMap({})
         self.name = name
         self.emitter = emitter
-        self.repeat_emitter = StaticEmitter(None) if repeat is None else repeat
-        self.gate_emitter = StaticEmitter(True) if gate is None else gate
+        self.repeat_emitter = Static(None) if repeat is None else repeat
+        self.gate_emitter = Static(True) if gate is None else gate
         self.rng_seed = rng_seed
         self.reset()
 

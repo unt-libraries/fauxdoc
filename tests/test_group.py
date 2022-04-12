@@ -2,12 +2,13 @@
 import pytest
 
 from solrfixtures.group import ObjectGroup, ObjectMap
-from solrfixtures.emitter import Emitter, StaticEmitter
+from solrfixtures.emitter import Emitter
+from solrfixtures.emitters.fixed import Static
 
 
 # Fixtures and test data
 
-class MockEmitter(StaticEmitter):
+class MockEmitter(Static):
     def __init__(self, value):
         self.value = value
         self.mock_val = value
@@ -22,10 +23,10 @@ class MockEmitter(StaticEmitter):
 @pytest.mark.parametrize('emitters', [
     (None,),
     (MockEmitter('foo'),),
-    (StaticEmitter('foo'),),
+    (Static('foo'),),
     (MockEmitter('foo'), None),
-    (MockEmitter('foo'), StaticEmitter('foo'), MockEmitter('foo')),
-    (MockEmitter('foo'), StaticEmitter('foo'), None, MockEmitter('foo')),
+    (MockEmitter('foo'), Static('foo'), MockEmitter('foo')),
+    (MockEmitter('foo'), Static('foo'), None, MockEmitter('foo')),
 ])
 def test_objectgroup_setattr(emitters):
     group = ObjectGroup(*emitters)
@@ -42,10 +43,10 @@ def test_objectgroup_setattr(emitters):
 @pytest.mark.parametrize('emitters', [
     (None,),
     (MockEmitter('foo'),),
-    (StaticEmitter('foo'),),
+    (Static('foo'),),
     (MockEmitter('foo'), None),
-    (MockEmitter('foo'), StaticEmitter('foo'), MockEmitter('foo')),
-    (MockEmitter('foo'), StaticEmitter('foo'), None, MockEmitter('foo')),
+    (MockEmitter('foo'), Static('foo'), MockEmitter('foo')),
+    (MockEmitter('foo'), Static('foo'), None, MockEmitter('foo')),
 ])
 def test_objectgroup_domethod(emitters):
     group = ObjectGroup(*emitters)
@@ -63,11 +64,11 @@ def test_objectgroup_domethod(emitters):
 @pytest.mark.parametrize('emitters', [
     {'first': None},
     {'first': MockEmitter('foo')},
-    {'first': StaticEmitter('foo')},
+    {'first': Static('foo')},
     {'first': MockEmitter('foo'), 'second': None},
-    {'first': MockEmitter('foo'), 'second': StaticEmitter('foo'),
+    {'first': MockEmitter('foo'), 'second': Static('foo'),
      'third': MockEmitter('foo')},
-    {'first': MockEmitter('foo'), 'second': StaticEmitter('foo'),
+    {'first': MockEmitter('foo'), 'second': Static('foo'),
      'third': None, 'fourth': MockEmitter('foo')},
 ])
 def test_objectmap_setattr(emitters):
@@ -85,11 +86,11 @@ def test_objectmap_setattr(emitters):
 @pytest.mark.parametrize('emitters', [
     {'first': None},
     {'first': MockEmitter('foo')},
-    {'first': StaticEmitter('foo')},
+    {'first': Static('foo')},
     {'first': MockEmitter('foo'), 'second': None},
-    {'first': MockEmitter('foo'), 'second': StaticEmitter('foo'),
+    {'first': MockEmitter('foo'), 'second': Static('foo'),
      'third': MockEmitter('foo')},
-    {'first': MockEmitter('foo'), 'second': StaticEmitter('foo'),
+    {'first': MockEmitter('foo'), 'second': Static('foo'),
      'third': None, 'fourth': MockEmitter('foo')},
 ])
 def test_objectgroup_domethod(emitters):

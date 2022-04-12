@@ -1,8 +1,21 @@
-"""Contains tests for solrfixtures.emitters.counters."""
+"""Contains tests for solrfixtures.emitters.fixed."""
 import itertools
 import pytest
 
-from solrfixtures.emitters import counters
+from solrfixtures.emitters import fixed
+
+
+@pytest.mark.parametrize('value', [
+    None,
+    10,
+    'my value',
+    True,
+    ['one', 'two'],
+])
+def test_static_emit(value):
+    em = fixed.Static(value)
+    assert em() == value
+    assert em(5) == [value] * 5
 
 
 @pytest.mark.parametrize('iterator_factory, expected', [
@@ -16,8 +29,8 @@ from solrfixtures.emitters import counters
     (lambda: (str(n) for n in range(3)), ['0', '1', '2', '0', '1', '2', '0']),
     (lambda: iter(['red', 'cat', 'sun']), ['red', 'cat', 'sun', 'red', 'cat']),
 ])
-def test_sequential_emit(iterator_factory, expected):
-    em = counters.Sequential(iterator_factory)
+def test_iterative_emit(iterator_factory, expected):
+    em = fixed.Iterative(iterator_factory)
     number = len(expected)
     assert em(number) == expected
     em.reset()
@@ -31,8 +44,8 @@ def test_sequential_emit(iterator_factory, expected):
     (range(1, 3), [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1]),
     (['red', 'cat', 'sun'], ['red', 'cat', 'sun', 'red', 'cat']),
 ])
-def test_sequentialfromiterable_emit(iterable, expected):
-    em = counters.sequential_from_iterable(iterable)
+def test_iterativefromiterable_emit(iterable, expected):
+    em = fixed.iterative_from_iterable(iterable)
     number = len(expected)
     assert em(number) == expected
     em.reset()

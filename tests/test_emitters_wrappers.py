@@ -2,7 +2,8 @@
 from datetime import date, time, datetime
 import pytest
 
-from solrfixtures.emitter import Emitter, StaticEmitter
+from solrfixtures.emitter import Emitter
+from solrfixtures.emitters.fixed import Static
 from solrfixtures.emitters.wrappers import Wrap, WrapMany
 
 
@@ -46,15 +47,15 @@ class NumberEmitter(Emitter):
 # Tests
 
 @pytest.mark.parametrize('source, wrapper, expected', [
-    (StaticEmitter(1000), str, ['1000']),
+    (Static(1000), str, ['1000']),
     (NumberEmitter(), str, ['0', '1', '2', '3', '4', '5', '6', '7']),
-    (StaticEmitter('1000'), int, [1000]),
-    (StaticEmitter(date(2016, 1, 1)), str, ['2016-01-01']),
-    (StaticEmitter(datetime(2016, 1, 1, 23, 30, 5)),
+    (Static('1000'), int, [1000]),
+    (Static(date(2016, 1, 1)), str, ['2016-01-01']),
+    (Static(datetime(2016, 1, 1, 23, 30, 5)),
      lambda dt: (f'{dt:%A}, {dt:%B} {dt.day}, {dt.year} @ {dt.hour % 12}:'
                  f'{dt:%M:%S %p}'),
      ['Friday, January 1, 2016 @ 11:30:05 PM']),
-    (StaticEmitter('Susan'), lambda n: f'{n} says, "Hello!"',
+    (Static('Susan'), lambda n: f'{n} says, "Hello!"',
      ['Susan says, "Hello!"']),
     (lambda number=None: (['Susan'] * number) if number else 'Susan',
      lambda n: f'{n} says, "Hello!"', ['Susan says, "Hello!"']),
@@ -85,10 +86,10 @@ def test_wrap_seed_seeds_source_emitter():
 
 
 @pytest.mark.parametrize('sources, wrapper, expected', [
-    ([StaticEmitter(1000)], str, ['1000', '1000']),
-    ([StaticEmitter('A'), NumberEmitter()], lambda a, b: f"{a} -- {b}",
+    ([Static(1000)], str, ['1000', '1000']),
+    ([Static('A'), NumberEmitter()], lambda a, b: f"{a} -- {b}",
      ['A -- 0', 'A -- 1', 'A -- 2', 'A -- 3', 'A -- 4', 'A -- 5']),
-    ([StaticEmitter('Susan'), StaticEmitter('says'), StaticEmitter('Hello')],
+    ([Static('Susan'), Static('says'), Static('Hello')],
      lambda a, b, c: f'{a} {b}, "{c}!"',
      ['Susan says, "Hello!"', 'Susan says, "Hello!"']),
 ])

@@ -17,8 +17,10 @@ class Wrap(Emitter):
     transformed value.
 
     E.g.:
-        >>> em1 = Sequential(lambda: itertools.count())
-        >>> em2 = Wrap(Sequential(lambda: itertools.count(), str))
+        >>> from solrfixtures.emitters.fixed import Iterative
+        >>> from solrfixtures.emitters.wrappers import Wrap
+        >>> em1 = Iterative(lambda: itertools.count())
+        >>> em2 = Wrap(Iterative(lambda: itertools.count(), str))
         >>> em1(5); em2(5)
         [0, 1, 2, 3, 4]
         ['0', '1', '2', '3', '4']
@@ -95,9 +97,11 @@ class WrapMany(Emitter):
     order.
 
     E.g.:
-        >>> e = Wrap([StaticEmitter('Susan'), StaticEmitter('Hello!')],
-        ...          lambda em_a, em_b: f'{em_a} says, "{em_b}"')
-        >>> e(2)
+        >>> from solrfixtures.emitters.fixed import Static
+        >>> from solrfixtures.emitters.wrappers import WrapMany
+        >>> em = WrapMany([Static('Susan'), Static('Hello!')],
+        ...               lambda em_a, em_b: f'{em_a} says, "{em_b}"')
+        >>> em(2)
         ['Susan says, "Hello!"', 'Susan says, "Hello!"']
 
     See the docstring for `Wrap`.
