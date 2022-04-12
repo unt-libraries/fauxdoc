@@ -7,18 +7,45 @@ from solrfixtures.typing import Number, T
 
 
 class Sequential(Emitter):
-    """Emitter class for emitting values in a sequence."""
+    """Class for emitting values in a sequence from an iterator.
+
+    Sequential emitters are infinite and will restart from the
+    beginning when they run out of values.
+
+    Note that this class wants an iterator *factory* and not just an
+    iterator. Why? Iterators by definition cannot be reset, nor can
+    they be copied. The only way to implement a sequential emitter with
+    a resettable iterator (without resorting to caching emitted values)
+    is to generate a new iterator each time we need to reset. To do
+    that, we need a factory. In most cases you should just be able to
+    wrap your iterator in a lambda, e.g.:
+
+        >>> em = Sequential(lambda: iter(range(5)))
+        >>> em(6)
+        [0, 1, 2, 3, 4, 0, 1]
+
+    If you just want an emitter based on an iterable value, you can use
+    the `sequential_from_iterator` factory, if that's easier. (It just
+    does the above for you.)
+
+    Attributes:
+        iterator_factory: A callable that takes no args and returns an
+            iterator.
+        iterator: The currently active iterator, generated from the
+            iterator_factory.
+    """
 
     def __init__(self, iterator_factory: Callable[[], Iterator]) -> None:
-        """Inits a Sequential emitter."""
+        """Inits a Sequential emitter.
+
+        Args:
+            iterator_factory: See `iterator_factory` attribute.
+        """
         self.iterator_factory = iterator_factory
         self.reset()
 
-    @classmethod
-    def from_iterable(cls, iterable: Iterable) -> 'Sequential':
-        return cls(lambda: iter(iterable))
-
     def reset(self) -> None:
+        """Resets self.iterator to the initial state."""
         self.iterator = self.iterator_factory()
 
     def emit(self) -> T:
@@ -27,7 +54,7 @@ class Sequential(Emitter):
             return next(self.iterator)
         except StopIteration:
             self.reset()
-            return next(self.iterator)
+            return next(self.iterator, None)
 
     def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted values.
@@ -37,66 +64,23 @@ class Sequential(Emitter):
         """
         result = list(itertools.islice(self.iterator, 0, number))
         n_result = len(result)
+        if not n_result:
+            return [None] * number
         if n_result == number:
             return result
         self.reset()
-        result.extend(self(number - n_result))
+        result.extend(self.emit_many(number - n_result))
         return result
 
 
-class AutoIncrementNumber(Emitter):
-    """Emitter class for emitting number-based auto-incrementing IDs.
+def sequential_from_iterable(iterable: Iterable) -> Sequential:
+    """Creates a Sequential emitter from the given iterable.
 
-    Define the number to start with ('start'), and each value emitted
-    will increment the number by 1. Optionally, if you need a number
-    formatted in some special way, you can include a string template
-    to use for formatting. With no template defined, this emits ints.
-    With a template defined, this emits strings.
+    This is just a convenience factory for when you just want to create
+    a Sequential emitter from an iterable.
 
-    Attributes:
-        start: The number to start counting from.
-        template: (Optional.) A string to use to format the number. You
-            must format the string such that `template.format(n)`,
-            where `n` is the number, will return your formatted number.
-            E.g.: template "A{}B" yields "A0B", "A1B", etc.; "A{0}{0}"
-            yields "A00", "A11", etc.
+    Args:
+        iterable: The iterable from which to create the Sequential
+            emitter.
     """
-    def __init__(self,
-                 start: Number = 0,
-                 template: Optional[str] = None) -> None:
-        """Inits an AutoIncrementNumber with a start val and template.
-
-        Args:
-            start: (Optional.) See `start` attribute. Default is 0.
-            template: (Optional.) See `template` attribute.
-        """
-        self.start = start
-        self.template = template
-        self.reset()
-
-    def reset(self) -> None:
-        """Resets the current count back to `self.start`."""
-        self._count = self.start
-
-    @property
-    def emits_unique_values(self) -> bool:
-        """Returns True; all AutoIncrement instances emit unique vals."""
-        return True
-
-    def emit(self) -> T:
-        """Return an emitted value."""
-        return self.emit_many(1)[0]
-
-    def emit_many(self, number: int) -> List[T]:
-        """Returns a list of emitted values.
-
-        Args:
-            number: See superclass.
-        """
-        if self.template is None:
-            data = list(range(self._count, self._count + number))
-        else:
-            data = [self.template.format(n)
-                    for n in range(self._count, self._count + number)]
-        self._count += number
-        return data
+    return Sequential(lambda: iter(iterable))

@@ -17,22 +17,20 @@ class Wrap(Emitter):
     transformed value.
 
     E.g.:
-        >>> em1 = AutoIncrementNumber()
-        >>> em2 = Wrap(AutoIncrementNumber(), str)
+        >>> em1 = Sequential(lambda: itertools.count())
+        >>> em2 = Wrap(Sequential(lambda: itertools.count(), str))
         >>> em1(5); em2(5)
         [0, 1, 2, 3, 4]
         ['0', '1', '2', '3', '4']
 
     Note that there is some overhead in wrapping one emitter with
-    another. Instead of the above example, you could subclass
-    AutoIncrementNumber, extending it so that it converts ints to strs
-    internally. This does result in a slightly more performant emitter.
-    However, the timing difference isn't huge, and the wrapper approach
-    is much more flexible: you can create general-purpose wrapper
-    functions to do generic data conversions instead of hard-coding it
-    in each and every class that might need it. But -- as always, you
-    should use whatever approach works best for your use case.
-    
+    another. If your use case requires extremely high efficiency,
+    creating your own Emitter classes that do what you need will be a
+    bit more performant. However, the wrapper approach is more
+    flexible: you can create general-purpose wrapper functions to do
+    generic data conversions instead of hard-coding it in each and
+    every class that might need it. (Such as for date conversions.)
+
     Attributes:
         source: The object to wrap. An emitter-like is expected, but it
             *could* be any callable that takes an int (number of values
