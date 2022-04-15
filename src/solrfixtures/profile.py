@@ -5,10 +5,11 @@ from typing import Any, Dict, Optional
 
 from solrfixtures.group import ObjectMap
 from solrfixtures.emitters.fixed import Static
+from solrfixtures.mixins import RandomMixin
 from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
 
 
-class Field:
+class Field(RandomMixin, object):
     """Class for representing a field in a schema.
 
     Each Field instance wraps an emitter and provides some additional
@@ -94,8 +95,7 @@ class Field:
         self.emitter = emitter
         self.repeat_emitter = Static(None) if repeat is None else repeat
         self.gate_emitter = Static(True) if gate is None else gate
-        self.rng_seed = rng_seed
-        self.reset()
+        super().__init__(rng_seed=rng_seed)
 
     @property
     def previous(self) -> Any:
@@ -142,6 +142,7 @@ class Field:
 
     def reset(self) -> None:
         """Resets state on this field, including attached emitters."""
+        super().reset()
         self._cache = None
         self._emitters.setattr('rng_seed', self.rng_seed)
         self._emitters.do_method('reset')
@@ -154,7 +155,7 @@ class Field:
                 passed to a random.Random instance, so it should be any
                 value valid for seeding random.Random.
         """
-        self.rng_seed = rng_seed
+        super().seed(rng_seed)
         self._emitters.do_method('seed', self.rng_seed)
 
     def __call__(self) -> T:

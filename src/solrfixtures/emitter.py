@@ -1,7 +1,6 @@
 """Contains base Emitter classes, for emitting data values."""
 from abc import ABC, abstractmethod
-import random
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union
 
 from .typing import T
 
@@ -102,45 +101,3 @@ class Emitter(ABC):
     @abstractmethod
     def emit_many(self, number: int) -> List[T]:
         """Return multiple data values, as a list."""
-
-
-class RandomEmitter(Emitter):
-    """Abstract base class for defining emitters that need RNG.
-
-    Subclass this to implement an emitter object that uses randomized
-    values. In your subclass, instead of calling the `random` module
-    directly, use the `rng` attribute. Override the `seed` method if
-    you have an emitter composed of multiple BaseRandomEmitters and
-    need to seed multiple RNGs at once.
-
-    Attributes:
-        rng: A random.Random object. Use this for generating random
-            values in subclasses.
-        rng_seed: (Optional.) Any valid seed value you'd provide to
-            random.seed. This value is used to reset the RNG when
-            `reset` is called; it can be set to something else either
-            directly or by calling `seed` and providing a new value.
-            Default is None.
-    """
-
-    def __init__(self, rng_seed: Any = None) -> None:
-        """Inits a BaseRandomEmitter.
-
-        Args:
-            rng_seed: See `rng_seed` attribute.
-        """
-        self.rng_seed = rng_seed
-        self.reset()
-
-    def reset(self) -> None:
-        """Reset the emitter's RNG instance."""
-        self.rng = random.Random(self.rng_seed)
-
-    def seed(self, rng_seed: Any) -> None:
-        """Seeds all RNGs on this object with the given seed value.
-
-        Args:
-            seed: Any valid seed value you'd provide to random.seed.
-        """
-        self.rng_seed = rng_seed
-        self.rng.seed(rng_seed)

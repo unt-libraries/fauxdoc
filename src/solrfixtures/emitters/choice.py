@@ -2,12 +2,13 @@
 import itertools
 from typing import Any, Optional, List, Sequence
 
-from solrfixtures.emitter import RandomEmitter
+from solrfixtures.emitter import Emitter
 from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle
+from solrfixtures.mixins import RandomMixin
 from solrfixtures.typing import Number, T
 
 
-class Choice(RandomEmitter):
+class Choice(RandomMixin, Emitter):
     """Class for making random selections, optionally with weighting.
 
     This covers any kind of random choice and implements the most
@@ -70,9 +71,8 @@ class Choice(RandomEmitter):
         self.unique = unique
         self.each_unique = each_unique
         self.noun = noun
-        self.rng_seed = rng_seed
         self._shuffled = None
-        self.reset()
+        super().__init__(rng_seed=rng_seed)
 
     def reset(self) -> None:
         """Reset state and calculated attributes.

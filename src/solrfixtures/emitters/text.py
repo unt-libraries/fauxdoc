@@ -2,8 +2,9 @@
 from typing import Any, Iterator, List, Optional, Sequence
 
 from solrfixtures.group import ObjectMap
-from solrfixtures.emitter import RandomEmitter
+from solrfixtures.emitter import Emitter
 from solrfixtures.mathtools import clamp
+from solrfixtures.mixins import RandomMixin
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
 
 
@@ -36,7 +37,7 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     ]
 
 
-class Word(RandomEmitter):
+class Word(RandomMixin, Emitter):
     """Class for generating and emitting randomized words.
 
     Words that are emitted have a random variable length and characters
@@ -69,8 +70,7 @@ class Word(RandomEmitter):
         self._emitters = ObjectMap({})
         self.length_emitter = length_emitter
         self.alphabet_emitter = alphabet_emitter
-        self.rng_seed = rng_seed
-        self.reset()
+        super().__init__(rng_seed=rng_seed)
 
     @property
     def length_emitter(self) -> IntEmitterLike:
@@ -141,7 +141,7 @@ class Word(RandomEmitter):
         return words
 
 
-class Text(RandomEmitter):
+class Text(RandomMixin, Emitter):
     """Class for emitting random text.
 
     "Text" in this case is defined very basically as a string of words,
@@ -182,8 +182,7 @@ class Text(RandomEmitter):
         self.numwords_emitter = numwords_emitter
         self.word_emitter = word_emitter
         self.sep_emitter = sep_emitter
-        self.rng_seed = rng_seed
-        self.reset()
+        super().__init__(rng_seed=rng_seed)
 
     @property
     def numwords_emitter(self) -> IntEmitterLike:
