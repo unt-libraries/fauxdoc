@@ -37,16 +37,29 @@ def test_iterative_emit(iterator_factory, expected):
     assert [em() for _ in range(number)] == expected
 
 
-@pytest.mark.parametrize('iterable, expected', [
+@pytest.mark.parametrize('sequence, expected', [
     ([], [None, None, None, None]),
     (range(1, 2), [1, 1, 1, 1, 1, 1, 1, 1, 1]),
     (range(1, 101), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
     (range(1, 3), [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1]),
     (['red', 'cat', 'sun'], ['red', 'cat', 'sun', 'red', 'cat']),
 ])
-def test_iterativefromiterable_emit(iterable, expected):
-    em = fixed.iterative_from_iterable(iterable)
+def test_sequential_emit(sequence, expected):
+    em = fixed.Sequential(sequence)
     number = len(expected)
     assert em(number) == expected
     em.reset()
     assert [em() for _ in range(number)] == expected
+
+
+def test_sequential_reset_after_changing_items():
+    """If you modify the `items` on an existing Sequential instance,
+    the instance should continue to emit the previous items until a
+    `reset` is issued.
+    """
+    em = fixed.Sequential(range(5))
+    assert em(2) == [0, 1]
+    em.items = range(5, 10)
+    assert em() == 2
+    em.reset()
+    assert em(2) == [5, 6]

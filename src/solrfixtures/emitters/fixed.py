@@ -1,6 +1,6 @@
 """Contains functions and classes for implementing counter emitters."""
 import itertools
-from typing import Callable, Iterable, Iterator, List
+from typing import Callable, Iterator, List, Sequence
 
 from solrfixtures.emitter import Emitter
 from solrfixtures.typing import T
@@ -39,16 +39,17 @@ class Iterative(Emitter):
     they be copied. The only way to implement an emitter with a
     resettable iterator (without resorting to caching emitted values)
     is to generate a new iterator each time we need to reset. To do
-    that, we need a factory. In most cases you should just be able to
-    wrap your iterator in a lambda, e.g.:
+    that, we need a factory that returns a new iterator. In most cases,
+    you can just wrap your iterator in a lambda, like this.
 
         >>> em = Iterative(lambda: iter(range(5)))
         >>> em(6)
         [0, 1, 2, 3, 4, 0, 1]
 
-    If you just want an emitter based on an iterable value, you can use
-    the `iterative_from_iterator` factory, if that's easier. (It just
-    does the above for you.)
+    Or of course you can use a function that returns a generator.
+    However, very often -- including in the above example -- you just
+    want to emit a static sequence of some kind (like a range or list).
+    For this, you should use the Sequential class, instead.
 
     Attributes:
         iterator_factory: A callable that takes no args and returns an
@@ -95,14 +96,31 @@ class Iterative(Emitter):
         return result
 
 
-def iterative_from_iterable(iterable: Iterable) -> Iterative:
-    """Creates a Iterative emitter from the given iterable.
+class Sequential(Iterative):
+    """Class for creating an Iterative emitter for a sequence.
 
-    This is just a convenience factory for when you just want to create
-    a Iterative emitter from an iterable.
+    Although you can acheive this using a plain Iterative emitter:
+        Iterative(lambda: iter(sequence))
 
-    Args:
-        iterable: The iterable from which to create the Iterative
-            emitter.
+    ... this class also stores the sequence in self.items so that all
+    available choices can be accessed as a finite value.
+
+    Attributes:
+        iterator_factory: See superclass.
+        iterator: See superclass.
+        items: The sequence of values this emitter emits.
     """
-    return Iterative(lambda: iter(iterable))
+
+    def __init__(self, items: Sequence) -> None:
+        """Inits a Sequential emitter instance.
+
+        Args:
+            items: See `items` attribute.
+        """
+        self.items = items
+        self.reset()
+
+    def reset(self) -> None:
+        """Resets this emitter based on current self.items."""
+        self.iterator_factory = lambda: iter(self.items)
+        super().reset()
