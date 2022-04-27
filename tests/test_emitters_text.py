@@ -20,8 +20,9 @@ def make_wordlist_emitter():
              'on', 'clapping')
     weights = (5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 5, 5, 10, 5)
 
-    def _make_wordlist_emitter(each_unique=False):
-        return Choice(words, weights, each_unique=each_unique)
+    def _make_wordlist_emitter(replace_only_after_call=False):
+        return Choice(words, weights,
+                      replace_only_after_call=replace_only_after_call)
     return _make_wordlist_emitter
 
 

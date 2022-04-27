@@ -28,14 +28,14 @@ def emitter():
 @pytest.fixture
 def emitter_unique():
     def _emitter_unique():
-        return choice.Choice(WORDS, unique=True)
+        return choice.Choice(WORDS, replace=False)
     return _emitter_unique
 
 
 @pytest.fixture
 def emitter_each_unique():
     def _emitter_each_unique():
-        return choice.Choice(WORDS, each_unique=True)
+        return choice.Choice(WORDS, replace_only_after_call=True)
     return _emitter_each_unique
 
 
@@ -44,7 +44,7 @@ def name_emitter():
     def _name_emitter():
         return text.Text(
             choice.Choice(range(2, 4)),
-            choice.Choice(NAMES, each_unique=True),
+            choice.Choice(NAMES, replace_only_after_call=True),
             choice.Choice((' ', '-'), weights=[90, 10])
         )
     return _name_emitter
@@ -182,7 +182,7 @@ def test_field_multivalued_attribute(field, expected):
 
 def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field = Field('test', emitter_unique(),
-                  repeat=choice.Choice([1] * 12, unique=True),
+                  repeat=choice.Choice([1] * 12, replace=False),
                   gate=choice.chance(100), rng_seed=999)
     [field() for _ in range(12)]
     assert field.emitter.num_unique_values == 0
@@ -193,7 +193,7 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field.gate_emitter.seed(54321)
     field.reset()
     assert field.emitter.num_unique_values == 12
-    assert field.repeat_emitter.num_unique_values == 12
+    assert field.repeat_emitter.num_unique_values == 1
     assert all([em.rng_seed == 999 for em in field._emitters.values()])
 
 
@@ -234,7 +234,7 @@ def test_field_caches_previous_value(seed, repeat, gate, expected, emitter):
 def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
                                       phrase_emitter):
     test_schema = Schema(
-        Field('id', choice.Choice(range(1, 10000), unique=True)),
+        Field('id', choice.Choice(range(1, 10000), replace=False)),
         Field('title', phrase_emitter()),
         Field('author', name_emitter()),
         Field('contributors', name_emitter(),
@@ -302,10 +302,10 @@ def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
 def test_schema_resetfields_resets_all_fields(emitter_unique):
     schema = Schema(
         Field('test', emitter_unique(),
-              repeat=choice.Choice([1] * 12, unique=True),
+              repeat=choice.Choice([1] * 12, replace=False),
               gate=choice.chance(100)),
         Field('test2', emitter_unique(),
-              repeat=choice.Choice([1] * 12, unique=True),
+              repeat=choice.Choice([1] * 12, replace=False),
               gate=choice.chance(100))
     )
     [schema() for _ in range(12)]
@@ -316,7 +316,7 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
     schema.reset_fields()
     for field in schema.fields.values():
         assert field.emitter.num_unique_values == 12
-        assert field.repeat_emitter.num_unique_values == 12
+        assert field.repeat_emitter.num_unique_values == 1
 
 
 def test_field_seedfields_reseeds_all_fields(emitter):

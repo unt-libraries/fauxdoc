@@ -230,33 +230,33 @@ class Text(RandomMixin, Emitter):
 
         # This addresses the edge case where the word_emitter for this
         # is a list of words (e.g. implemented via a Choice object),
-        # where `each_unique` is True -- the expectation is that each
-        # set of words emitted will contain unique words, but each word
-        # can appear in multiple sets. (Each text value is essentially
-        # a set of words.) If we generated text values one at a time,
+        # where `replace_only_after_call` is True -- the expectation is
+        # that each set of words emitted will contain unique words, but
+        # each word can appear in multiple sets, where each text value
+        # is a set of words. If we generated text values one at a time,
         # this would be trivial. But, instead, we generate all words at
         # once and then divide them out into text values they belong
         # to, because this is way more performant. In order to address
-        # the each_unique edge case, we create a generator that resets
-        # the word_emitter each time it runs out of words; thus, words
-        # are reused, but each word appears only after all words have
-        # been emitted. Text values generated that way don't guarantee
+        # this edge case, we create a generator that resets the
+        # word_emitter each time it runs out of words; thus, words are
+        # reused, but each word appears only after all words have been
+        # emitted. Text values generated that way don't guarantee
         # totally unique sets of words, since words might repeat if a
         # `reset` call happens in the middle of a set of words, but
         # this is about the best we can do I think.
 
-        num_unique = self._emitters['word'].num_unique_values
-        each_unique = getattr(self._emitters['word'], 'each_unique', False)
-        if each_unique and total > num_unique:
-            def generator():
-                remainder = total
-                while remainder > 0:
-                    needed = clamp(num_unique, mx=remainder)
-                    for word in self._emitters['word'](needed):
-                        yield word
-                    self._emitters['word'].reset()
-                    remainder -= needed
-            return generator()
+        if getattr(self._emitters['word'], 'replace_only_after_call', False):
+            num_unique = self._emitters['word'].num_unique_items
+            if total > num_unique:
+                def generator():
+                    remainder = total
+                    while remainder > 0:
+                        needed = clamp(num_unique, mx=remainder)
+                        for word in self._emitters['word'](needed):
+                            yield word
+                        self._emitters['word'].reset()
+                        remainder -= needed
+                return generator()
         return iter(self._emitters['word'](total))
 
     def emit(self) -> str:

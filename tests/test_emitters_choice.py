@@ -52,9 +52,9 @@ from solrfixtures.emitters.choice import chance, Choice, gaussian_choice,\
 ])
 def test_choice(seed, items, weights, unq, num, repeat, expected):
     each_unique = unq == 'each'
-    unique = unq and not each_unique
-    ce = Choice(items, weights=weights, unique=unique, each_unique=each_unique,
-                rng_seed=seed)
+    replace = not unq or each_unique
+    ce = Choice(items, weights=weights, replace=replace,
+                replace_only_after_call=each_unique, rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert result == expected
 
@@ -78,8 +78,8 @@ def test_choice_empty_items():
 ])
 def test_choice_too_many_unique(items, unq, num, repeat, exp_error):
     each_unique = unq == 'each'
-    unique = unq and not each_unique
-    ce = Choice(items, unique=unique, each_unique=each_unique)
+    replace = not unq or each_unique
+    ce = Choice(items, replace=replace, replace_only_after_call=each_unique)
     with pytest.raises(ValueError) as excinfo:
         [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert exp_error in str(excinfo.value)
@@ -95,6 +95,40 @@ def test_choice_incorrect_weights(items, weights):
     error_msg = str(excinfo.value)
     assert f"({len(items)}" in error_msg
     assert f"({len(weights)}" in error_msg
+
+
+@pytest.mark.parametrize(
+    'emitter, exp_unique_vals, exp_unique_items, exp_emits_unique,'
+    'num_to_emit, post_emit_exp_unique_vals, post_emit_exp_unique_items,'
+    'post_emit_exp_emits_unique', [
+        (Choice(range(5), replace=True), 5, 5, False, 10, 5, 5, False),
+        (Choice(range(5), replace_only_after_call=True),
+         5, 5, False, 5, 5, 5, False),
+        (Choice(range(5), replace=False), 5, 5, True, 3, 2, 2, True),
+        (Choice(range(5), replace=False), 5, 5, True, 5, 0, 0, True),
+        (Choice([0, 1, 0, 2, 2], replace=False, rng_seed=999),
+         3, 5, False, 3, 2, 2, True),
+        (Choice([0, 1, 0, 2, 2], replace=True, rng_seed=999),
+         3, 5, False, 10, 3, 5, False),
+    ]
+)
+def test_choice_uniqueness_properties(emitter, exp_unique_vals,
+                                      exp_unique_items, exp_emits_unique,
+                                      num_to_emit, post_emit_exp_unique_vals,
+                                      post_emit_exp_unique_items,
+                                      post_emit_exp_emits_unique):
+    assert emitter.num_unique_values == exp_unique_vals
+    assert emitter.num_unique_items == exp_unique_items
+    assert emitter.emits_unique_values == exp_emits_unique
+    emitter(num_to_emit)
+    print(emitter._shuffled)
+    assert emitter.num_unique_values == post_emit_exp_unique_vals
+    assert emitter.num_unique_items == post_emit_exp_unique_items
+    assert emitter.emits_unique_values == post_emit_exp_emits_unique
+    emitter.reset()
+    assert emitter.num_unique_values == exp_unique_vals
+    assert emitter.num_unique_items == exp_unique_items
+    assert emitter.emits_unique_values == exp_emits_unique
 
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [
