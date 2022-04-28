@@ -197,6 +197,13 @@ def test_text_emit_words_list(seed, word_mn, word_mx, unique, num, repeat,
          5 + (25 * 3) + (125 * 9)),
         (Word(Choice([1, 2]), Choice('abcde')), [' ', '-', '; '], [1, 2, 3],
          (5 + 25) + (((5 + 25) ** 2) * 3) + (((5 + 25) ** 3) * (3 ** 2))),
+        (Choice([str(n) for n in range(100)]), [' '], [1], 100),
+        (Choice([str(n) for n in range(100)]), [' '], [2], 100 ** 2),
+        (Choice([str(n) for n in range(100)]), [' '], [3], 100 ** 3),
+        (Choice([str(n) for n in range(100)]), [' ', '-', '; '], [3],
+         (100 ** 3) * (3 ** 2)),
+        (Choice([str(n) for n in range(100)]), [' ', '-', '; '], [1, 2, 3],
+         100 + ((100 ** 2) * 3) + (100 ** 3) * 3 ** 2),
     ]
 )
 def test_text_unique_properties(word_emitter, sep_choices, numwords_choices,
