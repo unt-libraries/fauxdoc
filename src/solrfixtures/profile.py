@@ -126,7 +126,7 @@ class Field(RandomMixin, object):
         """
         self._emitters['repeat'] = repeat_emitter
         try:
-            self.multi_valued = repeat_emitter.value is not None
+            self.multi_valued = repeat_emitter.items != [None]
         except AttributeError:
             self.multi_valued = True
 

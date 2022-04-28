@@ -21,6 +21,16 @@ class Static(Emitter):
         """
         self.value = value
 
+    @property
+    def items(self):
+        """Return the static value as a list of items.
+
+        This is to provide a consistent interface for emitters that use
+        a static item or items, such as this, choices.Choice, and
+        fixed.Sequential.
+        """
+        return [self.value]
+
     def emit(self) -> T:
         return self.value
 

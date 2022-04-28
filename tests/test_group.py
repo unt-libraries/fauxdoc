@@ -10,7 +10,7 @@ from solrfixtures.emitters.fixed import Static
 
 class MockEmitter(Static):
     def __init__(self, value):
-        self.value = value
+        super().__init__(value)
         self.mock_val = value
         self.mock_method_call = None
 
