@@ -44,14 +44,35 @@ class Word(RandomMixin, Emitter):
     randomly selected from an alphabet. Each of these dimensions is
     implemented via emitters that you pass to __init__.
 
+    Note about uniqueness: I have not implemented a way to ensure
+    uniqueness for this emitter, mainly because the best implementation
+    for this depends on the number of possible combinations your
+    alphabet and range of lengths would produce. If you need unique
+    words, I'd recommend one of these options:
+
+        1) Emit values into a set and stop once you have enough unique
+        values. This works well for high cardinality emitters that are
+        less likely to emit duplicate values. Be aware -- even modest-
+        seeming Word emitters can be very high cardinality. One that
+        can emit between 2 and 10 letter words using a 26-character
+        alphabet gives you 146,813,779,479,484 possible combinations.
+        (Though, heavily weighting fewer lengths or characters
+        increases the chance for duplication, so you may have to
+        experiment.)
+
+        2) If you have a smaller set of possible unique values, I'd
+        suggest using a choices.Choice emitter without replacement,
+        where you explicitly initialize the emitter with your desired
+        vocabulary words.
+
     Attributes:
         rng: Random Number Generator, inherited from superclass.
-        length_emitter: A `BaseEmitter`-like instance that emits
-            integers, used to generate a randomized length for each
-            emitted string.
-        alphabet_emitter: A `BaseEmitter`-like instance that emits
+        length_emitter: An `Emitter`-like instance that emits integers,
+            used to generate a random length for each emitted string.
+            It should emit infinite values.
+        alphabet_emitter: A `Emitter`-like instance that emits
             characters (strings), used to generate each character for
-            each emitted string.
+            each emitted string. It should emit infinite values.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. Default is None.
     """
@@ -95,14 +116,15 @@ class Word(RandomMixin, Emitter):
         self._update_num_unique_vals()
 
     def _update_num_unique_vals(self) -> None:
-        """Updates """
+        """Updates the cached number of unique values this can emit."""
         alpha = self._emitters.get('alphabet')
         length = self._emitters.get('length')
         if alpha and length:
             nchars = alpha.num_unique_values
-            nlengths = length.num_unique_values
-            number = sum([nchars ** i for i in range(1, nlengths + 1)])
+            number = sum([nchars ** i for i in length.items])
             self._num_unique_values = number
+            return
+        self._num_unique_values = None
 
     def reset(self) -> None:
         """See superclass."""
@@ -117,7 +139,7 @@ class Word(RandomMixin, Emitter):
 
     @property
     def num_unique_values(self) -> int:
-        """Returns the max number of unique strs this emitter produces."""
+        """Returns the max number of unique values this can emit."""
         return self._num_unique_values
 
     def emit(self) -> str:
@@ -151,16 +173,16 @@ class Text(RandomMixin, Emitter):
 
     Attributes:
         rng: Random Number Generator, inherited from superclass.
-        numwords_emitter: A `BaseRandomEmitter`-like instance that
-            emits integers. Used to generate the number of words for
-            each emitted text value.
-        word_emitter: A `BaseRandomEmitter`-like instance that emits
-            words (strings.) Used to generate the list of words for
-            each emitted text value.
-        sep_emitter: (Optional.) A `BaseRandomEmitter`-like instance
-            that emits word separator character strings, used to
-            generate the characters between words. If not provided,
-            words are separated by a space (' ') value.
+        numwords_emitter: An `Emitter`-like instance that emits
+            integers. Used to generate the number of words for each
+            emitted text value. This should emit infinite values.
+        word_emitter: An `Emitter`-like instance that emits words
+            (strings.) Used to generate the list of words for each
+            emitted text value. This should emit infinite values.
+        sep_emitter: (Optional.) An `Emitter`-like instance that emits
+            word separator character strings, used to generate the
+            characters between words. If not provided, words are simply
+            separated by a space (' ') value.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. Default is None.
     """
@@ -193,6 +215,7 @@ class Text(RandomMixin, Emitter):
     def numwords_emitter(self, numwords_emitter: IntEmitterLike):
         """Sets the 'numwords_emitter' attribute."""
         self._emitters['numwords'] = numwords_emitter
+        self._update_num_unique_vals()
 
     @property
     def word_emitter(self) -> StrEmitterLike:
@@ -203,6 +226,7 @@ class Text(RandomMixin, Emitter):
     def word_emitter(self, word_emitter: StrEmitterLike):
         """Sets the 'word_emitter' attribute."""
         self._emitters['word'] = word_emitter
+        self._update_num_unique_vals()
 
     @property
     def sep_emitter(self) -> StrEmitterLike:
@@ -213,6 +237,27 @@ class Text(RandomMixin, Emitter):
     def sep_emitter(self, sep_emitter: StrEmitterLike):
         """Sets the 'sep_emitter' attribute."""
         self._emitters['sep'] = sep_emitter
+        self._update_num_unique_vals()
+
+    def _update_num_unique_vals(self) -> None:
+        """Updates the cached number of unique values this can emit."""
+        word = self._emitters.get('word')
+        sep = self._emitters.get('sep')
+        numwords = self._emitters.get('numwords')
+        if word and sep and numwords:
+            n_uw = word.num_unique_values
+            n_us = sep.num_unique_values
+            lengths = numwords.items
+            if n_uw is not None and n_us is not None:
+                num = sum([(n_uw ** i) * (n_us ** (i - 1)) for i in lengths])
+                self._num_unique_values = num
+                return
+        self._num_unique_values = None
+
+    @property
+    def num_unique_values(self) -> int:
+        """Returns the max number of unique values this can produce."""
+        return self._num_unique_values
 
     def reset(self) -> None:
         """See superclass."""

@@ -2,6 +2,7 @@
 import pytest
 
 from solrfixtures.emitters.choice import Choice
+from solrfixtures.emitters.fixed import Static
 from solrfixtures.emitters.text import make_alphabet, Text, Word
 
 
@@ -73,6 +74,22 @@ def test_word_emit(seed, mn, mx, lweights, alpha, aweights, num, repeat,
     we = Word(length_emitter, alphabet_emitter, rng_seed=seed)
     result = [we(num) for _ in range(repeat)] if repeat else we(num)
     assert result == expected
+
+
+@pytest.mark.parametrize('len_choices, alphabet, exp_num_unique', [
+    ([1], 'abcde', 5),
+    ([2], 'abcde', 25),
+    ([3], 'abcde', 125),
+    ([4], 'abcde', 625),
+    ([1, 2, 3, 4], 'abcde', 5 + 25 + 125 + 625),
+    ([3, 1], 'abcde', 125 + 5),
+])
+def test_word_unique_properties(len_choices, alphabet, exp_num_unique):
+    length_emitter = Choice(len_choices)
+    alphabet_emitter = Choice(alphabet)
+    we = Word(length_emitter, alphabet_emitter)
+    assert we.num_unique_values == exp_num_unique
+    assert not we.emits_unique_values
 
 
 @pytest.mark.parametrize(
@@ -162,3 +179,32 @@ def test_text_emit_words_list(seed, word_mn, word_mx, unique, num, repeat,
     result = [te(num) for _ in range(repeat)] if repeat else te(num)
     print(result)
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    'word_emitter, sep_choices, numwords_choices, exp_unique_vals', [
+        (Word(Static(1), Choice('abcde')), [' '], [1], 5),
+        (Word(Static(2), Choice('abcde')), [' '], [1], 25),
+        (Word(Choice([1, 2, 3]), Choice('abcde')), [' '], [1], 5 + 25 + 125),
+        (Word(Choice([1, 3]), Choice('abcde')), [' '], [1], 5 + 125),
+        (Word(Static(2), Choice('abcde')), [' ', '-', '; '], [1], 25),
+        (Word(Static(1), Choice('abcde')), [' ', '-'], [2], 25 * 2),
+        (Word(Static(1), Choice('abcde')), [' ', '-', '; '], [2], 25 * 3),
+        (Word(Static(1), Choice('abcde')), [' ', '-', '; '], [3], 125 * 9),
+        (Word(Static(1), Choice('abcde')), [' ', '-', '; '], [2, 3],
+         (25 * 3) + (125 * 9)),
+        (Word(Static(1), Choice('abcde')), [' ', '-', '; '], [1, 2, 3],
+         5 + (25 * 3) + (125 * 9)),
+        (Word(Choice([1, 2]), Choice('abcde')), [' ', '-', '; '], [1, 2, 3],
+         (5 + 25) + (((5 + 25) ** 2) * 3) + (((5 + 25) ** 3) * (3 ** 2))),
+    ]
+)
+def test_text_unique_properties(word_emitter, sep_choices, numwords_choices,
+                                exp_unique_vals):
+    te = Text(
+        Choice(numwords_choices),
+        word_emitter,
+        Choice(sep_choices)
+    )
+    assert te.num_unique_values == exp_unique_vals
+    assert not te.emits_unique_values
