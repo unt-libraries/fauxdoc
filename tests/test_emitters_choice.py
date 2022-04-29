@@ -121,7 +121,6 @@ def test_choice_uniqueness_properties(emitter, exp_unique_vals,
     assert emitter.num_unique_items == exp_unique_items
     assert emitter.emits_unique_values == exp_emits_unique
     emitter(num_to_emit)
-    print(emitter._shuffled)
     assert emitter.num_unique_values == post_emit_exp_unique_vals
     assert emitter.num_unique_items == post_emit_exp_unique_items
     assert emitter.emits_unique_values == post_emit_exp_emits_unique
