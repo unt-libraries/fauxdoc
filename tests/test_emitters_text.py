@@ -183,7 +183,9 @@ def test_text_emit_words_list(seed, word_mn, word_mx, unique, num, repeat,
 
 @pytest.mark.parametrize(
     'word_emitter, sep_choices, numwords_choices, exp_unique_vals', [
+        (Word(Static(1), Choice('abcde')), None, [1], 5),
         (Word(Static(1), Choice('abcde')), [' '], [1], 5),
+        (Word(Static(2), Choice('abcde')), None, [1], 25),
         (Word(Static(2), Choice('abcde')), [' '], [1], 25),
         (Word(Choice([1, 2, 3]), Choice('abcde')), [' '], [1], 5 + 25 + 125),
         (Word(Choice([1, 3]), Choice('abcde')), [' '], [1], 5 + 125),
@@ -211,7 +213,7 @@ def test_text_unique_properties(word_emitter, sep_choices, numwords_choices,
     te = Text(
         Choice(numwords_choices),
         word_emitter,
-        Choice(sep_choices)
+        Choice(sep_choices) if sep_choices else None
     )
     assert te.num_unique_values == exp_unique_vals
     assert not te.emits_unique_values

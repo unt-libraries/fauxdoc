@@ -244,9 +244,9 @@ class Text(RandomMixin, Emitter):
         word = self._emitters.get('word')
         sep = self._emitters.get('sep')
         numwords = self._emitters.get('numwords')
-        if word and sep and numwords:
+        if word and numwords:
             n_uw = word.num_unique_values
-            n_us = sep.num_unique_values
+            n_us = getattr(sep, 'num_unique_values', 1)
             lengths = numwords.items
             if n_uw is not None and n_us is not None:
                 num = sum([(n_uw ** i) * (n_us ** (i - 1)) for i in lengths])
