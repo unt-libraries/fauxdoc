@@ -1,6 +1,6 @@
 """Contains mixin classes."""
 import random
-from typing import Any
+from typing import Any, List
 
 
 class RandomMixin:
@@ -56,3 +56,38 @@ class RandomMixin:
             super().seed(rng_seed)
         except AttributeError:
             pass
+
+
+class ItemsMixin:
+    """Mixin class for emitters that emit based on a list of items.
+
+    This is super simple, but it provides a reliable interface for
+    emitters that emit from a finite set of values.
+
+    Attributes:
+        items: (Optional.) The sequence of values that this emitter
+            outputs. Defaults to an empty list.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Inits an object using ItemsMixin.
+
+        Args:
+            *args: Args to pass through to the parent class' __init__.
+            **kwargs: Kwargs to pass through to the parent class'
+                __init__. If you include 'items', then it is used as
+                the 'items' attribute and is NOT passed through to
+                parent classes.
+        """
+        self._items = kwargs.pop('items', [])
+        super().__init__(*args, **kwargs)
+
+    @property
+    def items(self) -> List[Any]:
+        """Returns this emitter's list of items."""
+        return self._items
+
+    @property
+    def num_unique_values(self) -> int:
+        """Returns an int, the number of unique values emittable."""
+        return len(set(self._items))

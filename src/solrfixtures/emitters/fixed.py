@@ -3,10 +3,11 @@ import itertools
 from typing import Callable, Iterator, List, Sequence
 
 from solrfixtures.emitter import Emitter
+from solrfixtures.mixins import ItemsMixin
 from solrfixtures.typing import T
 
 
-class Static(Emitter):
+class Static(ItemsMixin, Emitter):
     """Class for emitting static values.
 
     Attributes:
@@ -20,16 +21,7 @@ class Static(Emitter):
             value: See `value` attribute.
         """
         self.value = value
-
-    @property
-    def items(self):
-        """Return the static value as a list of items.
-
-        This is to provide a consistent interface for emitters that use
-        a static item or items, such as this, choices.Choice, and
-        fixed.Sequential.
-        """
-        return [self.value]
+        super().__init__(items=[value])
 
     def emit(self) -> T:
         return self.value
@@ -106,14 +98,14 @@ class Iterative(Emitter):
         return result
 
 
-class Sequential(Iterative):
+class Sequential(ItemsMixin, Iterative):
     """Class for creating an Iterative emitter for a sequence.
 
-    Although you can acheive this using a plain Iterative emitter:
+    Although you can achieve this using a plain Iterative emitter:
         Iterative(lambda: iter(sequence))
 
     ... this class also stores the sequence in self.items so that all
-    available choices can be accessed as a finite value.
+    available choices can be accessed as a finite set of values.
 
     Attributes:
         iterator_factory: See superclass.
@@ -127,10 +119,4 @@ class Sequential(Iterative):
         Args:
             items: See `items` attribute.
         """
-        self.items = items
-        self.reset()
-
-    def reset(self) -> None:
-        """Resets this emitter based on current self.items."""
-        self.iterator_factory = lambda: iter(self.items)
-        super().reset()
+        super().__init__(lambda: iter(self.items), items=items)

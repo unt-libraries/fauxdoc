@@ -52,14 +52,13 @@ def test_sequential_emit(sequence, expected):
     assert [em() for _ in range(number)] == expected
 
 
-def test_sequential_reset_after_changing_items():
-    """If you modify the `items` on an existing Sequential instance,
-    the instance should continue to emit the previous items until a
-    `reset` is issued.
-    """
-    em = fixed.Sequential(range(5))
-    assert em(2) == [0, 1]
-    em.items = range(5, 10)
-    assert em() == 2
-    em.reset()
-    assert em(2) == [5, 6]
+@pytest.mark.parametrize('sequence, expected', [
+    ([], 0),
+    ('abcde', 5),
+    ([1, 2, 1, 2, 1, 2], 2),
+    ('aaaaaa', 1)
+])
+def test_sequential_uniqueness_properties(sequence, expected):
+    em = fixed.Sequential(sequence)
+    assert em.num_unique_values == expected
+    assert not em.emits_unique_values

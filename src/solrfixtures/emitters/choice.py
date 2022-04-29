@@ -4,11 +4,11 @@ from typing import Any, Optional, List, Sequence
 
 from solrfixtures.emitter import Emitter
 from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle
-from solrfixtures.mixins import RandomMixin
+from solrfixtures.mixins import RandomMixin, ItemsMixin
 from solrfixtures.typing import Number, T
 
 
-class Choice(RandomMixin, Emitter):
+class Choice(RandomMixin, ItemsMixin, Emitter):
     """Class for making random selections, optionally with weighting.
 
     This covers any kind of random choice and implements the most
@@ -70,14 +70,13 @@ class Choice(RandomMixin, Emitter):
             noun: (Optional.) See `noun` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        self.items = items
         self.weights = weights
         self.cum_weights = None
         self.replace = replace or replace_only_after_call
         self.replace_only_after_call = replace_only_after_call
         self.noun = noun
         self._shuffled = None
-        super().__init__(rng_seed=rng_seed)
+        super().__init__(items=items, rng_seed=rng_seed)
 
     def reset(self) -> None:
         """Reset state and calculated attributes.
@@ -88,14 +87,14 @@ class Choice(RandomMixin, Emitter):
         It also resets `cum_weights`.
         """
         super().reset()
-        if not self.items:
+        if not self._items:
             raise ValueError(
                 f"The 'items' attribute must be a non-empty sequence. "
-                f"(Provided: {self.items})"
+                f"(Provided: {self._items})"
             )
-        self._num_unique_items = len(self.items)
+        self._num_unique_items = len(self._items)
         if self.weights is not None:
-            nitems = len(self.items)
+            nitems = len(self._items)
             nweights = len(self.weights)
             if nitems != nweights:
                 noun_phr = f"{self.noun} choices" if self.noun else "choices"
@@ -127,8 +126,8 @@ class Choice(RandomMixin, Emitter):
             self._global_shuffle()
 
     def _global_shuffle(self):
-        weights = self.weights or [1] * len(self.items)
-        self._shuffled = weighted_shuffle(self.items, weights, self.rng)
+        weights = self.weights or [1] * len(self._items)
+        self._shuffled = weighted_shuffle(self._items, weights, self.rng)
         self._shuffled_index = 0
 
     @property
@@ -155,7 +154,7 @@ class Choice(RandomMixin, Emitter):
         """
         if getattr(self, '_shuffled', None):
             return len(set(self._shuffled[self._shuffled_index:]))
-        return len(set(self.items))
+        return super().num_unique_values
 
     @property
     def num_unique_items(self) -> int:
@@ -183,20 +182,20 @@ class Choice(RandomMixin, Emitter):
             return items
         if self.weights is None:
             # One call without replacement, without weights.
-            return self.rng.sample(self.items, k=number)
+            return self.rng.sample(self._items, k=number)
         # One call without replacement, with weights.
-        return weighted_shuffle(self.items, self.weights, self.rng, number)
+        return weighted_shuffle(self._items, self.weights, self.rng, number)
 
     def _choice_with_replacement(self, number: int):
         """Makes non-unique choices (with replacement)."""
-        if len(self.items) == 1:
+        if len(self._items) == 1:
             # No choice here.
-            return list(self.items) * number
+            return list(self._items) * number
         if self.weights is None and number == 1:
             # `choice` is fastest if there are no weights and we just
             # need 1.
-            return [self.rng.choice(self.items)]
-        return self.rng.choices(self.items, cum_weights=self.cum_weights,
+            return [self.rng.choice(self._items)]
+        return self.rng.choices(self._items, cum_weights=self.cum_weights,
                                 k=number)
 
     def emit(self) -> T:

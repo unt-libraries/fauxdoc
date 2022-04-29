@@ -45,8 +45,7 @@ class Emitter(ABC):
         should return the number of unique values that remain at any
         given time. Otherwise, this should give the total number of
         unique values that can be emitted. Return None if the number is
-        so high as to be effectively infinite (such as with a random
-        text emitter).
+        unknowable (such as with purely generated values).
         """
         return None
 
