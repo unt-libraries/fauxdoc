@@ -284,14 +284,13 @@ def gaussian_choice(items: Sequence[T],
                   rng_seed)
 
 
-def chance(percent_chance: Number, rng_seed: Any = None) -> None:
-    """Returns a Choice emitter with a percent_chance of emitting True.
+def chance(chance: Number, rng_seed: Any = None) -> None:
+    """Returns a Choice emitter with a certain chance of emitting True.
 
     Args:
-        percent_chance: A number representing the percent chance this
-            emits True. Always emits False if chance <= 0; always emits
-            True if chance >= 100.
+        chance: A number between 0.0 and 1.0 representing the chance
+            this emits True. Always emits False if chance <= 0; always emits
+            True if chance >= 1.0.
         rng_seed: (Optional.) 'rng_seed' kwarg to pass to Choice.
     """
-    return Choice([True, False], [percent_chance, 100 - percent_chance],
-                  rng_seed=rng_seed)
+    return Choice([True, False], [chance, 1.0 - chance], rng_seed=rng_seed)

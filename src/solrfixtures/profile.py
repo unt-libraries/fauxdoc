@@ -53,7 +53,7 @@ class Field(RandomMixin, object):
             generate a value at all for a given call. (True if yes,
             False if no.) E.g., for a field in your schema that is
             populated in ~10 percent of records or docs, an emitter
-            instance like emitters.choice.chance(10) would work.
+            instance like emitters.choice.chance(0.1) would work.
         multi_valued: True if this Field can emit multiple values at
             once; False if it only emits one at a time.
         rng_seed: (Optional.) Any valid seed value you'd provide to
