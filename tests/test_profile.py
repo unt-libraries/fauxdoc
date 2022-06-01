@@ -207,23 +207,38 @@ def test_field_seed_reseeds_all_emitters(emitter):
     assert all([em.rng_seed == 999 for em in field._emitters.values()])
 
 
-@pytest.mark.parametrize('seed, repeat, gate, expected', [
-    (999, None, None,
+@pytest.mark.parametrize('seed, repeat, gate, hide, expected', [
+    (999, None, None, False,
      ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
       'crazy', 'flautist']),
-    (999, choice.poisson_choice(range(1, 6), mu=2), None,
+    (999, None, None, True,
+     ['crazy', 'warm', 'eat', 'eat', 'sluggish', 'happy', 'happy', 'snowstorm',
+      'crazy', 'flautist']),
+    (999, choice.poisson_choice(range(1, 6), mu=2), None, False,
      [['eat', 'bicycle', 'crazy'], ['eat'],
       ['yellow', 'flautist', 'crazy', 'happy'], ['happy', 'happy'],
       ['eat', 'happy'], ['zebra'], ['warm', 'chairs', 'bicycle'], ['sympathy'],
       ['sympathy', 'eat', 'chairs'], ['crazy', 'sympathy', 'zebra']]),
-    (999, None, choice.chance(0.5),
+    (999, choice.poisson_choice(range(1, 6), mu=2), None, True,
+     [['eat', 'bicycle', 'crazy'], ['eat'],
+      ['yellow', 'flautist', 'crazy', 'happy'], ['happy', 'happy'],
+      ['eat', 'happy'], ['zebra'], ['warm', 'chairs', 'bicycle'], ['sympathy'],
+      ['sympathy', 'eat', 'chairs'], ['crazy', 'sympathy', 'zebra']]),
+    (999, None, choice.chance(0.5), False,
      [None, 'crazy', None, None, 'warm', 'eat', None, 'eat', None, None]),
-    (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(0.75),
+    (999, None, choice.chance(0.5), True,
+     [None, 'crazy', None, None, 'warm', 'eat', None, 'eat', None, None]),
+    (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(0.75), False,
+     [None, ['eat', 'bicycle'], None, ['eat'], ['yellow', 'flautist'],
+      ['snowstorm'], None, ['crazy'], None, None]),
+    (999, choice.poisson_choice(range(1, 4), mu=1), choice.chance(0.75), True,
      [None, ['eat', 'bicycle'], None, ['eat'], ['yellow', 'flautist'],
       ['snowstorm'], None, ['crazy'], None, None]),
 ])
-def test_field_caches_previous_value(seed, repeat, gate, expected, emitter):
-    field = Field('test', emitter(), repeat=repeat, gate=gate, rng_seed=seed)
+def test_field_caches_previous_value(seed, repeat, gate, hide, expected,
+                                     emitter):
+    field = Field('test', emitter(), repeat=repeat, gate=gate, hide=hide,
+                  rng_seed=seed)
     prev_expected = [None] + expected[:-1]
     for exp_val, exp_prev_val in zip(expected, prev_expected):
         assert exp_prev_val == field.previous
@@ -231,10 +246,11 @@ def test_field_caches_previous_value(seed, repeat, gate, expected, emitter):
         assert exp_val == field.previous
 
 
-def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
+def test_schema_generates_record_dict(name_emitter, date_emitter,
                                       phrase_emitter):
     test_schema = Schema(
         Field('id', choice.Choice(range(1, 10000), replace=False)),
+        Field('hidden1', Static('TEST'), hide=True),
         Field('title', phrase_emitter()),
         Field('author', name_emitter()),
         Field('contributors', name_emitter(),
@@ -243,7 +259,9 @@ def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
         Field('subjects', phrase_emitter(),
               repeat=choice.poisson_choice(range(1, 6), mu=1),
               gate=choice.chance(0.9)),
-        Field('creation_date', date_emitter())
+        Field('hidden2', Static('TEST'), hide=True),
+        Field('creation_date', date_emitter()),
+        Field('hidden3', Static('TEST'), hide=True),
     )
     test_schema.seed_fields(999)
     assert [test_schema() for _ in range(10)] == [
@@ -299,6 +317,49 @@ def test_schema_generates_record_dict(emitter, name_emitter, date_emitter,
          'creation_date': datetime.date(2018, 12, 19)}]
 
 
+def test_schema_hidden_and_public_fields(name_emitter, date_emitter,
+                                         phrase_emitter):
+    test_schema = Schema(
+        Field('id', choice.Choice(range(1, 10000), replace=False)),
+        Field('hidden1', Static('TEST'), hide=True),
+        Field('title', phrase_emitter()),
+        Field('author', name_emitter()),
+    )
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'title': test_schema.fields['title'],
+        'author': test_schema.fields['author'],
+    }
+    assert test_schema.hidden_fields == {
+        'hidden1': test_schema.fields['hidden1']
+    }
+
+    test_schema.add_fields(
+        Field('contributors', name_emitter(),
+              repeat=choice.poisson_choice(range(1, 6), mu=2),
+              gate=choice.chance(0.66)),
+        Field('subjects', phrase_emitter(),
+              repeat=choice.poisson_choice(range(1, 6), mu=1),
+              gate=choice.chance(0.9)),
+        Field('hidden2', Static('TEST'), hide=True),
+        Field('creation_date', date_emitter()),
+        Field('hidden3', Static('TEST'), hide=True),
+    )
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'title': test_schema.fields['title'],
+        'author': test_schema.fields['author'],
+        'contributors': test_schema.fields['contributors'],
+        'subjects': test_schema.fields['subjects'],
+        'creation_date': test_schema.fields['creation_date']
+    }
+    assert test_schema.hidden_fields == {
+        'hidden1': test_schema.fields['hidden1'],
+        'hidden2': test_schema.fields['hidden2'],
+        'hidden3': test_schema.fields['hidden3']
+    }
+
+
 def test_schema_resetfields_resets_all_fields(emitter_unique):
     schema = Schema(
         Field('test', emitter_unique(),
@@ -306,7 +367,11 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
               gate=choice.chance(1.0)),
         Field('test2', emitter_unique(),
               repeat=choice.Choice([1] * 12, replace=False),
-              gate=choice.chance(1.0))
+              gate=choice.chance(1.0)),
+        Field('test3', emitter_unique(),
+              repeat=choice.Choice([1] * 12, replace=False),
+              gate=choice.chance(1.0),
+              hide=True)
     )
     [schema() for _ in range(12)]
     for field in schema.fields.values():
@@ -325,6 +390,8 @@ def test_field_seedfields_reseeds_all_fields(emitter):
               gate=choice.chance(0.75), rng_seed=12345),
         Field('test2', emitter(), repeat=choice.Choice(range(1, 13)),
               gate=choice.chance(0.75), rng_seed=54321),
+        Field('test4', emitter(), repeat=choice.Choice(range(1, 13)),
+              gate=choice.chance(0.75), hide=True, rng_seed=212121),
     )
     schema.seed_fields(999)
     for field in schema.fields.values():

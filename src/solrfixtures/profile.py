@@ -56,6 +56,10 @@ class Field(RandomMixin, object):
             instance like emitters.choice.chance(0.1) would work.
         multi_valued: True if this Field can emit multiple values at
             once; False if it only emits one at a time.
+        hide: If True, the field generates and caches a value but is
+            not included in schema output. This is for generating data
+            to use as a basis for `BasedOnFields` emitters that *are*
+            included in schema output.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. This value is used to reset any RNGs on the
             three emitter instances attached to this field. Pass the
@@ -72,6 +76,7 @@ class Field(RandomMixin, object):
                  emitter: EmitterLike,
                  repeat: Optional[IntEmitterLike] = None,
                  gate: Optional[BoolEmitterLike] = None,
+                 hide: bool = False,
                  rng_seed: Any = None) -> None:
         """Inits a Field instance.
 
@@ -88,6 +93,7 @@ class Field(RandomMixin, object):
                 values, used as the `gate_emitter` attribute. If a
                 field should always have a value, then use the default
                 (None).
+            hidden: See `hidden` attribute.
             rng_seed: See `rng_seed` attribute.
         """
         self._emitters = ObjectMap({})
@@ -95,6 +101,7 @@ class Field(RandomMixin, object):
         self.emitter = emitter
         self.repeat_emitter = Static(None) if repeat is None else repeat
         self.gate_emitter = Static(True) if gate is None else gate
+        self.hide = hide
         super().__init__(rng_seed=rng_seed)
 
     @property
@@ -190,6 +197,10 @@ class Schema:
             order. (If you have a field with an emitter that uses the
             cached data values from other fields, be sure it appears
             after the fields it copies data from.)
+        hidden_fields: An ObjectMap that maps field names to field
+            objects, where `field.hide` is True.
+        public_fields: An ObjectMap that maps field names to field
+            objects, where `field.hide` is False.
     """
 
     def __init__(self, *fields: Field) -> None:
@@ -212,6 +223,24 @@ class Schema:
                 argument, so provided your fields as args.
         """
         self.fields.update({field.name: field for field in fields})
+        self._hidden_fields = None
+        self._public_fields = None
+
+    @property
+    def hidden_fields(self):
+        if self._hidden_fields is None:
+            self._hidden_fields = ObjectMap({
+                fn: fd for fn, fd in self.fields.items() if fd.hide
+            })
+        return self._hidden_fields
+
+    @property
+    def public_fields(self):
+        if self._public_fields is None:
+            self._public_fields = ObjectMap({
+                fn: fd for fn, fd in self.fields.items() if not fd.hide
+            })
+        return self._public_fields
 
     def reset_fields(self) -> None:
         """Resets state on all schema fields."""
@@ -234,4 +263,7 @@ class Schema:
             A dict, where field names are keys and field values are
             values.
         """
-        return {fname: field() for fname, field in self.fields.items()}
+        doc = {fname: field() for fname, field in self.fields.items()}
+        for field in self.hidden_fields:
+            del(doc[field])
+        return doc
