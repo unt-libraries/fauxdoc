@@ -2,15 +2,18 @@
 import random
 from typing import Any, List
 
+from solrfixtures.group import ObjectMap
+
 
 class RandomMixin:
     """Mixin class for defining components that need RNG.
 
     Use this to implement an object that generates randomized values.
     In your subclass, instead of calling the `random` module directly,
-    use the 'rng' attribute. Override the `reset` and `seed` methods if
-    you have something composed of multiple components using
-    RandomMixin and need to seed multiple RNGs at once.
+    use the 'rng' attribute.
+
+    If you also need child emitters, use RandomWithChildrenMixin,
+    to get RandomMixin and ChildrenMixin to play well together.
 
     Attributes:
         rng: A random.Random object. Use this for generating random
@@ -37,7 +40,7 @@ class RandomMixin:
         self.reset()
 
     def reset(self) -> None:
-        """Reset the emitter's RNG instance."""
+        """Resets the emitter's RNG instance."""
         self.rng = random.Random(self.rng_seed)
         try:
             super().reset()
@@ -91,3 +94,64 @@ class ItemsMixin:
     def num_unique_values(self) -> int:
         """Returns an int, the number of unique values emittable."""
         return len(set(self._items))
+
+
+class ChildrenMixin:
+    """Mixin class for anything that needs to use child emitters.
+
+    All this does is give you a self._emitters attribute (and
+    associated public `emitters` property) where you can add whatever
+    child emitters you need to use in generating values for your parent
+    to emit.
+
+    If you also need RNG, then use the RandomWithChildrenMixin, to get
+    ChildrenMixin and RandomMixin to play well together.
+
+    Attributes:
+        emitters: An ObjectMap mapping labels to child emitters.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Inits an object using ChildrenMixin.
+
+        Args:
+            *args: Args to pass through to the parent class' __init__.
+            **kwargs: Kwargs to pass through to the parent class'
+                __init__. Optionally, if you include 'children', then
+                that is used to populate the private '_emitters' attr.
+        """
+        self._emitters = ObjectMap(kwargs.pop('children', {}))
+        super().__init__(*args, **kwargs)
+
+    @property
+    def emitters(self) -> ObjectMap:
+        """Returns the children emitters, as a dict-like ObjectMap."""
+        return self._emitters
+
+    def reset(self) -> None:
+        """Resets this emitter and all children."""
+        self._emitters.do_method('reset')
+        super().reset()
+
+
+class RandomWithChildrenMixin(RandomMixin, ChildrenMixin):
+    """Mixin class for RandomMixin + ChildrenMixin.
+
+    Use this instead of RandomMixin and / or ChildrenMixin if your
+    parent emitter or any of your children need RNG. This takes care of
+    resetting and seeding the children correctly when `reset` and
+    `seed` are called on the parent.
+    """
+
+    def reset(self) -> None:
+        """Resets this emitter and all children, including RNG."""
+        self._emitters.setattr('rng_seed', self.rng_seed)
+        super().reset()
+
+    def seed(self, rng_seed: Any) -> None:
+        """Seeds RNG for this emitter and all children."""
+        self._emitters.do_method('seed', rng_seed)
+        try:
+            super().seed(rng_seed)
+        except AttributeError:
+            pass
