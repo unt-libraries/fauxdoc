@@ -1,29 +1,27 @@
 """Contains emitters that wrap other emitters."""
-from typing import Any, Callable, List, Sequence
+from inspect import signature
+from typing import Any, Callable, List, Mapping, Optional, Sequence
+from unittest.mock import call
 
 from solrfixtures.emitter import Emitter
-from solrfixtures.group import ObjectGroup
+from solrfixtures.mixins import RandomWithChildrenMixin
 from solrfixtures.typing import EmitterLikeCallable, T
 
 
-class Wrap(Emitter):
-    """General Emitter class for wrapping another emitter.
+class Wrap(RandomWithChildrenMixin, Emitter):
+    """Abstract base class for creating wrapper emitters.
 
-    The intention is to allow creating emitters that convert the values
-    from a source emitter. The source emitter should be emitter-like in
-    that, when you call it, you tell it how many values you want, and
-    it returns a sequence containing that many values. The wrapper
-    should act on each individual value in that sequence and return the
-    transformed value.
+    Wrapper emitters are useful for easily converting output of an
+    existing emitter without having to create a whole new class. This
+    can be useful for simple operations like data conversion: the user
+    initializes a new Wrap instance by supplying one or more source
+    emitters and a wrapper function that takes the emitted data and
+    returns the modified value.
 
-    E.g.:
-        >>> from solrfixtures.emitters.fixed import Iterative
-        >>> from solrfixtures.emitters.wrappers import Wrap
-        >>> em1 = Iterative(lambda: itertools.count())
-        >>> em2 = Wrap(Iterative(lambda: itertools.count(), str))
-        >>> em1(5); em2(5)
-        [0, 1, 2, 3, 4]
-        ['0', '1', '2', '3', '4']
+    Optionally, the wrapper may also take an additional 'rng' kwarg, if
+    it needs to generate random values. In this case the parent passes
+    its 'rng' attribute, ensuring your wrapper uses the correct seed,
+    etc.
 
     Note that there is some overhead in wrapping one emitter with
     another. If your use case requires extremely high efficiency,
@@ -31,139 +29,207 @@ class Wrap(Emitter):
     bit more performant. However, the wrapper approach is more
     flexible: you can create general-purpose wrapper functions to do
     generic data conversions instead of hard-coding it in each and
-    every class that might need it. (Such as for date conversions.)
+    every class that might need it.
 
     Attributes:
-        source: The object to wrap. An emitter-like is expected, but it
-            *could* be any callable that takes an int (number of values
-            to emit) and returns a sequence of that length.
-        wrapper: A callable to serve as the wrapper. The wrapper should
-            take one input value from the source sequence and return a
-            corresponding value.
+        emitters: (From RandomWithChildrenMixin.) This is a
+            group.ObjectMap containing the source emitter-like
+            instance(s) to wrap.
+        wrapper: A callable that takes input values from the source
+            emitter(s) and returns a corresponding value. Optionally,
+            it may also take an 'rng' kwarg.
+        rng: See superclass (RandomWithChildrenMixin).
+        rng_seed: See superclass (RandomWithChildrenMixin).
+    """
+
+    def __init__(self,
+                 source: Mapping[str, EmitterLikeCallable],
+                 wrapper: Callable,
+                 rng_seed: Optional[Any] = None):
+        """Inits a Wrap emitter with a source and a wrapper callable.
+
+        Args:
+            source: A dict that maps labels to wrapped source emitters,
+                used to populate the 'emitter' attribute.
+            wrapper: See 'wrapper' attribute.
+            rng_seed: See 'rng_seed' attribute.
+        """
+        self.wrapper = wrapper
+        super().__init__(children=source, rng_seed=rng_seed)
+
+    @property
+    def wrapper(self) -> Callable:
+        return self._wrapper
+
+    @wrapper.setter
+    def wrapper(self, wrapper: Callable) -> None:
+        """Sets the `wrapper` property.
+
+        This also looks for an 'rng' kwarg in the provided wrapper's
+        call signature and sets a private '_wrapper_wants_rng'
+        attribute.
+
+        Arguments:
+            wrapper: See 'wrapper' attribute.
+        """
+        try:
+            wrapsig = signature(wrapper)
+        except ValueError:
+            self._wrapper_wants_rng = False
+        else:
+            self._wrapper_wants_rng = 'rng' in wrapsig.parameters
+        self._wrapper = wrapper
+
+    def _raise_wrapper_call_error(self, error: TypeError, args: Sequence,
+                                  kwargs: Mapping) -> None:
+        """Raises a TypeError based on a failed wrapper call.
+
+        The intended use for this is to catch/raise a TypeError during
+        either of the emit methods if the wrapper call fails.
+        """
+        call_str = str(call(*args, **kwargs))[4:]
+        raise TypeError(
+            f'Trying to call ``self.wrapper{call_str}`` raised a TypeError: '
+            f'"{error}." (The signature for self.wrapper may not match what '
+            f'the ``{type(self).__name__}`` class expects.)'
+        ) from error
+
+
+class WrapOne(Wrap):
+    """Emitter class for wrapping one other emitter.
+
+    Use this to create an emitter that converts values from one source
+    emitter. When you call __init__, provide the source emitter and a
+    wrapper function. The wrapper should take a value emitted by the
+    source and return the modified value.
+
+    E.g.:
+        >>> from solrfixtures.emitters.fixed import Iterative
+        >>> from solrfixtures.emitters.wrappers import Wrap
+        >>> em = WrapOne(Iterative(lambda: itertools.count(), str))
+        >>> em(5)
+        ['0', '1', '2', '3', '4']
+
+    See superclass (Wrap) for more details.
+
+    Attributes:
+        emitters: See superclass.
+        wrapper: A callable that takes one input value from the source
+            emitter and returns a corresponding value. Optionally,
+            it may also take an 'rng' kwarg.
+        rng: See superclass.
+        rng_seed: See superclass.
     """
 
     def __init__(self,
                  source: EmitterLikeCallable,
-                 wrapper: Callable[[T], Any]) -> None:
-        """Inits a Wrap emitter with a source and a wrapper callable.
+                 wrapper: Callable,
+                 rng_seed: Optional[Any] = None) -> None:
+        """Inits a WrapOne emitter with a source and wrapper callable.
 
         Args:
-            source: See 'source' attribute for details.
+            source: The emitter to wrap.
             wrapper: See 'wrapper' attribute.
         """
-        self.source = source
-        self.wrapper = wrapper
-
-    def reset(self) -> None:
-        """Resets 'source' state, if it can be reset."""
-        try:
-            self.source.reset()
-        except AttributeError:
-            pass
-
-    def seed(self, rng_seed: Any) -> None:
-        """Seed or reseed the 'source' with the given rng_seed value.
-
-        This does nothing if the 'source' object is not RandomEmitter-
-        like and has no `seed` method.
-
-        Args:
-            rng_seed: Any seed value that the random module accepts.
-        """
-        try:
-            self.source.seed(rng_seed)
-        except AttributeError:
-            pass
+        super().__init__({'source': source}, wrapper, rng_seed)
 
     def emit(self) -> T:
         """Returns an emitted value, run through `self.wrapper`."""
-        return self.wrapper(self.source())
+        kwargs = {'rng': self.rng} if self._wrapper_wants_rng else {}
+        args = (self._emitters['source'](),)
+        try:
+            return self._wrapper(*args, **kwargs)
+        except TypeError as e:
+            self._raise_wrapper_call_error(e, args, kwargs)
 
     def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted, wrapped values.
 
         Args:
-            number: See superclass.
+            number: See superclass (Emitter).
         """
-        return [self.wrapper(v) for v in self.source(number)]
+        emitted = self._emitters['source'](number)
+        kwargs = {'rng': self.rng} if self._wrapper_wants_rng else {}
+        try:
+            return [self._wrapper(v, **kwargs) for v in emitted]
+        except TypeError as e:
+            self._raise_wrapper_call_error(e, (emitted[0],), kwargs)
 
 
-class WrapMany(Emitter):
-    """Emitter class for wrapping multiple emitters.
+class WrapMany(Wrap):
+    """Emitter class for wrapping multiple other emitters.
 
-    This is like `Wrap`, except it wraps multiple emitters. The wrapper
-    callable should accept N arguments, where N is len(sources); the
-    output for each source emitter is passed to 'wrapper' in 'sources'
-    order.
+    Use this to create an emitter that combines or converts values from
+    multiple source emitters. When you call __init__, provide source
+    emitters in a dict plus a wrapper function. The wrapper should take
+    values emitted by the sources, using the dict keys as kwargs, and
+    return the modified value.
 
     E.g.:
-        >>> from solrfixtures.emitters.fixed import Static
-        >>> from solrfixtures.emitters.wrappers import WrapMany
-        >>> em = WrapMany([Static('Susan'), Static('Hello!')],
-        ...               lambda em_a, em_b: f'{em_a} says, "{em_b}"')
-        >>> em(2)
-        ['Susan says, "Hello!"', 'Susan says, "Hello!"']
+        >>> from solrfixtures.emitters.fixed import Sequential
+        >>> from solrfixtures.emitters.wrappers import Wrap
+        >>> em = WrapMany({
+        ...     'name': Sequential(['Susan', 'Alice', 'Bob', 'Terry']),
+        ...     'greet': Sequential(['Hi!', 'Yes?', 'What?', 'Yo!']),
+        ... }, lambda name, greet: f'{name} says, "{greet}"')
+        >>> em(4)
+        ['Susan says, "Hi!"', 'Alice says, "Yes?"', 'Bob says, "What?"',
+         'Terry says, "Yo!"']
 
-    See the docstring for `Wrap`.
+    See superclass (Wrap) for more details.
 
     Attributes:
-        sources: An ObjectGroup of the objects to wrap. Emitter-like
-            objects are expected, but they could be any callables that
-            take an int (number of values to emit) and return a
-            sequence of that length.
-        wrapper: A callable to serve as the wrapper. The arg list
-            should comprise one value from each source emitter output
-            sequence.
+        emitters: See superclass.
+        wrapper: A callable that takes one kwarg from each source
+            emitter, using the label from the 'emitters' ObjectMap as
+            the kwarg name. Optionally, it may take an addition 'rng'
+            kwarg. It should return a final value based on the source
+            emitter values.
+        rng: See superclass.
+        rng_seed: See superclass.
     """
 
-    def __init__(self,
-                 sources: Sequence[EmitterLikeCallable],
-                 wrapper: Callable) -> None:
-        """Inits WrapMany with sources and a wrapper callable.
-
-        Args:
-            sources: A sequence of the objects to wrap. See 'sources'
-                attribute for details. (You do not have to provide an
-                ObjectGroup -- your sequence is converted.)
-            wrapper: See 'wrapper' attribute.
-        """
-        self.sources = sources
-        self.wrapper = wrapper
-
-    @property
-    def sources(self) -> ObjectGroup:
-        """Returns the 'sources' attribute."""
-        return self._sources
-
-    @sources.setter
-    def sources(self, sources: Sequence[EmitterLikeCallable]) -> None:
-        """Sets the 'sources' attribute."""
-        self._sources = ObjectGroup(*sources)
-
-    def reset(self) -> None:
-        """Resets state for each of 'sources', if possible."""
-        self._sources.do_method('reset')
-
-    def seed(self, rng_seed: Any) -> None:
-        """Seed or reseed 'sources' with the given rng_seed value.
-
-        This does nothing for any objects in 'sources' that lack a
-        `seed` method.
-
-        Args:
-            rng_seed: Any seed value that the random module accepts.
-        """
-        self._sources.do_method('seed', rng_seed)
-
     def emit(self) -> T:
-        """Returns emitted values, run through `self.wrapper`."""
-        return self.wrapper(*(s() for s in self._sources))
+        """Returns an emitted value, run through `self.wrapper`."""
+        kwargs = {k: em() for k, em in self._emitters.items()}
+        if self._wrapper_wants_rng:
+            kwargs['rng'] = self.rng
+        try:
+            return self._wrapper(**kwargs)
+        except TypeError as e:
+            self._raise_wrapper_call_error(e, [], kwargs)
+
+    def _check_emit_many_typeerror(self, error: TypeError,
+                                   emitted_data: Sequence,
+                                   has_rng_kwarg: bool):
+        kwargs = {k: v[0] for k, v in emitted_data}
+        if has_rng_kwarg:
+            kwargs['rng'] = self.rng
+        try:
+            self._wrapper(**kwargs)
+        except TypeError as e:
+            self._raise_wrapper_call_error(e, [], kwargs)
+        raise error
 
     def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted, wrapped values.
 
         Args:
-            number: See superclass.
+            number: See superclass (Emitter).
         """
-        return [self.wrapper(*args)
-                for args in list(zip(*(s(number) for s in self._sources)))]
+        emdata = [(k, em(number)) for k, em in self._emitters.items()]
+        if self._wrapper_wants_rng:
+            try:
+                return [
+                    self._wrapper(rng=self.rng, **{k: v[i] for k, v in emdata})
+                    for i in range(number)
+                ]
+            except TypeError as e:
+                self._check_emit_many_typeerror(e, emdata, True)
+        try:
+            return [
+                self._wrapper(**{k: v[i] for k, v in emdata})
+                for i in range(number)
+            ]
+        except TypeError as e:
+            self._check_emit_many_typeerror(e, emdata, False)
