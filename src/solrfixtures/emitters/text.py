@@ -1,10 +1,9 @@
 """Contains functions and emitters for emitting text data."""
 from typing import Any, Iterator, List, Optional, Sequence
 
-from solrfixtures.group import ObjectMap
 from solrfixtures.emitter import Emitter
 from solrfixtures.mathtools import clamp
-from solrfixtures.mixins import RandomMixin
+from solrfixtures.mixins import RandomWithChildrenMixin
 from solrfixtures.typing import IntEmitterLike, StrEmitterLike
 
 
@@ -37,7 +36,7 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     ]
 
 
-class Word(RandomMixin, Emitter):
+class Word(RandomWithChildrenMixin, Emitter):
     """Class for generating and emitting randomized words.
 
     Words that are emitted have a random variable length and characters
@@ -88,32 +87,22 @@ class Word(RandomMixin, Emitter):
             alphabet_emitter: See `alphabet_emitter` attribute.
             rng_seed (Optional.) See `rng_seed` attribute.
         """
-        self._emitters = ObjectMap({})
-        self.length_emitter = length_emitter
-        self.alphabet_emitter = alphabet_emitter
-        super().__init__(rng_seed=rng_seed)
+        children = {
+            'length': length_emitter,
+            'alphabet': alphabet_emitter
+        }
+        super().__init__(children=children, rng_seed=rng_seed)
+        self._update_num_unique_vals()
 
     @property
     def length_emitter(self) -> IntEmitterLike:
         """Returns the 'length_emitter' attribute."""
         return self._emitters['length']
 
-    @length_emitter.setter
-    def length_emitter(self, length_emitter: IntEmitterLike) -> None:
-        """Sets the 'length_emitter' attribute."""
-        self._emitters['length'] = length_emitter
-        self._update_num_unique_vals()
-
     @property
     def alphabet_emitter(self) -> None:
         """Returns the 'alphabet_emitter' attribute."""
         return self._emitters['alphabet']
-
-    @alphabet_emitter.setter
-    def alphabet_emitter(self, alphabet_emitter: StrEmitterLike) -> None:
-        """Sets the 'alphabet_emitter' attribute."""
-        self._emitters['alphabet'] = alphabet_emitter
-        self._update_num_unique_vals()
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
@@ -163,7 +152,7 @@ class Word(RandomMixin, Emitter):
         return words
 
 
-class Text(RandomMixin, Emitter):
+class Text(RandomWithChildrenMixin, Emitter):
     """Class for emitting random text.
 
     "Text" in this case is defined very basically as a string of words,
@@ -200,44 +189,28 @@ class Text(RandomMixin, Emitter):
             sep_emitter: (Optional.) See `sep_emitter` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        self._emitters = ObjectMap({})
-        self.numwords_emitter = numwords_emitter
-        self.word_emitter = word_emitter
-        self.sep_emitter = sep_emitter
-        super().__init__(rng_seed=rng_seed)
+        children = {
+            'numwords': numwords_emitter,
+            'word': word_emitter,
+            'sep': sep_emitter
+        }
+        super().__init__(children=children, rng_seed=rng_seed)
+        self._update_num_unique_vals()
 
     @property
     def numwords_emitter(self) -> IntEmitterLike:
         """Returns the 'numwords_emitter' attribute."""
         return self._emitters['numwords']
 
-    @numwords_emitter.setter
-    def numwords_emitter(self, numwords_emitter: IntEmitterLike):
-        """Sets the 'numwords_emitter' attribute."""
-        self._emitters['numwords'] = numwords_emitter
-        self._update_num_unique_vals()
-
     @property
     def word_emitter(self) -> StrEmitterLike:
         """Returns the 'word_emitter' attribute."""
         return self._emitters['word']
 
-    @word_emitter.setter
-    def word_emitter(self, word_emitter: StrEmitterLike):
-        """Sets the 'word_emitter' attribute."""
-        self._emitters['word'] = word_emitter
-        self._update_num_unique_vals()
-
     @property
     def sep_emitter(self) -> StrEmitterLike:
         """Returns the 'sep_emitter' attribute."""
         return self._emitters['sep']
-
-    @sep_emitter.setter
-    def sep_emitter(self, sep_emitter: StrEmitterLike):
-        """Sets the 'sep_emitter' attribute."""
-        self._emitters['sep'] = sep_emitter
-        self._update_num_unique_vals()
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
