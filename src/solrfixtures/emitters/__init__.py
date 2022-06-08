@@ -14,12 +14,12 @@ from .fromfields import BasedOnFields, CopyFields
 from . import text
 from .text import make_alphabet, Text, Word
 from . import wrappers
-from .wrappers import Wrap, WrapMany
+from .wrappers import Wrap, WrapOne, WrapMany
 
 
 __all__ = [
     'choice', 'chance', 'Choice', 'gaussian_choice', 'poisson_choice',
     'fixed', 'Iterative', 'Sequential', 'Static', 'fromfields',
     'BasedOnFields', 'CopyFields', 'text', 'make_alphabet', 'Text',
-    'Word', 'wrappers', 'Wrap', 'WrapMany'
+    'Word', 'wrappers', 'Wrap', 'WrapOne', 'WrapMany'
 ]
