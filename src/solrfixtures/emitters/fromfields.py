@@ -1,6 +1,7 @@
 """Contains emitters that use Field data to generate output."""
-import random
-from typing import Any, Callable, List, Optional, Sequence, Union
+from inspect import signature
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Union
+from unittest.mock import call
 
 from solrfixtures.group import ObjectGroup
 from solrfixtures.emitter import Emitter
@@ -118,9 +119,10 @@ class CopyFields(Emitter):
 class BasedOnFields(RandomMixin, CopyFields):
     """Emitter class for basing output on existing Field instances.
 
-    Use this if you need to emit data that is based on the data from
-    other fields -- like CopyFields, but you supply an 'action'
-    function that modifies the value(s) before returning anything.
+    Use this if you need to emit data that is *based on* the data from
+    other fields. This is like CopyFields, but, instead of making a
+    straight copy of the 'source' field, you supply an 'action' function
+    that can modify the value(s) before returning anything.
 
     Like with CopyFields, the 'source' you supply may be a single field
     or a sequence of fields. If it's a single field, then the 'action'
@@ -130,7 +132,7 @@ class BasedOnFields(RandomMixin, CopyFields):
     as keys.
 
     Note that this is faster than using wrapper emitters to wrap
-    CopyFields output, although functionally equivalent.
+    CopyFields output, although it's functionally equivalent.
 
     Also note that, in your schema assignment, you should put each
     Field using this emitter AFTER all of its source fields. E.g., the
@@ -140,22 +142,23 @@ class BasedOnFields(RandomMixin, CopyFields):
         source: An ObjectGroup containing the Field instance(s) to copy
             data from. Values are sent to the 'action' function in
             Field order.
-        action: A callable that takes either one or two args. The first
-            is always the source data. The second is the 'rng'
-            (random.Random) instance from the BasedOnFields instance,
-            provided only if 'needs_rng' is True. It should return the
-            appropriate output value or values.
-        needs_rng: (Optional.) A boolean value that dictates whether or
-            not the second (rng) argument will be supplied to the
-            'action' callable when called. Default is False.
+        action: A callable that takes data from the source field(s) and
+            returns some output value(s) based on the source data. The
+            appropriate call signature depends on your source fields
+            and whether your function requires RNG. 1) If you have one
+            source field, the first positional arg provided will be the
+            output value for that field. 2) Or, if you have multiple
+            source fields, one kwarg for each source field will be
+            provided, where the kwarg name is the field name and the
+            value is the output value. 3) If you need RNG, supply an
+            'rng' kwarg, and the RNG (random.Random) instance attached
+            to the BasedOnFields instance will be provided.
         rng_seed: (Optional.) See parent class (RandomMixin).
     """
 
     def __init__(self,
                  source: Union[FieldLike, Sequence[FieldLike]],
-                 action: Union[Callable[[Any], Any],
-                               Callable[[Any, random.Random], Any]],
-                 needs_rng: bool = False,
+                 action: Callable,
                  rng_seed: Any = None) -> None:
         """Inits a BasedOnFields instance.
 
@@ -163,12 +166,47 @@ class BasedOnFields(RandomMixin, CopyFields):
             source: Provide either one Field instance or a sequence of
                 Field instances (to get base data values from).
             action: See `action` attribute.
-            needs_rng: (Optional.) See `needs_rng` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
         super().__init__(source, rng_seed=rng_seed)
         self.action = action
-        self.needs_rng = needs_rng
+
+    @property
+    def action(self) -> Callable:
+        return self._action
+
+    @action.setter
+    def action(self, action: Callable) -> None:
+        """Sets the `action` property.
+
+        This also looks for an 'rng' kwarg in the provided action's
+        call signature and sets a private '_action_wants_rng'
+        attribute.
+
+        Arguments:
+            action: See 'action' attribute.
+        """
+        try:
+            actionsig = signature(action)
+        except ValueError:
+            self._action_wants_rng = False
+        else:
+            self._action_wants_rng = 'rng' in actionsig.parameters
+        self._action = action
+
+    def _raise_action_call_error(self, error: TypeError, args: Sequence,
+                                 kwargs: Mapping) -> None:
+        """Raises a TypeError based on a failed wrapper call.
+
+        The intended use for this is to catch/raise a TypeError during
+        either of the emit methods if the wrapper call fails.
+        """
+        call_str = str(call(*args, **kwargs))[4:]
+        raise TypeError(
+            f'Trying to call ``self.action{call_str}`` raised a TypeError: '
+            f'"{error}." (The signature for self.action may not match what '
+            f'the ``{type(self).__name__}`` class expects.)'
+        ) from error
 
     def seed_source(self, rng_seed: Any) -> None:
         """Seeds all RNGs associated with source fields.
@@ -193,12 +231,16 @@ class BasedOnFields(RandomMixin, CopyFields):
 
     def emit(self) -> T:
         """Returns one emitted value."""
+        args = []
+        kwargs = {}
         if len(self._source) == 1:
-            vals = self._source[0].previous
+            args = [self._source[0].previous]
         else:
-            vals = {}
             for field in self._source:
-                vals[field.name] = field.previous
-        if self.needs_rng:
-            return self.action(vals, self.rng)
-        return self.action(vals)
+                kwargs[field.name] = field.previous
+        if self._action_wants_rng:
+            kwargs['rng'] = self.rng
+        try:
+            return self.action(*args, **kwargs)
+        except TypeError as e:
+            self._raise_action_call_error(e, args, kwargs)
