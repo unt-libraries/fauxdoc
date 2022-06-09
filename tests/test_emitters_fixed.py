@@ -19,7 +19,6 @@ def test_static_emit(value):
 
 
 @pytest.mark.parametrize('iterator_factory, expected', [
-    (lambda: iter([]), [None, None, None, None]),
     (lambda: iter([1]), [1, 1, 1, 1, 1, 1]),
     (lambda: itertools.count(), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
     (lambda: itertools.count(1001), [1001, 1002, 1003, 1004, 1005, 1006]),
@@ -37,8 +36,13 @@ def test_iterative_emit(iterator_factory, expected):
     assert [em() for _ in range(number)] == expected
 
 
+def test_iterative_empty_iterator_factory_raises_error():
+    with pytest.raises(ValueError) as excinfo:
+        _ = fixed.Iterative(lambda: iter([]))
+    assert 'empty iterator' in str(excinfo.value)
+
+
 @pytest.mark.parametrize('sequence, expected', [
-    ([], [None, None, None, None]),
     (range(1, 2), [1, 1, 1, 1, 1, 1, 1, 1, 1]),
     (range(1, 101), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
     (range(1, 3), [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1]),
@@ -53,7 +57,6 @@ def test_sequential_emit(sequence, expected):
 
 
 @pytest.mark.parametrize('sequence, expected', [
-    ([], 0),
     ('abcde', 5),
     ([1, 2, 1, 2, 1, 2], 2),
     ('aaaaaa', 1)
@@ -62,3 +65,9 @@ def test_sequential_uniqueness_properties(sequence, expected):
     em = fixed.Sequential(sequence)
     assert em.num_unique_values == expected
     assert not em.emits_unique_values
+
+
+def test_sequential_empty_iterator_factory_raises_error():
+    with pytest.raises(ValueError) as excinfo:
+        _ = fixed.Sequential([])
+    assert 'empty iterator' in str(excinfo.value)

@@ -53,6 +53,12 @@ class Iterative(Emitter):
     want to emit a static sequence of some kind (like a range or list).
     For this, you should use the Sequential class, instead.
 
+    Also note that your iterator_factory must return an iterable with
+    at least one value. Passing something like, `lambda: iter([])`
+    raises an error. (In this case the infinitely regenerating iterator
+    creates a generator that never yields anything and never raises
+    StopIteration, which causes an infinite loop when iterating.)
+
     Attributes:
         iterator_factory: A callable that takes no args and returns an
             iterator.
@@ -69,17 +75,36 @@ class Iterative(Emitter):
         self.iterator_factory = iterator_factory
         self.reset()
 
+    @property
+    def iterator_factory(self) -> None:
+        return self._iterator_factory
+
+    @iterator_factory.setter
+    def iterator_factory(self, factory: Callable[[], Iterator]) -> None:
+        """Sets the iterator_factory property."""
+        try:
+            next(factory())
+        except StopIteration:
+            raise ValueError(
+                "The provided 'iterator_factory' appears to return an empty "
+                "iterator. This will result in an infinite loop while trying "
+                "to emit values."
+            )
+        self._iterator_factory = factory
+
+    def _infinite_iterator(self):
+        """Returns an infinitely regenerating iterator."""
+        while True:
+            for item in self.iterator_factory():
+                yield item
+
     def reset(self) -> None:
         """Resets self.iterator to the initial state."""
-        self.iterator = self.iterator_factory()
+        self.iterator = self._infinite_iterator()
 
     def emit(self) -> T:
         """Returns one emitted value."""
-        try:
-            return next(self.iterator)
-        except StopIteration:
-            self.reset()
-            return next(self.iterator, None)
+        return next(self.iterator)
 
     def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted values.
@@ -87,15 +112,7 @@ class Iterative(Emitter):
         Args:
             number: See superclass.
         """
-        result = list(itertools.islice(self.iterator, 0, number))
-        n_result = len(result)
-        if not n_result:
-            return [None] * number
-        if n_result == number:
-            return result
-        self.reset()
-        result.extend(self.emit_many(number - n_result))
-        return result
+        return list(itertools.islice(self.iterator, 0, number))
 
 
 class Sequential(ItemsMixin, Iterative):
