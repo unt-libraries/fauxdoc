@@ -42,6 +42,24 @@ def test_iterative_empty_iterator_factory_raises_error():
     assert 'empty iterator' in str(excinfo.value)
 
 
+def test_iterative_resetaftercall_isfalse_doesnot_reset_after_call():
+    em = fixed.Iterative(lambda: iter([1, 2, 3]), reset_after_call=False)
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em(7) == [2, 3, 1, 2, 3, 1, 2]
+    assert em() == 3
+    assert em() == 1
+    assert em() == 2
+
+
+def test_iterative_resetaftercall_istrue_resets_after_call():
+    em = fixed.Iterative(lambda: iter([1, 2, 3]), reset_after_call=True)
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em() == 1
+    assert em() == 1
+    assert em() == 1
+
+
 @pytest.mark.parametrize('sequence, expected', [
     (range(1, 2), [1, 1, 1, 1, 1, 1, 1, 1, 1]),
     (range(1, 101), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
@@ -71,3 +89,21 @@ def test_sequential_empty_iterator_factory_raises_error():
     with pytest.raises(ValueError) as excinfo:
         _ = fixed.Sequential([])
     assert 'empty iterator' in str(excinfo.value)
+
+
+def test_sequential_resetaftercall_isfalse_doesnot_reset_after_call():
+    em = fixed.Sequential([1, 2, 3], reset_after_call=False)
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em(7) == [2, 3, 1, 2, 3, 1, 2]
+    assert em() == 3
+    assert em() == 1
+    assert em() == 2
+
+
+def test_sequential_resetaftercall_istrue_resets_after_call():
+    em = fixed.Sequential([1, 2, 3], reset_after_call=True)
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em(7) == [1, 2, 3, 1, 2, 3, 1]
+    assert em() == 1
+    assert em() == 1
+    assert em() == 1

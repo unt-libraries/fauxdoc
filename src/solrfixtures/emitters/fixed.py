@@ -34,45 +34,60 @@ class Iterative(Emitter):
     """Class for emitting values from an iterator.
 
     Iterative emitters are infinite and will restart from the
-    beginning when they run out of values.
+    beginning when they run out of values -- like itertools.cycle,
+    without storing values in memory. That's why this class wants an
+    iterator *factory* and not just an iterator: iterators by
+    definition cannot be reset or copied. The only way to implement an
+    emitter with a resettable iterator (without resorting to caching
+    emitted values) is to generate a new iterator each time we need to
+    reset. To do that, we need a factory that returns a new iterator.
 
-    Note that this class wants an iterator *factory* and not just an
-    iterator. Why? Iterators by definition cannot be reset, nor can
-    they be copied. The only way to implement an emitter with a
-    resettable iterator (without resorting to caching emitted values)
-    is to generate a new iterator each time we need to reset. To do
-    that, we need a factory that returns a new iterator. In most cases,
-    you can just wrap your iterator in a lambda, like this.
+    In many cases you may just want to emit a static sequence. For that
+    you should use the Sequential subclass. Otherwise, if you're using
+    a generator or some other iterator, you can just wrap it in a
+    lambda, e.g.:
 
         >>> em = Iterative(lambda: iter(range(5)))
-        >>> em(6)
-        [0, 1, 2, 3, 4, 0, 1]
+        >>> em(8)
+        [0, 1, 2, 3, 4, 0, 1, 2]
+        >>> em(8)
+        [3, 4, 0, 1, 2, 3, 4, 0]
 
-    Or of course you can use a function that returns a generator.
-    However, very often -- including in the above example -- you just
-    want to emit a static sequence of some kind (like a range or list).
-    For this, you should use the Sequential class, instead.
+    The above example shows the default scenario, where the iterator
+    state is kept between calls. If you want it to reset for each call,
+    you can set the `reset_after_call` attribute to True. E.g.:
 
-    Also note that your iterator_factory must return an iterable with
-    at least one value. Passing something like, `lambda: iter([])`
-    raises an error. (In this case the infinitely regenerating iterator
-    creates a generator that never yields anything and never raises
-    StopIteration, which causes an infinite loop when iterating.)
+        >>> em = Iterative(lambda: iter(range(5)),
+        ...                reset_after_call=True)
+        >>> em(8)
+        [0, 1, 2, 3, 4, 0, 1, 2]
+        >>> em(8)
+        [0, 1, 2, 3, 4, 0, 1, 2]
+
+    Note that your iterator_factory *must* return an iterable with at
+    least one value. Passing something like `lambda: iter([])` raises
+    an error, to prevent an infinite loop when you try to emit.
 
     Attributes:
         iterator_factory: A callable that takes no args and returns an
             iterator.
         iterator: The currently active iterator, generated from the
             iterator_factory.
+        reset_after_call: If True, the emitter automatically resets
+            after each call.
     """
 
-    def __init__(self, iterator_factory: Callable[[], Iterator]) -> None:
+    def __init__(self,
+                 iterator_factory: Callable[[], Iterator],
+                 reset_after_call: bool = False) -> None:
         """Inits a Iterative emitter.
 
         Args:
             iterator_factory: See `iterator_factory` attribute.
+            reset_after_call: See `reset_after_call` attribute.
         """
         self.iterator_factory = iterator_factory
+        self.reset_after_call = reset_after_call
         self.reset()
 
     @property
@@ -104,7 +119,10 @@ class Iterative(Emitter):
 
     def emit(self) -> T:
         """Returns one emitted value."""
-        return next(self.iterator)
+        ret_value = next(self.iterator)
+        if self.reset_after_call:
+            self.reset()
+        return ret_value
 
     def emit_many(self, number: int) -> List[T]:
         """Returns a list of emitted values.
@@ -112,7 +130,10 @@ class Iterative(Emitter):
         Args:
             number: See superclass.
         """
-        return list(itertools.islice(self.iterator, 0, number))
+        ret_value = list(itertools.islice(self.iterator, 0, number))
+        if self.reset_after_call:
+            self.reset()
+        return ret_value
 
 
 class Sequential(ItemsMixin, Iterative):
@@ -125,15 +146,20 @@ class Sequential(ItemsMixin, Iterative):
     available choices can be accessed as a finite set of values.
 
     Attributes:
-        iterator_factory: See superclass.
-        iterator: See superclass.
+        iterator_factory: See superclass (Iterative).
+        iterator: See superclass (Iterative).
         items: The sequence of values this emitter emits.
+        reset_after_call: See superclass (Iterative).
     """
 
-    def __init__(self, items: Sequence) -> None:
+    def __init__(self,
+                 items: Sequence,
+                 reset_after_call: bool = False) -> None:
         """Inits a Sequential emitter instance.
 
         Args:
             items: See `items` attribute.
+            reset_after_call: See `reset_after_call` attribute.
         """
-        super().__init__(lambda: iter(self.items), items=items)
+        super().__init__(lambda: iter(self.items),
+                         reset_after_call=reset_after_call, items=items)
