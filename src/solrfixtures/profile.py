@@ -265,5 +265,5 @@ class Schema:
         """
         doc = {fname: field() for fname, field in self.fields.items()}
         for field in self.hidden_fields:
-            del(doc[field])
+            del doc[field]
         return doc
