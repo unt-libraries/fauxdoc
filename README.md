@@ -12,17 +12,23 @@ fauxdoc
 
 ### Why not Faker or Mimesis?
 
-Faker and Mimesis are established tools for generating fake data, and they have a lot more features than fauxdoc. Why did I create a new library rather than just implement a set of custom Faker or Mimesis data providers?
+[Faker](https://faker.readthedocs.io) and [Mimesis](https://mimesis.name) are established tools for generating fake data, and they are way more "batteries included" than Fauxdoc. Why not just implement a set of custom data providers for one of these?
 
 #### Dynamically Generating Bespoke Data
 
-Libraries like Faker and Mimesis are mainly geared toward producing values that recognizably correspond to real-world items or properties (colors, names, addresses, etc.). Fauxdoc provides more tools to help you create your own objects that generate data that may not look realistic but fits certain oddball patterns or has certain statistical qualities.
+Whereas other libraries make it dead simple to produce values that recognizably correspond to real-world items or properties (colors, names, addresses, etc.), Fauxdoc helps you dial in on patterns or features that may only pertain to your use case. This is helpful if you're trying to test something specific, like certain sets of edge cases.
 
-We originally created this to help generate fake Solr documents for testing and benchmarking. We wanted to be able to test search performance by producing text that used specific alphabets; had word, phrase, and/or sentence lengths (etc.) within certain limits; and had specific terms appearing in certain specific distributions. We also wanted to be able to simulate facets by choosing data values from a finite list of random terms that would produce a term distribution equivalent to the live data. Other libraries did not let us control all of these factors using their built-in data providers, so I adapted some of the tools that we were already using to generate Solr data for unit testing, and Fauxdoc was born.
+Fauxdoc began as part of a utility for helping test and benchmark Solr. We wanted to test search performance by producing text that shared certain features of a live collection, such as using specific alphabets; having word, phrase, and/or sentence lengths (etc.) within certain limits; and having specific terms occur in certain specific distributions. And we wanted to be able to simulate facets by choosing data values from a finite list of random terms that would produce a term distribution similar to the real data. Other libraries did not seem to address these needs adequately.
 
-#### Field / Schema / Document Set Control
+#### Field / Schema / Document-Set Control
 
-When generating documents to use to benchmark Solr, we found that we wanted to be able do things like control uniqueness across an entire document set, generate data based on values generated in other fields, and have better control over how multi-valued fields are generated. Fauxdoc facilitates these slightly more meta kinds of controls.
+Other libraries mostly focus on generating values in isolation, but Fauxdoc facilitates having more control at the `Field` and `Schema` levels. For example, when generating documents to use to benchmark Solr, we found that we wanted to be able to do things like control uniqueness on a per-field basis, control uniqueness across an entire document set, generate data based on values in other fields, and have better control over multi-valued fields.
+
+#### Performant Extensibility
+
+We wrote Fauxdoc knowing that we'd be using it to generate hundreds of thousands or millions of fake Solr documents at one time, so performance was a critical concern. However, Fauxdoc is also meant to be highly extensible, and it's easy for extensibility to come at the expense of performance. So, Fauxdoc classes are designed to allow performant extensibility. You generally have a choice: you can implement something as (e.g.) a wrapper that's conceptually simple but a bit slower, or you can implement the same feature using a custom class, with lower-level methods that are faster but not as simple. It just depends on your use case and where you need the extra performance.
+
+The built-in data providers (called `Emitters`) are designed to be as fast as we could make them. Their performance is roughly comparable to Mimesis', although this is an apples-to-oranges comparison.
 
 [Top](#top)
 
@@ -44,7 +50,7 @@ See [Contributing](#contributing) for the recommended installation process if yo
 
 ### Emitters
 
-`Emitters` are like Faker or Mimesis `Providers`. You instantiate one and then call it to output values. When calling, you can supply an integer to output multiple values at once.
+Conceptually, `Emitters` are like Faker or Mimesis `Providers`. They are the objects that output your data values: simply instantiate one and then call it. If you need multiple values at once, you can supply an integer when calling.
 
 ```python
 from fauxdoc import emitters
@@ -57,13 +63,13 @@ myrandom(5)
 # ['c', 'c', 'a', 'b', 'a']
 ```
 
-Several emitter types are provided in `fauxdoc.emitters` that do general things and allow you to create emitter instances by passing options to them. Above, the `Choice` emitter chooses randomly between multiple supplied options. (You can optionally supply weights and parameters to control uniqueness.)
+Several emitter types are provided in `fauxdoc.emitters` that have general behavior and options. Above, the `Choice` emitter chooses randomly between multiple values. You can also supply weights along with parameters to control uniqueness.
 
-For more complex behavior, you can of course create your own Emitter classes using `fauxdoc.emitter.Emitter` as your base class. Mixins are provided in `fauxdoc.mixins` for standard ways of doing things, such as including random components or having emitters with explicit lists of items that they emit.
+For more complex behavior, you can of course create your own Emitter classes using `fauxdoc.emitter.Emitter` as your base class. Mixins are provided in `fauxdoc.mixins` for standard ways of doing things (such as randomization).
 
 ### Fields
 
-Each `Field` wraps an emitter instance and provides options to gate the output or generate a random number of multiple values. These options are themselves implemented as emitters. You also call a Field instance to output data for that field.
+Each `Field` wraps an emitter instance and provides options to gate the output and/or generate multiple values. These options are themselves implemented as emitters. As with Emitters, you also call a Field instance to output values.
 
 ```python
 from fauxdoc import emitters, profile
@@ -94,7 +100,7 @@ user_tags_field()
 
 ### Schema
 
-Your `Schema` is a specific collection of field instances. Calling the schema instance generates data representing one document. It returns a dictionary mapping field names to values.
+Your `Schema` is a specific collection of field instances. Calling the schema instance generates data representing one full document (a dictionary).
 
 ```python
 import itertools
@@ -176,27 +182,25 @@ myschema()
 
 ### Generating Data Based on Other Fields
 
-For complex schemas, you may find generating values for each field in isolation to be too limiting. Fauxdoc allows you to create emitters that can access values generated via other fields. You can also _hide_ fields in your schema so that you can generate collective data once and then pull the appropriate data values into the appropriate fields.
-
-Note that, for each document generated, data is created in the order you've specified fields on the schema. A field that serves as the basis for other fields must therefore come before the fields based on it, to ensure its value gets generated first.
+For complex schemas, you may find generating values for each field in isolation to be too limiting. Fauxdoc allows you to create emitters that can access values generated via other fields. You can also create hidden fields, allowing you to generate data in a normalized or collective way and then pull it into the appropriate de-normalized fields.
 
 ```python
 import itertools
 from fauxdoc import emitter, emitters, profile
 
-def copy_generator():
+def item_data_generator():
   for num in itertools.count(1):
     yield {
-      'copy_id': num,
+      'item_id': num,
       'barcode': 2000000000 + num
     }
 
 myschema = profile.Schema(
-  # This field is hidden. It generates data for 1 to 10 "copies" that
-  # other fields then pull from.
+  # This field is hidden. It generates data for 1 to 10 "items" that
+  # the other fields then pull from.
   profile.Field(
-    '__all_copies',
-    emitters.Iterative(copy_generator),
+    '__all_items',
+    emitters.Iterative(item_data_generator),
     repeat=emitters.poisson_choice(range(1, 10), mu=3),
     hide=True,
   )
@@ -204,66 +208,66 @@ myschema = profile.Schema(
 
 myschema.add_fields(
   profile.Field(
-    'display_copies',
+    'display_items',
     emitters.BasedOnFields(
-      myschema.fields['__all_copies'],
-      lambda copies: copies[:3]
+      myschema.fields['__all_items'],
+      lambda items: items[:3]
     )
   ),
   profile.Field(
-    'more_copies',
+    'more_items',
     emitters.BasedOnFields(
-      myschema.fields['__all_copies'],
-      lambda copies: copies[3:] if len(copies) > 3 else None
+      myschema.fields['__all_items'],
+      lambda items: items[3:] if len(items) > 3 else None
     )
   ),
   profile.Field(
-    'has_more_copies',
+    'has_more_items',
     emitters.BasedOnFields(
-      myschema.fields['__all_copies'],
-      lambda copies: bool(len(copies) > 3)
+      myschema.fields['__all_items'],
+      lambda items: bool(len(items) > 3)
     )
   ),
   profile.Field(
-    'copy_ids',
+    'item_ids',
     emitters.BasedOnFields(
-      myschema.fields['__all_copies'],
-      lambda copies: [c['copy_id'] for c in copies]
+      myschema.fields['__all_items'],
+      lambda items: [i['item_id'] for i in items]
     )
   ),
   profile.Field(
-    'copy_barcodes',
+    'item_barcodes',
     emitters.BasedOnFields(
-      myschema.fields['__all_copies'],
-      lambda copies: [c['barcode'] for c in copies]
+      myschema.fields['__all_items'],
+      lambda items: [i['barcode'] for i in items]
     )
   )
 )
 
 myschema()
 # {
-#   'display_copies': [
-#     {'copy_id': 1, 'barcode': 2000000001}
+#   'display_items': [
+#     {'item_id': 1, 'barcode': 2000000001}
 #   ],
-#   'more_copies': None,
-#   'has_more_copies': False,
-#   'copy_ids': [1],
-#   'copy_barcodes': [2000000001]
+#   'more_items': None,
+#   'has_more_items': False,
+#   'item_ids': [1],
+#   'item_barcodes': [2000000001]
 # }
 
 myschema()
 # {
-#   'display_copies': [
-#     {'copy_id': 2, 'barcode': 2000000002},
-#     {'copy_id': 3, 'barcode': 2000000003},
-#     {'copy_id': 4, 'barcode': 2000000004}
+#   'display_items': [
+#     {'item_id': 2, 'barcode': 2000000002},
+#     {'item_id': 3, 'barcode': 2000000003},
+#     {'item_id': 4, 'barcode': 2000000004}
 #   ],
-#   'more_copies': [
-#     {'copy_id': 5, 'barcode': 2000000005}
+#   'more_items': [
+#     {'item_id': 5, 'barcode': 2000000005}
 #   ],
-#   'has_more_copies': True,
-#   'copy_ids': [2, 3, 4, 5],
-#   'copy_barcodes': [2000000002, 2000000003, 2000000004, 2000000005]
+#   'has_more_items': True,
+#   'item_ids': [2, 3, 4, 5],
+#   'item_barcodes': [2000000002, 2000000003, 2000000004, 2000000005]
 # }
 ```
 
@@ -282,13 +286,13 @@ git clone https://github.com/[your-github-account]/fauxdoc.git
 
 #### Poetry
 
-This project uses [Poetry](https://python-poetry.org/) for builds and dependency management. Although it recommends installing Poetry system wide, you don't *have* to if you don't want to; I prefer to isolate it within each virtual environment that needs it instead of using a global Poetry instance to manage my virtual environments. In part this is because I also use tox, and I use pyenv + pyenv-virtualenv to manage my virtual environments.
+This project uses [Poetry](https://python-poetry.org/) for builds and dependency management. Although the Poetry documentation recommends installing it system wide, you don't *have* to if you don't want to; I prefer instead to isolate it within each virtual environment that needs it. In part this is because I use pyenv + pyenv-virtualenv to manage my virtual environments, and I use tox for testing against multiple environments.
 
 If you're interested, here is my setup. (Disclaimer: I make no claims this is _objectively_ good, but it's how I've made sense of Python's notoriously convoluted dependency-management ecosystem, and it works well for me. Obviously this is not the only way to do it.)
 
 My MO is to keep components as isolated as possible so that nothing is hardwired and I can switch things out at will. Since both tox and Poetry can manage virtual environments, this is the best way I've found to ensure they play well together. And, I've been quite happy with using pyenv + pyenv-virtualenv as my version / environment manager.
 
-1. Install and configure [pyenv](https://github.com/pyenv/pyenv).
+1. Install and configure [pyenv](https://github.com/pyenv/pyenv). 
 2. Install and configure [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv).
 3. Use pyenv to download and install the currently supported Python versions, e.g. 3.7 to 3.10. (`pyenv install 3.7.15`, etc.)
 4. Create your main development environment using the latest Python version: `pyenv virtualenv 3.10.8 fauxdoc-3.10.8`.
