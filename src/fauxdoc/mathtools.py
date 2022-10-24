@@ -3,7 +3,7 @@ import math
 import random
 from typing import List, Optional, Sequence
 
-from solrfixtures.typing import Number, T
+from fauxdoc.typing import Number, T
 
 
 def poisson(x: int, mu: Optional[Number] = 1) -> float:

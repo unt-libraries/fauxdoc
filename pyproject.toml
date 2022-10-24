@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "solrfixtures"
+name = "fauxdoc"
 version = "1.0.0"
-description = "Python package for generating randomized data for populating Solr test fixtures. Sort of like model bakery for Solr."
+description = "Python package for generating fake (faux) record or document (doc) data, focusing on customizability and performance over realism."
 readme = "README.md"
 authors = ["Jason Thomale <jason.thomale@unt.edu>"]
 packages = [
-    { include = "solrfixtures", from = "src"}
+    { include = "fauxdoc", from = "src"}
 ]
 
 [tool.poetry.dependencies]
@@ -71,21 +71,21 @@ skip_install = True
 deps =
     flake8
 commands =
-    flake8 src/solrfixtures tests --exclude=__pycache__
+    flake8 src/fauxdoc tests --exclude=__pycache__
 
 [testenv:pylint_critical]
 basepython=python3.10
 deps =
     pylint
 commands =
-    pylint solrfixtures tests --errors-only --ignore=__pycache__
+    pylint fauxdoc tests --errors-only --ignore=__pycache__
 
 [testenv:pylint_all]
 basepython=python3.10
 deps =
     pylint
 commands =
-    pylint solrfixtures tests --ignore=__pycache__ --good-names=_,i,mn,mx,em
+    pylint fauxdoc tests --ignore=__pycache__ --good-names=_,i,mn,mx,em
 
 [testenv:build_package]
 basepython=python3.10

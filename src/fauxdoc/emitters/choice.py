@@ -2,10 +2,10 @@
 import itertools
 from typing import Any, Optional, List, Sequence
 
-from solrfixtures.emitter import Emitter
-from solrfixtures.mathtools import clamp, gaussian, poisson, weighted_shuffle
-from solrfixtures.mixins import RandomMixin, ItemsMixin
-from solrfixtures.typing import Number, T
+from fauxdoc.emitter import Emitter
+from fauxdoc.mathtools import clamp, gaussian, poisson, weighted_shuffle
+from fauxdoc.mixins import RandomMixin, ItemsMixin
+from fauxdoc.typing import Number, T
 
 
 class Choice(RandomMixin, ItemsMixin, Emitter):

@@ -3,10 +3,10 @@ import datetime
 
 import pytest
 
-from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters import choice, text
-from solrfixtures.emitters.fixed import Static
-from solrfixtures.profile import Field, Schema
+from fauxdoc.dtrange import dtrange
+from fauxdoc.emitters import choice, text
+from fauxdoc.emitters.fixed import Static
+from fauxdoc.profile import Field, Schema
 
 
 # Fixtures / test data

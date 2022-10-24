@@ -1,12 +1,12 @@
-"""Contains tests for solrfixtures.emitters.wrappers."""
+"""Contains tests for fauxdoc.emitters.wrappers."""
 from datetime import date, datetime
 from unittest.mock import call, Mock
 
 import pytest
-from solrfixtures.emitter import Emitter
-from solrfixtures.emitters.choice import Choice
-from solrfixtures.emitters.fixed import Static
-from solrfixtures.emitters.wrappers import WrapOne, WrapMany
+from fauxdoc.emitter import Emitter
+from fauxdoc.emitters.choice import Choice
+from fauxdoc.emitters.fixed import Static
+from fauxdoc.emitters.wrappers import WrapOne, WrapMany
 
 
 # Fixtures and test data

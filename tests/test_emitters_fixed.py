@@ -1,8 +1,8 @@
-"""Contains tests for solrfixtures.emitters.fixed."""
+"""Contains tests for fauxdoc.emitters.fixed."""
 import itertools
 import pytest
 
-from solrfixtures.emitters import fixed
+from fauxdoc.emitters import fixed
 
 
 @pytest.mark.parametrize('value', [

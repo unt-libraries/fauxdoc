@@ -1,10 +1,9 @@
 """Contains an implementation of a custom date/time range type."""
-
 from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 from typing import Optional, Tuple, TypeVar, Union
 
-from solrfixtures.typing import Number
+from fauxdoc.typing import Number
 
 
 DT = TypeVar('DT', date, datetime, time)

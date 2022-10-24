@@ -1,11 +1,11 @@
-"""Contains tests for the solrfixtures.emitters.choice module."""
+"""Contains tests for the fauxdoc.emitters.choice module."""
 import datetime
 
 import pytest
 
-from solrfixtures.dtrange import dtrange
-from solrfixtures.emitters.choice import chance, Choice, gaussian_choice,\
-                                         poisson_choice
+from fauxdoc.dtrange import dtrange
+from fauxdoc.emitters.choice import chance, Choice, gaussian_choice,\
+                                    poisson_choice
 
 
 @pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [

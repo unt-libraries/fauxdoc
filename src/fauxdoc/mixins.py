@@ -2,7 +2,7 @@
 import random
 from typing import Any, List
 
-from solrfixtures.group import ObjectMap
+from fauxdoc.group import ObjectMap
 
 
 class RandomMixin:

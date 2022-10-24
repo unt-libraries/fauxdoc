@@ -3,10 +3,10 @@ from inspect import signature
 from typing import Any, Callable, List, Mapping, Optional, Sequence, Union
 from unittest.mock import call
 
-from solrfixtures.group import ObjectGroup
-from solrfixtures.emitter import Emitter
-from solrfixtures.mixins import RandomMixin
-from solrfixtures.typing import FieldLike, T
+from fauxdoc.group import ObjectGroup
+from fauxdoc.emitter import Emitter
+from fauxdoc.mixins import RandomMixin
+from fauxdoc.typing import FieldLike, T
 
 
 class CopyFields(Emitter):

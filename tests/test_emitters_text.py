@@ -1,9 +1,9 @@
-"""Contains tests for the solrfixtures.emitters.text module."""
+"""Contains tests for the fauxdoc.emitters.text module."""
 import pytest
 
-from solrfixtures.emitters.choice import Choice
-from solrfixtures.emitters.fixed import Static
-from solrfixtures.emitters.text import make_alphabet, Text, Word
+from fauxdoc.emitters.choice import Choice
+from fauxdoc.emitters.fixed import Static
+from fauxdoc.emitters.text import make_alphabet, Text, Word
 
 
 # Module-specific fixtures

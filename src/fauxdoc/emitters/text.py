@@ -1,10 +1,10 @@
 """Contains functions and emitters for emitting text data."""
 from typing import Any, Iterator, List, Optional, Sequence
 
-from solrfixtures.emitter import Emitter
-from solrfixtures.mathtools import clamp
-from solrfixtures.mixins import RandomWithChildrenMixin
-from solrfixtures.typing import IntEmitterLike, StrEmitterLike
+from fauxdoc.emitter import Emitter
+from fauxdoc.mathtools import clamp
+from fauxdoc.mixins import RandomWithChildrenMixin
+from fauxdoc.typing import IntEmitterLike, StrEmitterLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:

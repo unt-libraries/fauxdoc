@@ -1,10 +1,10 @@
-"""Contains tests for the solrfixtures data.math module."""
+"""Contains tests for the fauxdoc data.math module."""
 
 import random
 
 import pytest
 
-from solrfixtures import mathtools as m
+from fauxdoc import mathtools as m
 
 
 @pytest.mark.parametrize('x, mu, expected', [

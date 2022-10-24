@@ -1,10 +1,10 @@
-"""Contains functions and classes for implementing counter emitters."""
+"""Contains functions and classes for implementing static emitters."""
 import itertools
 from typing import Callable, Iterator, List, Sequence
 
-from solrfixtures.emitter import Emitter
-from solrfixtures.mixins import ItemsMixin
-from solrfixtures.typing import T
+from fauxdoc.emitter import Emitter
+from fauxdoc.mixins import ItemsMixin
+from fauxdoc.typing import T
 
 
 class Static(ItemsMixin, Emitter):

@@ -1,7 +1,4 @@
-"""Generates randomized data for populating Solr test fixtures.
-
-Sort of like model-bakery (aka model-mommy), for Solr.
-"""
+"""Tools for generating fake data."""
 from . import dtrange
 from . import emitter
 from . import emitters
@@ -12,7 +9,7 @@ from . import profile
 from . import typing
 
 
-__version__ = '0.1.0'
+__version__ = '1.0.0'
 __all__ = [
     'dtrange', 'emitter', 'emitters', 'group', 'mathtools', 'mixins',
     'profile', 'typing'

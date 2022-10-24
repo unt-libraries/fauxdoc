@@ -1,9 +1,9 @@
-"""Contains tests for the solrfixtures data.dtrange module."""
+"""Contains tests for the fauxdoc data.dtrange module."""
 from datetime import date, datetime, time, timedelta
 
 import pytest
 
-from solrfixtures import dtrange
+from fauxdoc import dtrange
 
 
 def test_dateortimerange_attributes_are_readonly():

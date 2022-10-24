@@ -1,12 +1,10 @@
-"""
-Contains classes for creating faux-data-generation profiles.
-"""
+"""Contains classes for creating faux-data-generation profiles."""
 from typing import Any, Dict, Optional
 
-from solrfixtures.group import ObjectMap
-from solrfixtures.emitters.fixed import Static
-from solrfixtures.mixins import RandomMixin
-from solrfixtures.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
+from fauxdoc.group import ObjectMap
+from fauxdoc.emitters.fixed import Static
+from fauxdoc.mixins import RandomMixin
+from fauxdoc.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
 
 
 class Field(RandomMixin, object):

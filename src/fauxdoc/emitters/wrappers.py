@@ -3,9 +3,9 @@ from inspect import signature
 from typing import Any, Callable, List, Mapping, Optional, Sequence
 from unittest.mock import call
 
-from solrfixtures.emitter import Emitter
-from solrfixtures.mixins import RandomWithChildrenMixin
-from solrfixtures.typing import EmitterLikeCallable, T
+from fauxdoc.emitter import Emitter
+from fauxdoc.mixins import RandomWithChildrenMixin
+from fauxdoc.typing import EmitterLikeCallable, T
 
 
 class Wrap(RandomWithChildrenMixin, Emitter):
@@ -104,8 +104,8 @@ class WrapOne(Wrap):
     source and return the modified value.
 
     E.g.:
-        >>> from solrfixtures.emitters.fixed import Iterative
-        >>> from solrfixtures.emitters.wrappers import Wrap
+        >>> from fauxdoc.emitters.fixed import Iterative
+        >>> from fauxdoc.emitters.wrappers import Wrap
         >>> em = WrapOne(Iterative(lambda: itertools.count(), str))
         >>> em(5)
         ['0', '1', '2', '3', '4']
@@ -166,8 +166,8 @@ class WrapMany(Wrap):
     return the modified value.
 
     E.g.:
-        >>> from solrfixtures.emitters.fixed import Sequential
-        >>> from solrfixtures.emitters.wrappers import Wrap
+        >>> from fauxdoc.emitters.fixed import Sequential
+        >>> from fauxdoc.emitters.wrappers import Wrap
         >>> em = WrapMany({
         ...     'name': Sequential(['Susan', 'Alice', 'Bob', 'Terry']),
         ...     'greet': Sequential(['Hi!', 'Yes?', 'What?', 'Yo!']),

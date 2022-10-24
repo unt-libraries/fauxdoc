@@ -1,9 +1,9 @@
-"""Contains tests for the solrfixtures.group module."""
+"""Contains tests for the fauxdoc.group module."""
 import pytest
 
-from solrfixtures.group import ObjectGroup, ObjectMap
-from solrfixtures.emitter import Emitter
-from solrfixtures.emitters.fixed import Static
+from fauxdoc.group import ObjectGroup, ObjectMap
+from fauxdoc.emitter import Emitter
+from fauxdoc.emitters.fixed import Static
 
 
 # Fixtures and test data

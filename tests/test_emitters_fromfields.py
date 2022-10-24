@@ -1,10 +1,10 @@
-"""Contains tests for solrfixtures.emitters.fromfields emitters."""
+"""Contains tests for fauxdoc.emitters.fromfields emitters."""
 import pytest
 
-from solrfixtures.emitters.fixed import Static
-from solrfixtures.emitters.choice import chance, Choice
-from solrfixtures.emitters.fromfields import CopyFields, BasedOnFields
-from solrfixtures.profile import Field
+from fauxdoc.emitters.fixed import Static
+from fauxdoc.emitters.choice import chance, Choice
+from fauxdoc.emitters.fromfields import CopyFields, BasedOnFields
+from fauxdoc.profile import Field
 
 
 # Fixtures / test data
