@@ -8,7 +8,9 @@ fauxdoc
 
 ## About
 
-*`fauxdoc`* is designed to help you efficiently generate fake (faux) record or document (doc) data that conforms to bespoke requirements.
+*`fauxdoc`* is designed to help you efficiently generate fake (faux) record or document (doc) data conforming to bespoke requirements.
+
+Fauxdoc is compatible (and tested) with Python versions 3.7 and above, including 3.11. It has almost no external requirements beyond the standard library: if you are using Python 3.7, it requires typing_extensions to provide some typing features that were added in 3.8. Otherwise, it requires nothing.
 
 ### Why not Faker or Mimesis?
 
@@ -28,14 +30,14 @@ Other libraries mostly focus on generating values in isolation, but Fauxdoc faci
 
 We wrote Fauxdoc knowing that we'd be using it to generate hundreds of thousands or millions of fake Solr documents at one time, so performance was a critical concern. However, Fauxdoc is also meant to be highly extensible, and it's easy for extensibility to come at the expense of performance. So, Fauxdoc classes are designed to allow performant extensibility. You generally have a choice: you can implement something as (e.g.) a wrapper that's conceptually simple but a bit slower, or you can implement the same feature using a custom class, with lower-level methods that are faster but not as simple. It just depends on your use case and where you need the extra performance.
 
-The built-in data providers (called `Emitters`) are designed to be as fast as we could make them. Their performance is roughly comparable to Mimesis', although this is an apples-to-oranges comparison.
+The built-in data providers (called `Emitters`) are designed to be as fast as we could make them. Their performance is roughly comparable to Mimesis', although this is an apples-to-oranges comparison. Like Mimesis, they are much faster than Faker.
 
 [Top](#top)
 
 
 ## Installation
 
-Fauxdoc requires Python 3.7 or later. Install the latest published version with:
+Install the latest published version of fauxdoc with:
 
 ```
 python -m pip install fauxdoc
@@ -294,12 +296,12 @@ My MO is to keep components as isolated as possible so that nothing is hardwired
 
 1. Install and configure [pyenv](https://github.com/pyenv/pyenv). 
 2. Install and configure [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv).
-3. Use pyenv to download and install the currently supported Python versions, e.g. 3.7 to 3.10. (`pyenv install 3.7.15`, etc.)
-4. Create your main development environment using the latest Python version: `pyenv virtualenv 3.10.8 fauxdoc-3.10.8`.
+3. Use pyenv to download and install the currently supported Python versions, e.g. 3.7 to 3.11. (`pyenv install 3.7.15`, etc.)
+4. Create your main development environment using a sensible Python version: `pyenv virtualenv 3.10.8 fauxdoc-3.10.8`.
 5. `cd` into the local repository root for this project and activate that virtualenv: `pyenv activate fauxdoc-3.10.8`.
 6. Do `python -m pip install poetry`. (This installs Poetry into that virtualenv _only_.)
 7. Do `poetry lock` to resolve dependencies and generate a `poetry.lock` file.
-8. Do `poetry install -E test` to install dependencies, including those you need for tests.
+8. Do `poetry install -E dev` to install dependencies, including those you need for development.
 9. Run the tests just to make sure everything is working...
 
 And that's it. Now, as long as `fauxdoc-3.10.8` is activated, you can use Poetry commands to manage dependencies and run builds for that project; Poetry knows to install things there.
@@ -320,22 +322,23 @@ This runs the test suite within whatever python virtual environment you have act
 
 Just like Poetry, I prefer to isolate [tox](https://tox.wiki/en/latest/) within a virtual environment rather than installing it system wide. (What can I say, I have commitment issues.)
 
-The tox configuration for this project is in `pyproject.toml`. There, I have specified several test environments: flake8, pylint, and each of py37 through py310 using both the oldest possible dependencies and newest possible dependencies. That's a total of 10 environments. When you run tox, you can target a specific environment, target a specific list of environments, or run against all 10.
+The tox configuration for this project is in `pyproject.toml`. There, I have specified several test environments: flake8, pylint, and each of py37 through py311 using both the oldest possible dependencies and newest possible dependencies. That's a total of 12 environments. When you run tox, you can target a specific environment, target a specific list of environments, or run against all 12.
 
 When tox runs, it automatically builds each virtual environment it needs, and then it runs whatever commands it needs within that environment (for linting, or testing, etc.). All you have to do is expose all the necessary Python binaries on the path, and tox will pick the correct one. And you can use pyenv to activate multiple Python versions at once in a way that tox recognizes — *any* of the base Python versions or virtualenvs you have installed via pyenv can serve as the basis for tox's environments.
 
 The added setup for this is relatively minimal.
 
-1. You do need to have an environment with tox installed. If you don't have one, create one — I always use the latest version of Python in a virtualenv (e.g., currently `tox-3.10.8`) — then activate it and do `python -m pip install tox`. (Nothing else.)
-2. Now, in your project repository root (for fauxdoc), create a file called `.python-version`. Add all of the Python versions you want to use, 3.7 to 3.10. For 3.10, use your `tox-3.10.8`. This should look something like this:
+1. You do need to have an environment with tox installed. If you don't have one, create one — e.g., `tox-3.10.8` — then activate it and do `python -m pip install tox`. (Nothing else.)
+2. Now, in your project repository root (for fauxdoc), create a file called `.python-version`. Add all of the Python versions you want to use, 3.7 to 3.11. For 3.10, use your `tox-3.10.8`. This should look something like this:
     ```
     3.7.15
     3.8.15
     3.9.15
     tox-3.10.8
+    3.11.0
     ```
 4. Issue a `pyenv deactivate` command so that pyenv picks up what's in the file. (A manually-activated environment overrides anything set in a `.python-version` file.)
-5. At this point you should have all four environments active at once in that directory. You can issue commands that run using binaries from any of those versions, and they will run correctly. For commands that multiple environments share, like `python`, the one for the first Python version listed is what runs. In other words — if you run `python` or `python3.7` then you'll get a 3.7.15 shell. If you run `python3.9` you'll get the 3.9.15 shell. When you run `tox`, the tox in your `tox-3.10.8` environment will run.
+5. At this point you should have all five environments active at once in that directory. You can issue commands that run using binaries from any of those versions, and they will run correctly. For commands that multiple environments share, like `python`, the one for the first Python version listed is what runs. In other words — if you run `python` or `python3.7` then you'll get a 3.7.15 shell. If you run `python3.9` you'll get the 3.9.15 shell. When you run `tox`, the tox in your `tox-3.10.8` environment will run.
 
 Run tox like this to run linters and all tests against all environments:
 

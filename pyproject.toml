@@ -1,69 +1,81 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "fauxdoc"
 version = "1.0.0"
-description = "Python package for generating fake (faux) record or document (doc) data, focusing on customizability and performance over realism."
+description = "Python package for generating fake (faux) record or document (doc) data conforming to bespoke requirements."
 readme = "README.md"
 authors = ["Jason Thomale <jason.thomale@unt.edu>"]
+license = "BSD"
+homepage = "https://github.com/unt-libraries/fauxdoc"
+repository = "https://github.com/unt-libraries/fauxdoc"
+keywords = ["data", "fake", "mock", "faux", "Solr", "databases", "models",
+            "fixtures", "faker", "testing", "benchmarking", "records",
+            "documents"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Mocking"
+]
 packages = [
     { include = "fauxdoc", from = "src"}
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
-pytz = [
-    { version = ">=2020.5", python = "^3.9" },
-    { version = ">=2020.4", python = "~3.7 || ~3.8" }
-]
-ujson = [
-    { version = ">=4.2.0", python = "^3.10" },
-    { version = ">=4.0.0", python = "~3.9" },
-    { version = ">=2.0.0", python = "~3.7 || ~3.8" }
-]
+python = ">=3.7"
+# Note: we only use typing_extensions for `Protocol` support, added to
+# Python in 3.8. So this dependency is only needed for 3.7.
 typing_extensions = [
-    { version = "^4.1.1", python = "~3.7" }
+    { version = ">=3.6.5", python = "~3.7" }
 ]
+
+# Pytest is only needed for dev installations. Install by specifying
+# the `dev` extra when you run poetry install.
 pytest = [
-    { version = ">=6.2.5", python = "^3.10", optional = true },
-    { version = ">=5.4.2", python = "~3.9",  optional = true },
-    { version = ">=5.1.0", python= "~3.7 || ~3.8", optional = true }
+    { version = ">=6.2.4", python = ">=3.10", optional = true },
+    { version = ">=3.0.0", python= "~3.7 || ~3.8 || ~3.9", optional = true }
 ]
 
 [tool.poetry.extras]
-test = ["pytest"]
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+dev = ["pytest"]
 
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = flake8,pylint_critical,py{37,38,39,310}-{oldest,latest}
+envlist = flake8,pylint_critical,py{37,38,39,310,311}-{oldest,latest}
 isolated_build = True
 
 [testenv]
 extras =
-    test
+    dev
 commands =
     pytest
 
-[testenv:py{37,38}-oldest]
+[testenv:py37-oldest]
 deps =
-    pytest==5.1.0
-    ujson==2.0.0
-    pytz==2020.4
+    pytest==3.0.0
+    typing_extensions==3.6.5
 
-[testenv:py39-oldest]
+[testenv:py{38,39}-oldest]
 deps =
-    pytest==5.4.2
-    ujson==4.0.0
-    pytz==2020.5
+    pytest==3.0.0
 
-[testenv:py310-oldest]
+[testenv:py{310,311}-oldest]
 deps =
-    pytest==6.2.5
-    ujson==4.2.0
-    pytz==2020.5
+    pytest==6.2.4
 
 [testenv:flake8]
 basepython=python3.10

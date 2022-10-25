@@ -1,5 +1,4 @@
 """Contains tests for the fauxdoc data.math module."""
-
 import random
 
 import pytest
