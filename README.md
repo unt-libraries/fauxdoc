@@ -5,12 +5,13 @@ fauxdoc
 * [Installation](#installation)
 * [Basic Usage](#basic-usage)
 * [Contributing](#contributing)
+* [License](#license)
 
 ## About
 
 *`fauxdoc`* is designed to help you efficiently generate fake (faux) record or document (doc) data conforming to bespoke requirements.
 
-Fauxdoc is compatible (and tested) with Python versions 3.7 and above, including 3.11. It has almost no external requirements: if you are using Python 3.7, it requires typing_extensions and importlib_metadata to provide features that were added in 3.8. Otherwise, it requires nothing but the standard library.
+Fauxdoc is tested with Python versions 3.7 and above, including 3.11. It has almost no external requirements: if you are using Python 3.7, it requires typing_extensions and importlib_metadata to provide features that were added in 3.8. Otherwise, it requires nothing but the standard library.
 
 ### Why not Faker or Mimesis?
 
@@ -20,7 +21,7 @@ Fauxdoc is compatible (and tested) with Python versions 3.7 and above, including
 
 Whereas other libraries make it dead simple to produce values that recognizably correspond to real-world items or properties (colors, names, addresses, etc.), Fauxdoc helps you dial in on patterns or features that may only pertain to your use case. This is helpful if you're trying to test something specific, like forcing certain sets of edge cases.
 
-Fauxdoc began as part of a utility for helping test and benchmark Solr collections and configurations. We wanted to test search performance by producing text that shared certain features of a live collection, such as using specific alphabets; having word, phrase, and/or sentence lengths (etc.) within certain limits; and having specific terms occur in certain specific distributions. And we wanted to be able to simulate facets by choosing data values from a finite list of random terms that would produce a term distribution similar to the real data. Other libraries did not seem to address these needs adequately.
+Fauxdoc began as part of a utility for helping test and benchmark configurations for particular Solr collections. We wanted to test search performance by producing text that shared certain features of a live collection, such as using specific alphabets; having word, phrase, and/or sentence lengths (etc.) within certain limits; and having specific terms occur in certain specific distributions. And we wanted to be able to simulate facets by choosing data values from a finite list of random terms that would produce a term distribution similar to the real data. Even with Faker or Mimesis, we would have had to build most of this from scratch, anyway.
 
 #### Field / Schema / Document-Set Control
 
@@ -316,7 +317,12 @@ When tox runs, it automatically builds each virtual environment it needs, and th
 
 For example: Install these tools along with the Python versions you want to test against. Then:
 
-1. Create an environment with tox installed. E.g.: `pyenv virtualenv 3.10.8 tox-3.10.8` — then activate it and do `python -m pip install tox`. (Nothing else.)
+1. Create an environment with tox installed. E.g.:
+    ```
+    pyenv virtualenv 3.10.8 tox-3.10.8
+    pyenv activate
+    python -m pip install tox
+    ```
 2. In the fauxdoc project repository root, create a file called `.python-version`. Add all of the Python versions you want to use, e.g., 3.7 to 3.11. For 3.10, use your `tox-3.10.8`. This should look something like this:
     ```
     3.7.15
@@ -325,7 +331,7 @@ For example: Install these tools along with the Python versions you want to test
     tox-3.10.8
     3.11.0
     ```
-4. If you have another environment activated, issue a `pyenv deactivate` command so that pyenv picks up what's in the file. (A manually-activated environment overrides anything set in a `.python-version` file.)
+4. If `tox-3.10.8` is still activated, issue a `pyenv deactivate` command so that pyenv picks up what's in the file. (A manually-activated environment overrides anything set in a `.python-version` file.)
 5. At this point you should have all five environments active at once in that directory. When you run `tox`, the tox in your `tox-3.10.8` environment will run, and it will pick up the appropriate binaries automatically (`python3.7` through `python3.11`) since they're all on the path.
 
 Now you can just invoke tox to run linters and all the tests against all the environments:
@@ -345,5 +351,12 @@ Or run tests against a list of specific environments:
 ```bash
 tox -e py39-oldest,py39-newest
 ```
+
+[Top](#top)
+
+
+## License
+
+See the [LICENSE](LICENSE) file.
 
 [Top](#top)
