@@ -1,16 +1,14 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry]
+[project]
 name = "fauxdoc"
 version = "1.0.0"
 description = "Python package for generating fake (faux) record or document (doc) data conforming to bespoke requirements."
 readme = "README.md"
-authors = ["Jason Thomale <jason.thomale@unt.edu>"]
-license = "BSD"
-homepage = "https://github.com/unt-libraries/fauxdoc"
-repository = "https://github.com/unt-libraries/fauxdoc"
+authors = [{ name = "Jason Thomale", email = "jason.thomale@unt.edu"}]
+license = { file = "LICENSE" }
 keywords = ["data", "fake", "mock", "faux", "Solr", "databases", "models",
             "fixtures", "faker", "testing", "benchmarking", "records",
             "documents"]
@@ -30,27 +28,27 @@ classifiers = [
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Testing :: Mocking"
 ]
-packages = [
-    { include = "fauxdoc", from = "src"}
+requires-python = ">=3.7"
+dependencies = [
+    # Note: we only use typing_extensions for `Protocol` support, added
+    # to Python in 3.8. So this dependency is only needed for 3.7.
+    'typing_extensions >= 3.6.5; python_version == "3.7"',
+    # For Python >=3.8 we use importlib.metadata to get the installed
+    # package version so we can use pyproject.toml as the single source
+    # of truth for the version number. This was new in 3.8, so for 3.7
+    # we have to use importlib_metadata.
+    'importlib_metadata >= 2.0.0; python_version == "3.7"'
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.7"
-# Note: we only use typing_extensions for `Protocol` support, added to
-# Python in 3.8. So this dependency is only needed for 3.7.
-typing_extensions = [
-    { version = ">=3.6.5", python = "~3.7" }
-]
+[project.urls]
+homepage = "https://github.com/unt-libraries/fauxdoc"
+repository = "https://github.com/unt-libraries/fauxdoc"
 
-# Pytest is only needed for dev installations. Install by specifying
-# the `dev` extra when you run poetry install.
-pytest = [
-    { version = ">=6.2.4", python = ">=3.10", optional = true },
-    { version = ">=3.0.0", python= "~3.7 || ~3.8 || ~3.9", optional = true }
+[project.optional-dependencies]
+dev = [
+    'pytest >= 6.2.4; python_version >= "3.10"',
+    'pytest >= 3.0.0; python_version < "3.10"'
 ]
-
-[tool.poetry.extras]
-dev = ["pytest"]
 
 [tool.tox]
 legacy_tox_ini = """
@@ -68,6 +66,7 @@ commands =
 deps =
     pytest==3.0.0
     typing_extensions==3.6.5
+    importlib_metadata==2.0.0
 
 [testenv:py{38,39}-oldest]
 deps =
@@ -104,15 +103,14 @@ basepython=python3.10
 skip_install = True
 deps =
     pytest
+    build
     twine
-    poetry
 allowlist_externals =
     bash
 commands =
-    -python -m poetry version {posargs}
-    python -m poetry build
-    bash -c "python -m twine check dist/*-$(python -m poetry version -s)-*.whl"
-    bash -c "python -m twine check dist/*-$(python -m poetry version -s).*.gz"
-    bash -c "python -m pip install dist/*-$(python -m poetry version -s)-*.whl"
+    python -m build
+    bash -c 'python -m twine check dist/*-$(sed -nE "s/version = \\"(.*)\\"$/\\1/p" pyproject.toml)-*.whl'
+    bash -c 'python -m twine check dist/*-$(sed -nE "s/version = \\"(.*)\\"$/\\1/p" pyproject.toml).*.gz'
+    bash -c 'python -m pip install dist/*-$(sed -nE "s/version = \\"(.*)\\"$/\\1/p" pyproject.toml)-*.whl'
     pytest
 """
