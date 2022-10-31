@@ -1,4 +1,4 @@
-name: Run all checks and tests for fauxdoc
+name: Run linters and tests
 on: [push, workflow_call, workflow_dispatch]
 jobs:
 
