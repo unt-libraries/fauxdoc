@@ -51,6 +51,7 @@ dev = [
 ]
 
 [tool.setuptools_scm]
+local_scheme = "no-local-version"
 
 [tool.tox]
 legacy_tox_ini = """
