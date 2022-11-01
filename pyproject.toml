@@ -7,7 +7,6 @@ name = "fauxdoc"
 description = "Python package for generating fake (faux) record or document (doc) data conforming to bespoke requirements."
 readme = "README.md"
 authors = [{ name = "Jason Thomale", email = "jason.thomale@unt.edu"}]
-license = { file = "LICENSE" }
 keywords = ["data", "fake", "mock", "faux", "Solr", "databases", "models",
             "fixtures", "faker", "testing", "benchmarking", "records",
             "documents"]
