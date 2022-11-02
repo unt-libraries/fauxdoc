@@ -1,12 +1,34 @@
 name: Build and publish package
 on:
   workflow_call:
+    inputs:
+      skipTestUpload:
+        description: 'Skip uploading the package to Test PyPI?'
+        required: false
+        default: false
+        type: boolean
+      skipLiveUpload:
+        description: 'Skip uploading the package to Live PyPI?'
+        required: false
+        default: false
+        type: boolean
     secrets:
       TEST_PYPI_API_TOKEN:
         required: true
       PYPI_API_TOKEN:
         required: true
   workflow_dispatch:
+    inputs:
+      skipTestUpload:
+        description: 'Skip uploading the package to Test PyPI?'
+        required: false
+        default: false
+        type: boolean
+      skipLiveUpload:
+        description: 'Skip uploading the package to Live PyPI?'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build-and-publish:
@@ -26,10 +48,11 @@ jobs:
       - name: Build; check and test the build
         run: tox -e build_package
       - name: Publish package to Test PyPI
+        if: ${{ !inputs.skipTestUpload }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
       - name: Publish package to Live PyPI
-        if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && !(contains(github.ref_name, 'dev') || contains(github.ref_name, 'a') || contains(github.ref_name, 'b') || contains(github.ref_name, 'rc')) }}
+        if: ${{ !inputs.skipLiveUpload && github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && !(contains(github.ref_name, 'dev') || contains(github.ref_name, 'a') || contains(github.ref_name, 'b') || contains(github.ref_name, 'rc')) }}
         run: echo "Published to PyPI"
