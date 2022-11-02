@@ -5,16 +5,16 @@ on:
       - 'Run linters and tests'
     types:
       - completed
-    branches:
-      - main
-  release:
-    types:
-      - published
+    branches-ignore:
+      - '*'
+    tags:
+      - '*'
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || contains(github.event.release, 'published') }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_dispatch }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -35,5 +35,5 @@ jobs:
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
       - name: Publish package to Live PyPI
-        if: contains(github.event.release, 'published')
+        if: !(contains(github.event.ref, 'dev') || contains(github.event.ref, 'a') || contains(github.event.ref, 'b') || contains(github.event.ref, 'rc'))
         run: echo "Published to PyPI"
