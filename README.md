@@ -1,6 +1,8 @@
 fauxdoc
 =======
 
+[![Build Status](https://github.com/unt-libraries/fauxdoc/actions/workflows/do-checks-and-tests.yml/badge.svg?branch=main)](https://github.com/unt-libraries/fauxdoc/actions)
+
 * [About](#about)
 * [Installation](#installation)
 * [Basic Usage](#basic-usage)
