@@ -38,3 +38,8 @@ jobs:
           python -m pip install tox
       - name: Run tests
         run: tox -e "py${{ matrix.major }}${{ matrix.minor }}-{oldest,latest}"
+
+  trigger-publish:
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+    needs: [run-linters, run-tests]
+    uses: ./.github/workflows/publish.yml
