@@ -5,10 +5,8 @@ on:
       - 'Run linters and tests'
     types:
       - completed
-    branches-ignore:
-      - '*'
     tags:
-      - '*'
+      - 'v*'
   workflow_dispatch:
 
 jobs:
