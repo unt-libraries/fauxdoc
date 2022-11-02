@@ -35,5 +35,5 @@ jobs:
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
       - name: Publish package to Live PyPI
-        if: !(contains(github.event.ref, 'dev') || contains(github.event.ref, 'a') || contains(github.event.ref, 'b') || contains(github.event.ref, 'rc'))
+        if: ${{ !(contains(github.event.ref, 'dev') || contains(github.event.ref, 'a') || contains(github.event.ref, 'b') || contains(github.event.ref, 'rc')) }}
         run: echo "Published to PyPI"
