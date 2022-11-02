@@ -43,3 +43,6 @@ jobs:
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
     needs: [run-linters, run-tests]
     uses: ./.github/workflows/publish.yml
+    secrets:
+      TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

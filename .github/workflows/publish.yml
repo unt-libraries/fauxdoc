@@ -1,5 +1,12 @@
 name: Build and publish package
-on: [workflow_call, workflow_dispatch]
+on:
+  workflow_call:
+    secrets:
+      TEST_PYPI_API_TOKEN:
+        required: true
+      PYPI_API_TOKEN:
+        required: true
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
