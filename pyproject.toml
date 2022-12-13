@@ -101,10 +101,9 @@ commands =
     pylint fauxdoc tests --ignore=__pycache__ --good-names=_,i,mn,mx,em
 
 [testenv:build_package]
-basepython=python3.10
-skip_install = True
+basepython = python3.10
+skip_install = true
 deps =
-    pytest
     build
     twine
 allowlist_externals =
@@ -114,6 +113,14 @@ commands =
     python -m build
     bash -c 'python -m twine check dist/*.whl'
     bash -c 'python -m twine check dist/*.gz'
-    bash -c 'python -m pip install dist/*.whl'
+
+[testenv:py{37,38,39,310,311}-test_built_package]
+skip_install = true
+deps =
+    pytest
+allowlist_externals =
+    bash
+commands =
+    bash -c 'python -m pip install {posargs:dist/*.whl}'
     pytest
 """
