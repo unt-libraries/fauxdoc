@@ -6,7 +6,7 @@ from typing import List, Optional, Sequence
 from fauxdoc.typing import Number, T
 
 
-def poisson(x: int, mu: Optional[Number] = 1) -> float:
+def poisson(x: int, mu: Number = 1) -> float:
     """Applies a poisson probability distribution function.
 
     Args:
@@ -22,9 +22,7 @@ def poisson(x: int, mu: Optional[Number] = 1) -> float:
     return (mu ** x) * (math.exp(-1 * mu)) / math.factorial(x)
 
 
-def gaussian(x: Number,
-             mu: Optional[Number] = 0,
-             sigma: Optional[Number] = 1) -> float:
+def gaussian(x: Number, mu: Number = 0, sigma: Number = 1) -> float:
     """Applies a gaussian probability density function.
 
     Args:
@@ -76,7 +74,7 @@ def clamp(number: Number,
 
 def weighted_shuffle(items: Sequence[T],
                      weights: Sequence[Number],
-                     rng: Optional[random.Random] = random.Random(),
+                     rng: random.Random = random.Random(),
                      number: Optional[int] = None) -> List[T]:
     """Returns a list of items randomly shuffled based on weights.
 
@@ -97,14 +95,17 @@ def weighted_shuffle(items: Sequence[T],
         number: (Optional.) The number of items you need. Defaults to
             the full length of `items`.
     """
-    def _faster_for_low_k(items, weights, rng, k):
+    def _faster_for_low_k(items: Sequence[T],
+                          weights: Sequence[Number],
+                          rng: random.Random,
+                          k: int) -> List[T]:
         # I adapted this from https://stackoverflow.com/a/43649323.
         # We iterate using random.choices to build our sample, removing
         # duplicate selections as we go. This brute force approach is
         # surprisingly fast for lower values of k.
         weights = list(weights)
         positions = range(len(items))
-        sample = []
+        sample: List[T] = []
         while True:
             needed = k - len(sample)
             if not needed:
@@ -119,7 +120,10 @@ def weighted_shuffle(items: Sequence[T],
                     sample.append(items[i])
         return sample
 
-    def _faster_for_high_k(items, weights, rng, k):
+    def _faster_for_high_k(items: Sequence[T],
+                          weights: Sequence[Number],
+                          rng: random.Random,
+                          k: int) -> List[T]:
         # I adapted this from https://stackoverflow.com/a/20548895.
         # This is more of an actual shuffle: we create a randomized
         # score for each item based on weight, and then reverse sort

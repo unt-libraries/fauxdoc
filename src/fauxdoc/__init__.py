@@ -1,7 +1,9 @@
 """Tools for generating fake data."""
-try:
+import sys
+
+if sys.version_info >= (3, 8):
     from importlib import metadata
-except (ImportError, ModuleNotFoundError):
+else:
     import importlib_metadata as metadata
 from . import dtrange
 from . import emitter

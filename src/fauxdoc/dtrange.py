@@ -1,7 +1,7 @@
 """Contains an implementation of a custom date/time range type."""
 from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
-from typing import Optional, Tuple, TypeVar, Union
+from typing import Optional, overload, Tuple, TypeVar, Union
 
 from fauxdoc.typing import Number
 
@@ -12,29 +12,32 @@ DTS = TypeVar('DTS', date, datetime, time, str)
 
 def _index_to_value(index: int, start: DT, step: timedelta) -> DT:
     """Converts a 0-based index number to a date/time value."""
-    try:
-        return start + (step * index)
-    except TypeError:
-        # We can't do timedelta operations on `time` objects, so we
-        # have to fake it by combining the time with a reference date,
-        # doing the math, then getting back the time.
-        refdate = date(99, 1, 1)
-        return (datetime.combine(refdate, start) + (step * index)).time()
+    delta = step * index
+    if isinstance(start, time):
+        # We can't do timedelta operations on time objects, so we have
+        # to fake it by combining the time with a reference date, doing
+        # the math, and returning the time.
+        ref_date = date(99, 1, 1)
+        ref_dt = datetime.combine(ref_date, start)
+        return (ref_dt + delta).time()
+    return start + delta
 
 
 def _value_to_index(value: DT, start: DT,
                     step: timedelta) -> Tuple[int, timedelta]:
-    """Converts a date/time value to a 0-based index number."""
-    try:
-        return divmod(value - start, step)
-    except TypeError:
+    """Converts a date/time value to a 0-based index number.
+
+    `value` is the date, time, or datetime value to convert; `start` is
+    the 0-index value; and `step` is the timedelta interval between
+    values.
+    """
+    if isinstance(start, time):
         # We can't do timedelta operations on `time` objects, so we
         # have to fake it by combining the time with a reference date,
-        # doing the math, then getting back the time.
-        # We also want to wrap at midnight; a range like 11:00 PM to
-        # 4:00 AM with step +1 second is valid, as is 4:00 AM to
-        # 11:00 PM with step -1 second. We have to add a day on either
-        # side to make this work.
+        # doing the math, and getting the time. We also want to wrap at
+        # midnight; a range like 11:00 PM to 4:00 AM with step +1 sec
+        # is valid, as is 4:00 AM to 11:00 PM with step -1 sec. We have
+        # to add a day on either side to make this work.
         step_secs = step.total_seconds()
         startdate = date(99, 1, 2)
         if value < start and step_secs > 0:
@@ -45,10 +48,13 @@ def _value_to_index(value: DT, start: DT,
             valdate = startdate
         valdt = datetime.combine(valdate, value)
         startdt = datetime.combine(startdate, start)
-        return divmod(valdt - startdt, step)
+    else:
+        valdt = value
+        startdt = start
+    return divmod(valdt - startdt, step)
 
 
-class DateOrTimeRange(Sequence):
+class DateOrTimeRange(Sequence[DT]):
     """Class for representing ranges of dates and/or times.
 
     This is meant to be like the `range` type, for dates, times, and
@@ -108,17 +114,17 @@ class DateOrTimeRange(Sequence):
                 "Attribute 'start' must be an instance of date, datetime, or "
                 "time, from the datetime module."
             )
-        self._start = start_val
+        self._start: DT = start_val
 
     @property
     def stop(self) -> DT:
         """Read-only property. Returns the 'stop' attribute."""
         if not hasattr(self, '_stop'):
-            self._stop = _index_to_value(len(self), self.start, self.step)
+            self._stop: DT = _index_to_value(len(self), self.start, self.step)
         return self._stop
 
     @property
-    def step(self) -> int:
+    def step(self) -> timedelta:
         """Read-only property. Returns the 'step' attribute."""
         return self._step
 
@@ -153,7 +159,7 @@ class DateOrTimeRange(Sequence):
         return self._length
 
     @length.setter
-    def length(self, length_val: int):
+    def length(self, length_val: int) -> None:
         """Setter for the 'length' attribute. Can only be set once."""
         if hasattr(self, '_length'):
             raise AttributeError("Can't set attribute 'length'")
@@ -164,7 +170,15 @@ class DateOrTimeRange(Sequence):
                 "Attribute 'length' must be (or be castable to) an int."
             )
 
+    @overload
     def __getitem__(self, index: int) -> DT:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DT]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[Sequence[DT], DT]:
         """Returns the requested value or values from the range."""
         if isinstance(index, slice):
             slc = self._index_range[index]
@@ -184,7 +198,7 @@ class DateOrTimeRange(Sequence):
     def __repr__(self) -> str:
         """Returns the string representation of the range."""
         if not hasattr(self, '_str_repr'):
-            stop = self.stop
+            stop = str(self.stop)
             if isinstance(self.start, time):
                 days = (self.step * len(self)).days
                 if days > 0:
@@ -194,8 +208,10 @@ class DateOrTimeRange(Sequence):
             self._str_repr = f"{type(self).__name__}({desc})"
         return self._str_repr
 
-    def __eq__(self, other: 'DateOrTimeRange') -> bool:
+    def __eq__(self, other: object) -> bool:
         """Returns True if this range is equal to a comparison range."""
+        if not isinstance(other, type(self)):
+            return NotImplemented
         my_len = len(self)
         other_len = len(other)
         if my_len != other_len:
@@ -232,13 +248,16 @@ class DateOrTimeRange(Sequence):
                 return index
         raise ValueError(f'{value} is not in range')
 
-    def __contains__(self, value: DT) -> bool:
+    def __contains__(self, value: object) -> bool:
         """Returns True if a value is in this range."""
-        try:
-            self.index(value)
-        except ValueError:
-            return False
-        return True
+        if isinstance(value, type(self.start)):
+            try:
+                self.index(value)
+            except ValueError:
+                pass
+            else:
+                return True
+        return False
 
     def count(self, value: DT) -> int:
         """Returns the number of times a value occurs in this range.
@@ -249,15 +268,19 @@ class DateOrTimeRange(Sequence):
         return 1 if value in self else 0
 
 
-def _parse_user_date(val: DTS, label: str) -> Union[date, datetime, time]:
+def _parse_user_date(val: Union[DT, str], label: str) -> DT:
     """Converts a user date value to the appropriate date/time type."""
     dtypes = (date, time, datetime)
     if isinstance(val, dtypes):
         return val
     if isinstance(val, str):
         for dtype in dtypes:
+            fromisoformat = getattr(dtype, 'fromisoformat')
             try:
-                return getattr(dtype, 'fromisoformat')(val)
+                # Note: mypy throws a no-any-return error on this, I'm
+                # assuming because it can't tell what the return value
+                # of `fromisoformat` is supposed to be.
+                return fromisoformat(val)  # type: ignore[no-any-return]
             except ValueError:
                 pass
     raise ValueError(
@@ -268,8 +291,8 @@ def _parse_user_date(val: DTS, label: str) -> Union[date, datetime, time]:
     )
 
 
-def dtrange(start: DTS, stop: DTS, step: Number = 1,
-            step_unit: Optional[str] = None) -> DateOrTimeRange:
+def dtrange(start: Union[DT, str], stop: Union[DT, str], step: Number = 1,
+            step_unit: Optional[str] = None) -> DateOrTimeRange[DT]:
     """Constructs and returns a DateOrTimeRange object.
 
     This is the intended public factory method that makes it easy to
@@ -289,12 +312,12 @@ def dtrange(start: DTS, stop: DTS, step: Number = 1,
             the start of your range. If you provide a string, then it
             must be interpretable by the `fromisoformat` method of one
             these types. (Note this is just for convenience and is not
-            meant to exhaustively parse an ISO formatted date string.
+            meant to exhaustively parse an ISO formatted date string.)
         stop: A date, time, datetime, or string object representing the
             end of your range, not inclusive. Like 'start', if you
             provide a string it must be interpretable by the
             `fromisoformat` method of date, time, or datetime. 'stop'
-            and 'start must ultimately be the same type.
+            and 'start must ultimately resolve to the same type.
         step: (Optional.) An integer representing the number of units
             in your range. Default is 1.
         step_unit: (Optional.) A string defining what 'step'
@@ -302,36 +325,36 @@ def dtrange(start: DTS, stop: DTS, step: Number = 1,
             microseconds. If your range contains `date` objects, then
             this defaults to "days" -- otherwise "seconds".
     """
-    start = _parse_user_date(start, 'start')
-    stop = _parse_user_date(stop, 'stop')
+    start_obj = _parse_user_date(start, 'start')
+    stop_obj = _parse_user_date(stop, 'stop')
 
-    if type(start) != type(stop):
+    if type(start_obj) != type(stop_obj):
         raise ValueError(
             f"The 'start' and 'stop' arguments must be interpretable as the "
             f"same datetime type. The provided arguments appear to be "
-            f"different types: `{type(start)}` and `{type(stop)}`."
+            f"different types: `{type(start_obj)}` and `{type(stop_obj)}`."
         )
 
     if step_unit is None:
-        step_unit = 'seconds' if hasattr(start, 'second') else 'days'
+        step_unit = 'seconds' if hasattr(start_obj, 'second') else 'days'
 
     try:
-        step = timedelta(**{step_unit: step})
+        step_td = timedelta(**{step_unit: step})
     except TypeError:
         raise ValueError(
             "Invalid 'step_unit' argument. It must be a valid kwarg for "
             "timedelta: weeks, days, hours, minutes, seconds, or microseconds."
         )
 
-    if isinstance(start, time) and start == stop:
+    if isinstance(start_obj, time) and start_obj == stop_obj:
         # This is kind of hacky but the simplest way I could think of
         # to accommodate the (common) edge case where you want the full
         # 24-hour clock as a time range. E.g., midnight to midnight is
         # a 24-hour range instead of an empty range.
-        start_refdate = datetime.combine(date(99, 1, 1), start)
+        start_refdate = datetime.combine(date(99, 1, 1), start_obj)
         stop_refdate = start_refdate + timedelta(days=1)
-        length, rem = _value_to_index(stop_refdate, start_refdate, step)
+        length, rem = _value_to_index(stop_refdate, start_refdate, step_td)
     else:
-        length, rem = _value_to_index(stop, start, step)
+        length, rem = _value_to_index(stop_obj, start_obj, step_td)
     length += 1 if rem else 0
-    return DateOrTimeRange(start, length, step)
+    return DateOrTimeRange(start_obj, length, step_td)

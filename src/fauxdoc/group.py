@@ -1,10 +1,12 @@
 """Contains classes for grouping and operating on groups of objects."""
 from abc import ABC, abstractmethod
 from collections import OrderedDict, UserList
-from typing import Any, Mapping
+from typing import Any, Generic, Iterable, Mapping, TypeVar
+
+from fauxdoc.typing import T
 
 
-class GroupMixin(ABC):
+class GroupMixin(Generic[T], ABC):
     """Abstract base class for defining Group objects.
 
     This is implemented via ObjectGroup and ObjectMap, but could be
@@ -14,7 +16,7 @@ class GroupMixin(ABC):
 
     @property
     @abstractmethod
-    def objects_iterable(self):
+    def objects_iterable(self) -> Iterable[T]:
         """Returns an itereable for the objects in this group.
 
         Override this in your subclass to define how to iterate
@@ -55,7 +57,7 @@ class GroupMixin(ABC):
                     pass
 
 
-class ObjectGroup(GroupMixin, UserList):
+class ObjectGroup(GroupMixin[T], UserList[T]):
     """Class for operating on groups of similar objects (as a list).
 
     Use this instead of ObjectMap when you need your group to behave
@@ -67,7 +69,7 @@ class ObjectGroup(GroupMixin, UserList):
     skip them.
     """
 
-    def __init__(self, *objects: Any) -> None:
+    def __init__(self, *objects: T) -> None:
         """Inits an ObjectGroup with the given objects.
 
         Args:
@@ -78,12 +80,12 @@ class ObjectGroup(GroupMixin, UserList):
         super().__init__(objects)
 
     @property
-    def objects_iterable(self):
+    def objects_iterable(self) -> Iterable[T]:
         """Iterates through the objects in this group."""
         return self
 
 
-class ObjectMap(GroupMixin, OrderedDict):
+class ObjectMap(GroupMixin[T], OrderedDict[str, T]):
     """Class for operating on groups of similar objects (as a dict).
 
     Use this instead of ObjectGroup when you need your group to behave
@@ -95,7 +97,7 @@ class ObjectMap(GroupMixin, OrderedDict):
     skip them.
     """
 
-    def __init__(self, objects: Mapping) -> None:
+    def __init__(self, objects: Mapping[str, T]) -> None:
         """Inits an ObjectMap with the given objects.
 
         Args:
@@ -105,6 +107,6 @@ class ObjectMap(GroupMixin, OrderedDict):
         super().__init__(objects)
 
     @property
-    def objects_iterable(self):
+    def objects_iterable(self) -> Iterable[T]:
         """Iterates through the objects in this group."""
-        return self.values()
+        return list(self.values())

@@ -1,8 +1,9 @@
 """Contains mixin classes."""
 import random
-from typing import Any, List
+from typing import Any, Generic, List, Mapping, Sequence
 
 from fauxdoc.group import ObjectMap
+from fauxdoc.typing import EmitterLike, T
 
 
 class RandomMixin:
@@ -42,10 +43,9 @@ class RandomMixin:
     def reset(self) -> None:
         """Resets the emitter's RNG instance."""
         self.rng = random.Random(self.rng_seed)
-        try:
-            super().reset()
-        except AttributeError:
-            pass
+        supr = super()
+        if hasattr(supr, 'reset'):
+            supr.reset()
 
     def seed(self, rng_seed: Any) -> None:
         """Seeds all RNGs on this object with the given seed value.
@@ -55,13 +55,12 @@ class RandomMixin:
         """
         self.rng_seed = rng_seed
         self.rng.seed(rng_seed)
-        try:
-            super().seed(rng_seed)
-        except AttributeError:
-            pass
+        supr = super()
+        if hasattr(supr, 'seed'):
+            supr.seed(rng_seed)
 
 
-class ItemsMixin:
+class ItemsMixin(Generic[T]):
     """Mixin class for emitters that emit based on a list of items.
 
     This is super simple, but it provides a reliable interface for
@@ -82,11 +81,11 @@ class ItemsMixin:
                 the 'items' attribute and is NOT passed through to
                 parent classes.
         """
-        self._items = kwargs.pop('items', [])
+        self._items: Sequence[T] = kwargs.pop('items', [])
         super().__init__(*args, **kwargs)
 
     @property
-    def items(self) -> List[Any]:
+    def items(self) -> Sequence[T]:
         """Returns this emitter's list of items."""
         return self._items
 
@@ -124,14 +123,16 @@ class ChildrenMixin:
         super().__init__(*args, **kwargs)
 
     @property
-    def emitters(self) -> ObjectMap:
+    def emitters(self) -> ObjectMap[EmitterLike[Any]]:
         """Returns the children emitters, as a dict-like ObjectMap."""
         return self._emitters
 
     def reset(self) -> None:
         """Resets this emitter and all children."""
         self._emitters.do_method('reset')
-        super().reset()
+        supr = super()
+        if hasattr(supr, 'reset'):
+            supr.reset()
 
 
 class RandomWithChildrenMixin(RandomMixin, ChildrenMixin):

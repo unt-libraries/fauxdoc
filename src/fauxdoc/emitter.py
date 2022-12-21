@@ -1,11 +1,11 @@
 """Contains base Emitter classes, for emitting data values."""
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from typing import Generic, List, Optional, Union
 
-from .typing import T
+from fauxdoc.typing import CT
 
 
-class Emitter(ABC):
+class Emitter(Generic[CT], ABC):
     """Abstract base class for defining emitter objects.
 
     Subclass this to implement an emitter object. At this level all you
@@ -63,7 +63,7 @@ class Emitter(ABC):
             f"{'' if self.num_unique_values == 1 else 's'}."
         )
 
-    def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
+    def __call__(self, number: Optional[int] = None) -> Union[CT, List[CT]]:
         """Emits one data value or a list of multiple values.
 
         Use the 'number' kwarg to control whether you get a single
@@ -94,9 +94,9 @@ class Emitter(ABC):
         return self.emit_many(number)
 
     @abstractmethod
-    def emit(self) -> T:
+    def emit(self) -> CT:
         """Return one data value."""
 
     @abstractmethod
-    def emit_many(self, number: int) -> List[T]:
+    def emit_many(self, number: int) -> List[CT]:
         """Return multiple data values, as a list."""
