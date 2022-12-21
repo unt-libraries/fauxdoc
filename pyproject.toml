@@ -100,6 +100,13 @@ deps =
 commands =
     pylint fauxdoc tests --ignore=__pycache__ --good-names=_,i,mn,mx,em
 
+[testenv:mypy_strict]
+basepython=python3.10
+deps =
+    mypy
+commands =
+    mypy src/fauxdoc --strict
+
 [testenv:build_package]
 basepython = python3.10
 skip_install = true
