@@ -67,36 +67,32 @@ def test_wrapone_emit_w_rng(seed, source, wrapper, exp_single, exp_many):
 
 
 @pytest.mark.parametrize('wrapper, has_rng, problem', [
-    (lambda: None, False, 'takes 0 positional arguments but 1 was given'),
+    (lambda: None, False, 'too many positional arguments'),
     (lambda rng: rng, True, "multiple values for argument 'rng'"),
     (lambda rng, val: val, True, "multiple values for argument 'rng'"),
     (lambda val1, val2: val1, False,
-     "missing 1 required positional argument: 'val2'"),
+     "missing a required argument: 'val2'"),
     (lambda val1, val2, rng: val1, True,
-     "missing 1 required positional argument: 'val2'"),
+     "missing a required argument: 'val2'"),
     (lambda val1, rng, val2: val1, True,
-     "missing 1 required positional argument: 'val2'"),
+     "missing a required argument: 'val2'"),
 ])
 def test_wrapone_emit_bad_wrapper_raises_error(wrapper, has_rng, problem):
     args = "'test'"
     kwargs = "rng=" if has_rng else ''
-    em = WrapOne(Static('test'), wrapper)
-    with pytest.raises(TypeError) as excinfo_one:
-        _ = em()
-    with pytest.raises(TypeError) as excinfo_two:
-        _ = em(10)
-    for excinfo in (excinfo_one, excinfo_two):
-        err_msg = str(excinfo.value)
-        for blurb in (args, kwargs, problem):
-            assert blurb in err_msg
+    with pytest.raises(TypeError) as excinfo:
+        em = WrapOne(Static('test'), wrapper)
+    err_msg = str(excinfo.value)
+    for blurb in (args, kwargs, problem):
+        assert blurb in err_msg
 
 
 def test_wrapone_init_and_reset_do_reset_source_emitter():
     mock_em = Mock()
     wrapped_em = WrapOne(mock_em, lambda n: None)
-    mock_em.reset.assert_called_once()
-    wrapped_em.reset()
     mock_em.reset.assert_has_calls([call(), call()])
+    wrapped_em.reset()
+    mock_em.reset.assert_has_calls([call(), call(), call()])
 
 
 def test_wrapone_seed_does_seed_source_emitter():
@@ -143,46 +139,39 @@ def test_wrapmany_emit_w_rng(seed, sources, wrapper, exp_single, exp_many):
 @pytest.mark.parametrize('wrapper, has_rng, problem', [
     (lambda: None, False, "got an unexpected keyword argument 'a'"),
     (lambda rng: rng, True, "got an unexpected keyword argument 'a'"),
-    (lambda val1, val2: val1, False, "got an unexpected keyword argument 'a'"),
+    (lambda val1, val2: val1, False, "missing a required argument: 'val1'"),
     (lambda val1, val2, rng: val1, True,
-     "got an unexpected keyword argument 'a'"),
+     "missing a required argument: 'val1'"),
     (lambda a: a, False, "got an unexpected keyword argument 'b'"),
-    (lambda a, c: a, False, "got an unexpected keyword argument 'b'"),
+    (lambda a, c: a, False, "missing a required argument: 'c'"),
     (lambda a, rng: a, True, "got an unexpected keyword argument 'b'"),
-    (lambda a, b, c: a, False,
-     "missing 1 required positional argument: 'c'"),
-    (lambda a, b, c, rng: a, True,
-     "missing 1 required positional argument: 'c'"),
-    (lambda a, c, b, rng: a, True,
-     "missing 1 required positional argument: 'c'"),
+    (lambda a, b, c: a, False, "missing a required argument: 'c'"),
+    (lambda a, b, c, rng: a, True, "missing a required argument: 'c'"),
+    (lambda a, c, b, rng: a, True, "missing a required argument: 'c'"),
 ])
 def test_wrapmany_emit_bad_wrapper_raises_error(wrapper, has_rng, problem):
     kwargs_em = "a='test_a', b='test_b'"
     kwargs_rng = 'rng=' if has_rng else ''
-    em = WrapMany({'a': Static('test_a'), 'b': Static('test_b')}, wrapper)
-    with pytest.raises(TypeError) as excinfo_one:
-        _ = em()
-    with pytest.raises(TypeError) as excinfo_two:
-        _ = em(10)
-    for excinfo in (excinfo_one, excinfo_two):
-        err_msg = str(excinfo.value)
-        for blurb in (kwargs_em, kwargs_rng, problem):
-            assert blurb in err_msg
+    with pytest.raises(TypeError) as excinfo:
+        em = WrapMany({'a': Static('test_a'), 'b': Static('test_b')}, wrapper)
+    err_msg = str(excinfo.value)
+    for blurb in (kwargs_em, kwargs_rng, problem):
+        assert blurb in err_msg
 
 
 def test_wrapmany_init_and_reset_do_reset_all_source_emitters():
     mock_ems = {'one': Mock(), 'two': Mock()}
-    wrapped_em = WrapMany(mock_ems, lambda n: None)
-    for m in mock_ems.values():
-        m.reset.assert_called_once()
-    wrapped_em.reset()
+    wrapped_em = WrapMany(mock_ems, lambda one, two: None)
     for m in mock_ems.values():
         m.reset.assert_has_calls([call(), call()])
+    wrapped_em.reset()
+    for m in mock_ems.values():
+        m.reset.assert_has_calls([call(), call(), call()])
 
 
 def test_wrapmany_seed_seeds_all_source_emitters():
     mock_ems = {'one': Mock(), 'two': Mock()}
-    wrapped_em = WrapMany(mock_ems, lambda n: None)
+    wrapped_em = WrapMany(mock_ems, lambda one, two: None)
     for m in mock_ems.values():
         m.seed.assert_not_called()
     wrapped_em.seed(999)

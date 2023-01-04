@@ -1,8 +1,7 @@
 """Contains constants/variables/etc. used for type hinting."""
+import random
 import sys
-from typing import (
-    Any, Callable, Generic, List, Optional, Sequence, TypeVar, Union
-)
+from typing import Any, List, Optional, TypeVar, Union
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
@@ -15,7 +14,8 @@ else:
 Number = Union[int, float]
 T = TypeVar('T')
 CT = TypeVar('CT', covariant=True)
-EmitterLikeCallable = Union[Callable[[int], Sequence[T]], 'EmitterLike']
+SourceT = TypeVar('SourceT', contravariant=True)
+OutputT = TypeVar('OutputT', covariant=True)
 
 
 # Protocols defined here.
@@ -30,33 +30,24 @@ class EmitterLike(Protocol[CT]):
         ...
 
 
-class BoolEmitterLike(EmitterLike[bool], Protocol):
-    """An emitter.Emitter-like object that emits booleans."""
-
-    def __call__(self,
-                 number: Optional[int] = None) -> Union[bool, List[bool]]:
-        ...
+BoolEmitterLike = EmitterLike[bool]
+IntEmitterLike = EmitterLike[int]
+StrEmitterLike = EmitterLike[str]
 
 
-class IntEmitterLike(EmitterLike[int], Protocol):
-    """An emitter.Emitter-like object that emits integers."""
+class ImplementsRNG(Protocol):
+    """Is a type that implements RNG."""
 
-    def __call__(self, number: Optional[int] = None) -> Union[int, List[int]]:
-        ...
-
-
-class StrEmitterLike(EmitterLike[str], Protocol):
-    """An emitter.Emitter-like object that emits strings."""
-
-    def __call__(self, number: Optional[int] = None) -> Union[str, List[str]]:
-        ...
-
-
-class RandomEmitterLike(EmitterLike[CT], Protocol):
-    """Is like an emitter.RandomEmitter object."""
+    rng: random.Random
 
     def seed(self, rng_seed: Any) -> None:
         ...
+
+
+class RandomEmitterLike(ImplementsRNG, EmitterLike[CT]):
+    """Is like an emitter.RandomEmitter object."""
+
+
 
 
 class FieldLike(Protocol):
