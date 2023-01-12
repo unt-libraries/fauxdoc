@@ -1,13 +1,15 @@
 """Contains classes for creating faux-data-generation profiles."""
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Generic, List, Optional, Union
 
 from fauxdoc.group import ObjectMap
 from fauxdoc.emitters.fixed import Static
 from fauxdoc.mixins import RandomMixin
-from fauxdoc.typing import BoolEmitterLike, EmitterLike, IntEmitterLike, T
+from fauxdoc.typing import (
+    BoolEmitterLike, EmitterLike, FieldLike, IntEmitterLike, T
+)
 
 
-class Field(RandomMixin, object):
+class Field(RandomMixin, Generic[T]):
     """Class for representing a field in a schema.
 
     Each Field instance wraps an emitter and provides some additional
@@ -71,7 +73,7 @@ class Field(RandomMixin, object):
 
     def __init__(self,
                  name: str,
-                 emitter: EmitterLike,
+                 emitter: EmitterLike[T],
                  repeat: Optional[IntEmitterLike] = None,
                  gate: Optional[BoolEmitterLike] = None,
                  hide: bool = False,
@@ -94,11 +96,16 @@ class Field(RandomMixin, object):
             hidden: See `hidden` attribute.
             rng_seed: See `rng_seed` attribute.
         """
-        self._emitters = ObjectMap({})
-        self.name = name
         self.emitter = emitter
         self.repeat_emitter = Static(None) if repeat is None else repeat
         self.gate_emitter = Static(True) if gate is None else gate
+        self._emitters: ObjectMap[EmitterLike[Any]] = ObjectMap({
+            'emitter': self.emitter,
+            'repeat': self.repeat_emitter,
+            'gate': self.gate_emitter
+        })
+        self.emitter = emitter
+        self.name = name
         self.hide = hide
         super().__init__(rng_seed=rng_seed)
 
@@ -108,47 +115,29 @@ class Field(RandomMixin, object):
         return self._cache
 
     @property
-    def emitter(self) -> EmitterLike:
-        """Returns the 'emitter' attribute."""
-        return self._emitters['emitter']
-
-    @emitter.setter
-    def emitter(self, emitter: EmitterLike) -> None:
-        """Sets the 'emitter' attribute."""
-        self._emitters['emitter'] = emitter
-
-    @property
-    def repeat_emitter(self) -> EmitterLike:
+    def repeat_emitter(self) -> Union[EmitterLike[None], EmitterLike[int]]:
         """Returns the 'repeat_emitter' attribute."""
-        return self._emitters['repeat']
+        return self._repeat_emitter
 
     @repeat_emitter.setter
-    def repeat_emitter(self, repeat_emitter: EmitterLike) -> None:
+    def repeat_emitter(self,
+                       repeat_emitter: Union[EmitterLike[None],
+                                             EmitterLike[int]]) -> None:
         """Sets the 'repeat_emitter' attribute.
 
         Also sets the 'multi_valued' attribute; False if the
         repeat_emitter only emits None, otherwise True.
         """
-        self._emitters['repeat'] = repeat_emitter
-        try:
+        self._repeat_emitter = repeat_emitter
+        if hasattr(repeat_emitter, 'items'):
             self.multi_valued = repeat_emitter.items != [None]
-        except AttributeError:
+        else:
             self.multi_valued = True
-
-    @property
-    def gate_emitter(self) -> EmitterLike:
-        """Returns the 'gate_emitter' attribute."""
-        return self._emitters['gate']
-
-    @gate_emitter.setter
-    def gate_emitter(self, gate_emitter: EmitterLike) -> None:
-        """Sets the 'gate_emitter' attribute."""
-        self._emitters['gate'] = gate_emitter
 
     def reset(self) -> None:
         """Resets state on this field, including attached emitters."""
         super().reset()
-        self._cache = None
+        self._cache: Any = None
         self._emitters.setattr('rng_seed', self.rng_seed)
         self._emitters.do_method('reset')
 
@@ -163,7 +152,7 @@ class Field(RandomMixin, object):
         super().seed(rng_seed)
         self._emitters.do_method('seed', self.rng_seed)
 
-    def __call__(self) -> T:
+    def __call__(self) -> Optional[Union[T, List[T]]]:
         """Generates one field value via the emitter.
 
         Returns:
@@ -174,8 +163,8 @@ class Field(RandomMixin, object):
             generates the one value. If `gate_emitter` returns False,
             then this returns None.
         """
-        if self._emitters['gate']():
-            self._cache = self._emitters['emitter'](self._emitters['repeat']())
+        if self.gate_emitter():
+            self._cache = self.emitter(self._repeat_emitter())
         else:
             self._cache = None
         return self._cache
@@ -201,7 +190,7 @@ class Schema:
             objects, where `field.hide` is False.
     """
 
-    def __init__(self, *fields: Field) -> None:
+    def __init__(self, *fields: FieldLike[Any]) -> None:
         """Inits a Schema instance with the provided fields.
 
         Args:
@@ -210,10 +199,10 @@ class Schema:
                 args. The `fields` attribute is generated from this.
                 Your field names become keys.
         """
-        self.fields = ObjectMap({})
+        self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
         self.add_fields(*fields)
 
-    def add_fields(self, *fields: Field) -> None:
+    def add_fields(self, *fields: FieldLike[Any]) -> None:
         """Adds fields to your schema, in the order provided.
 
         Args:
@@ -221,11 +210,11 @@ class Schema:
                 argument, so provided your fields as args.
         """
         self.fields.update({field.name: field for field in fields})
-        self._hidden_fields = None
-        self._public_fields = None
+        self._hidden_fields: Optional[ObjectMap[FieldLike[Any]]] = None
+        self._public_fields: Optional[ObjectMap[FieldLike[Any]]] = None
 
     @property
-    def hidden_fields(self):
+    def hidden_fields(self) -> ObjectMap[FieldLike[Any]]:
         if self._hidden_fields is None:
             self._hidden_fields = ObjectMap({
                 fn: fd for fn, fd in self.fields.items() if fd.hide
@@ -233,7 +222,7 @@ class Schema:
         return self._hidden_fields
 
     @property
-    def public_fields(self):
+    def public_fields(self) -> ObjectMap[FieldLike[Any]]:
         if self._public_fields is None:
             self._public_fields = ObjectMap({
                 fn: fd for fn, fd in self.fields.items() if not fd.hide
