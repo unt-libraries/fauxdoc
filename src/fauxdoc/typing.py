@@ -1,7 +1,7 @@
 """Contains constants/variables/etc. used for type hinting."""
 import random
 import sys
-from typing import Any, List, Optional, TypeVar, Union
+from typing import Any, List, Optional, overload, TypeVar, Union
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
@@ -20,10 +20,26 @@ OutputT = TypeVar('OutputT', covariant=True)
 
 # Protocols defined here.
 
-class EmitterLike(Protocol[CT]):
+class EmitterLike(Protocol[T]):
     """Is like an emitter.Emitter object."""
 
-    def __call__(self, number: Optional[int] = None) -> Union[CT, List[CT]]:
+    @property
+    def num_unique_values(self) -> Optional[int]:
+        ...
+
+    @property
+    def emits_unique_values(self) -> bool:
+        ...
+
+    @overload
+    def __call__(self, number: None = None) -> T:
+        ...
+
+    @overload
+    def __call__(self, number: int) -> List[T]:
+        ...
+
+    def __call__(self, number: Optional[int] = None) -> Union[T, List[T]]:
         ...
 
     def reset(self) -> None:
@@ -44,7 +60,7 @@ class ImplementsRNG(Protocol):
         ...
 
 
-class RandomEmitterLike(ImplementsRNG, EmitterLike[CT]):
+class RandomEmitterLike(ImplementsRNG, EmitterLike[T]):
     """Is like an emitter.RandomEmitter object."""
 
 

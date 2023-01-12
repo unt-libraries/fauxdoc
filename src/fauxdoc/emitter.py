@@ -1,6 +1,6 @@
 """Contains base Emitter classes, for emitting data values."""
 from abc import ABC, abstractmethod
-from typing import Generic, List, Optional, Union
+from typing import Generic, List, Optional, overload, Union
 
 from fauxdoc.typing import CT
 
@@ -37,7 +37,7 @@ class Emitter(Generic[CT], ABC):
         return False
 
     @property
-    def num_unique_values(self) -> Union[None, int]:
+    def num_unique_values(self) -> Optional[int]:
         """Returns an int, the number of unique values emittable.
 
         This number should be relative to the next `emit` call. If your
@@ -62,6 +62,14 @@ class Emitter(Generic[CT], ABC):
             f"{self.num_unique_values} possible selection"
             f"{'' if self.num_unique_values == 1 else 's'}."
         )
+
+    @overload
+    def __call__(self, number: None = None) -> CT:
+        ...
+
+    @overload
+    def __call__(self, number: int) -> List[CT]:
+        ...
 
     def __call__(self, number: Optional[int] = None) -> Union[CT, List[CT]]:
         """Emits one data value or a list of multiple values.
