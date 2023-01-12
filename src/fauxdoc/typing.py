@@ -11,11 +11,12 @@ else:
 
 # Type aliases defined here.
 
-Number = Union[int, float]
 T = TypeVar('T')
 CT = TypeVar('CT', covariant=True)
 SourceT = TypeVar('SourceT', contravariant=True)
 OutputT = TypeVar('OutputT', covariant=True)
+Number = Union[int, float]
+FieldReturn = Optional[Union[T, List[T]]]
 
 
 # Protocols defined here.
@@ -64,19 +65,19 @@ class RandomEmitterLike(ImplementsRNG, EmitterLike[T]):
     """Is like an emitter.RandomEmitter object."""
 
 
-
-
-class FieldLike(Protocol):
+class FieldLike(Protocol[CT]):
     """Is like a profile.Field object."""
 
     multi_valued: bool
+    name: str
+    hide: bool
 
-    def __call__(self) -> Any:
+    def __call__(self) -> FieldReturn[CT]:
         ...
 
     def reset(self) -> None:
         ...
 
     @property
-    def previous(self) -> Any:
+    def previous(self) -> FieldReturn[CT]:
         ...

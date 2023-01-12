@@ -187,14 +187,13 @@ def test_basedonfields_emit(source, action, seed, expected):
 
 @pytest.mark.parametrize('source, action, has_rng, problem', [
     ([Field('test1', Static('test'))],
-     lambda: None, False, 'takes 0 positional arguments but 1 was given'),
+     lambda: None, False, 'too many positional arguments'),
     ([Field('test1', Static('test'))],
-     lambda rng: None, False, "got multiple values for argument 'rng'"),
+     lambda rng: None, False, "multiple values for argument 'rng'"),
     ([Field('test1', Static('test'))],
-     lambda rng, test1: None, False, "got multiple values for argument 'rng'"),
+     lambda rng, test1: None, False, "multiple values for argument 'rng'"),
     ([Field('test1', Static('test'))],
-     lambda v1, v2: None, False,
-     "missing 1 required positional argument: 'v2'"),
+     lambda v1, v2: None, False, "missing a required argument: 'v2'"),
     ([Field('test1', Static('test')),
       Field('test2', Static('test'))],
      lambda: None, False, "got an unexpected keyword argument 'test1'"),
@@ -203,7 +202,7 @@ def test_basedonfields_emit(source, action, seed, expected):
      lambda rng: None, False, "got an unexpected keyword argument 'test1'"),
     ([Field('test1', Static('test')),
       Field('test2', Static('test'))],
-     lambda v1, v2: None, False, "got an unexpected keyword argument 'test1'"),
+     lambda v1, v2: None, False, "missing a required argument: 'v1'"),
     ([Field('test1', Static('test')),
       Field('test2', Static('test'))],
      lambda test1, rng: None, False,
@@ -211,7 +210,7 @@ def test_basedonfields_emit(source, action, seed, expected):
     ([Field('test1', Static('test')),
       Field('test2', Static('test'))],
      lambda test1, test2, test3: None, False,
-     "missing 1 required positional argument: 'test3'"),
+     "missing a required argument: 'test3'"),
 ])
 def test_basedonfields_emit_bad_action_raises_error(source, action, has_rng,
                                                     problem):
@@ -222,13 +221,8 @@ def test_basedonfields_emit_bad_action_raises_error(source, action, has_rng,
         args = ''
         kwargs_sources = ', '.join([f"{f.name}='test'" for f in source])
     kwargs_rng = "rng=" if has_rng else ''
-    em = BasedOnFields(source, action)
-    _ = [field() for field in em.source]
-    with pytest.raises(TypeError) as excinfo_one:
-        _ = em()
-    with pytest.raises(TypeError) as excinfo_two:
-        _ = em(10)
-    for excinfo in (excinfo_one, excinfo_two):
-        err_msg = str(excinfo.value)
-        for blurb in (args, kwargs_sources, kwargs_rng, problem):
-            assert blurb in err_msg
+    with pytest.raises(TypeError) as excinfo:
+        em = BasedOnFields(source, action)
+    err_msg = str(excinfo.value)
+    for blurb in (args, kwargs_sources, kwargs_rng, problem):
+        assert blurb in err_msg

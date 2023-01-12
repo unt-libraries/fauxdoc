@@ -1,15 +1,50 @@
 """Contains emitters that use Field data to generate output."""
 from inspect import signature
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Union
+from typing import (
+    Any, Callable, Generic, List, Mapping, Optional, Sequence, Union
+)
 from unittest.mock import call
 
 from fauxdoc.group import ObjectGroup
 from fauxdoc.emitter import Emitter
+from fauxdoc.emitters.wrappers import BoundWrapper
 from fauxdoc.mixins import RandomMixin
-from fauxdoc.typing import FieldLike, T
+from fauxdoc.typing import CT, FieldLike, FieldReturn, OutputT, SourceT, T
 
 
-class CopyFields(Emitter):
+class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
+    """Provide utility features for groups of source fields.
+
+    This class abstracts out (an admittedly small amount of)
+    functionality around groups of Field or FieldLike objects, which
+    are used as data sources for the CopyFields and BasedOnFields
+    emitters.
+
+    - Your supplied field list can be one single FieldLike instance or
+      a Sequence of them.
+    - Provides a property that tells you if your source field(s) output
+      a single value, or not.
+    """
+
+    def __init__(self, fields: Union[FieldLike[T], Sequence[FieldLike[T]]]):
+        """Inits a SourceFieldGroup instance.
+
+        Args:
+            fields: You can provide a single FieldLike instance or a
+                Sequence of them.
+        """
+        args = fields if isinstance(fields, Sequence) else [fields]
+        super().__init__(*args)
+
+    @property
+    def single_valued(self) -> bool:
+        """True if there is one source field that returns one value."""
+        if len(self) == 1:
+            return not self[0].multi_valued
+        return False
+
+
+class CopyFields(Generic[T], Emitter[Optional[Union[T, List[T], str]]]):
     """Emitter class for copying data from Field instances.
 
     Use this if you have fields in your schema that need to copy data
@@ -24,24 +59,24 @@ class CopyFields(Emitter):
           fields into a single string value, joined using a provided
           'separator'.
 
-    Use a BasedOnFields emitter instead if you need to modify the
-    values from existing fields or otherwise base your output on
-    existing fields rather than copy it exactly.
+    Use CopyFields if you want an exact copy. Use BasedOnFields instead
+    if you need to modify or otherwise base your output on values from
+    existing fields.
 
     Note that, in your schema assignment, you should put each Field
     using this emitter AFTER all the fields it copies. E.g., the value
     being copied won't exist until the source field emits data.
 
     Attributes:
-        source: An ObjectGroup containing the Field instance(s) to copy
-            data from. Values are output in Field order.
+        source: A SourceFieldGroup instance containing the Field
+            instance(s) to copy data from.
         separator: (Optional.) A string value to use to join multiple
             values. If provided, then it's assumed you want multiple
             values collapsed into one string value.
     """
 
     def __init__(self,
-                 source: Union[FieldLike, Sequence[FieldLike]],
+                 source: Union[FieldLike[T], Sequence[FieldLike[T]]],
                  separator: Optional[str] = None) -> None:
         """Inits a CopyFields obj with source fields and separator.
 
@@ -50,54 +85,27 @@ class CopyFields(Emitter):
                 Field instances (to copy data from).
             separator: (Optional.) See `separator` attribute.
         """
-        self.source = source
         self.separator = separator
-
-    @property
-    def source(self) -> ObjectGroup:
-        """Returns the 'source' attribute."""
-        return self._source
-
-    @source.setter
-    def source(self, source: Union[FieldLike, Sequence[FieldLike]]) -> None:
-        """Sets the 'source' attribute.
-
-        Also sets a private '_single_valued' attribute, True if this
-        emitter has one source field that emits single values.
-
-        Args:
-            source: One Field instance or a sequence of Field instances
-                (to copy data from).
-        """
-        if isinstance(source, (list, tuple)):
-            self._source = ObjectGroup(*source)
-            self._single_valued = False
-        else:
-            self._source = ObjectGroup(source)
-            self._single_valued = not source.multi_valued
+        self.source = SourceFieldGroup(source)
 
     def reset_source(self) -> None:
         """Calls `reset` on all source fields.
 
-        Note that calling `self.reset` does not automatically reset
-        source fields because that behavior would generally be
-        redundant. I.e., usually a CopyField instance and its source
-        Field instances will belong to the same Schema instance, and
-        when used in that context, calling the Schema's `reset_fields`
-        method resets all source fields anyway. So with the primary use
-        case, reseting sources when `self.reset` is called would reset
-        them twice. This method is provided for unusual or advanced use
-        cases where you're using a BasedOnField instance outside a
-        schema, or your source fields aren't part of the same schema.
+        Note that the `reset` method does not automatically reset
+        source fields -- you have to use `reset_source`.
         """
-        self._source.do_method('reset')
+        self.source.do_method('reset')
 
-    def emit(self) -> T:
+    def single_valued(self) -> bool:
+        """True if there is one source field that returns one value."""
+        return self.source.single_valued
+
+    def emit(self) -> Optional[Union[T, List[T], str]]:
         """Returns one emitted value."""
-        if self._single_valued:
-            return self._source[0].previous
-        vals = []
-        for field in self._source:
+        if self.source.single_valued:
+            return self.source[0].previous
+        vals: List[T] = []
+        for field in self.source:
             val = field.previous
             if val is not None:
                 if not isinstance(val, (list, tuple)):
@@ -107,7 +115,7 @@ class CopyFields(Emitter):
             return vals or None
         return self.separator.join([str(v) for v in vals])
 
-    def emit_many(self, number: int) -> List[T]:
+    def emit_many(self, number: int) -> List[Optional[Union[T, List[T], str]]]:
         """Returns a list of emitted values.
 
         Args:
@@ -116,7 +124,7 @@ class CopyFields(Emitter):
         return [self.emit()] * number
 
 
-class BasedOnFields(RandomMixin, CopyFields):
+class BasedOnFields(Generic[SourceT, OutputT], RandomMixin, Emitter[OutputT]):
     """Emitter class for basing output on existing Field instances.
 
     Use this if you need to emit data that is *based on* the data from
@@ -131,7 +139,7 @@ class BasedOnFields(RandomMixin, CopyFields):
     that maps source fields to their output values, using field names
     as keys.
 
-    Note that this is faster than using wrapper emitters to wrap
+    Note that this performs better than using wrapper emitters to wrap
     CopyFields output, although it's functionally equivalent.
 
     Also note that, in your schema assignment, you should put each
@@ -139,8 +147,8 @@ class BasedOnFields(RandomMixin, CopyFields):
     values being sourced won't exist until the source fields emit data.
 
     Attributes:
-        source: An ObjectGroup containing the Field instance(s) to copy
-            data from. Values are sent to the 'action' function in
+        source: A SourceFieldGroup containing the Field instance(s) to
+            copy data from. Values are sent to the 'action' function in
             Field order.
         action: A callable that takes data from the source field(s) and
             returns some output value(s) based on the source data. The
@@ -157,8 +165,9 @@ class BasedOnFields(RandomMixin, CopyFields):
     """
 
     def __init__(self,
-                 source: Union[FieldLike, Sequence[FieldLike]],
-                 action: Callable,
+                 source: Union[FieldLike[SourceT],
+                               Sequence[FieldLike[SourceT]]],
+                 action: Callable[..., OutputT],
                  rng_seed: Any = None) -> None:
         """Inits a BasedOnFields instance.
 
@@ -168,79 +177,56 @@ class BasedOnFields(RandomMixin, CopyFields):
             action: See `action` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        super().__init__(source, rng_seed=rng_seed)
-        self.action = action
-
-    @property
-    def action(self) -> Callable:
-        return self._action
-
-    @action.setter
-    def action(self, action: Callable) -> None:
-        """Sets the `action` property.
-
-        This also looks for an 'rng' kwarg in the provided action's
-        call signature and sets a private '_action_wants_rng'
-        attribute.
-
-        Arguments:
-            action: See 'action' attribute.
-        """
-        try:
-            actionsig = signature(action)
-        except ValueError:
-            self._action_wants_rng = False
+        super().__init__(rng_seed=rng_seed)
+        self.source = SourceFieldGroup(source)
+        self.action: BoundWrapper[
+            FieldReturn[SourceT],
+            OutputT
+        ] = BoundWrapper(action, self)
+        if len(self.source) == 1:
+            args = [self.source[0]()]
+            kwargs = {}
         else:
-            self._action_wants_rng = 'rng' in actionsig.parameters
-        self._action = action
+            args = []
+            kwargs = {field.name: field() for field in self.source}
+        try:
+            self.action.try_mock_call(*args, **kwargs)
+        except TypeError:
+            raise
+        finally:
+            self.reset()
 
-    def _raise_action_call_error(self, error: TypeError, args: Sequence,
-                                 kwargs: Mapping) -> None:
-        """Raises a TypeError based on a failed wrapper call.
+    def reset_source(self) -> None:
+        """Calls `reset` on all source fields.
 
-        The intended use for this is to catch/raise a TypeError during
-        either of the emit methods if the wrapper call fails.
+        Note that the `reset` method does not automatically reset
+        source fields -- you have to use `reset_source`.
         """
-        call_str = str(call(*args, **kwargs))[4:]
-        raise TypeError(
-            f'Trying to call ``self.action{call_str}`` raised a TypeError: '
-            f'"{error}." (The signature for self.action may not match what '
-            f'the ``{type(self).__name__}`` class expects.)'
-        ) from error
+        self.source.do_method('reset')
 
     def seed_source(self, rng_seed: Any) -> None:
-        """Seeds all RNGs associated with source fields.
+        """Calls `seed` on all source fields.
 
-        Note that calling `self.seed` does not automatically reseed
-        source fields because that behavior would generally be
-        redundant. I.e., usually a BasedOnField instance and its source
-        Field instances will belong to the same Schema instance, and
-        when used in that context, calling the Schema's `seed_fields`
-        method seeds all source fields anyway. So with the primary use
-        case, seeding sources when `self.seed` is called would seed
-        them twice. This method is provided for unusual or advanced use
-        cases where you're using a BasedOnField instance outside a
-        schema, or your source fields aren't part of the same schema.
+        Note that the `seed` method does not automatically seed source
+        fields -- you have to use `seed_source`.
 
         Args:
-            rng_seed: The new seed you want to set. Ultimately this is
-                passed to a random.Random instance, so it should be any
-                value valid for seeding random.Random.
+            rng_seed: The new seed you want to set, to seed a
+                random.Random object.
         """
-        self._source.do_method('seed', rng_seed)
+        self.source.do_method('seed', rng_seed)
 
-    def emit(self) -> T:
+    def emit(self) -> OutputT:
         """Returns one emitted value."""
-        args = []
-        kwargs = {}
-        if len(self._source) == 1:
-            args = [self._source[0].previous]
-        else:
-            for field in self._source:
-                kwargs[field.name] = field.previous
-        if self._action_wants_rng:
-            kwargs['rng'] = self.rng
-        try:
-            return self.action(*args, **kwargs)
-        except TypeError as e:
-            self._raise_action_call_error(e, args, kwargs)
+        if len(self.source) == 1:
+            return self.action(self.source[0].previous)
+        kwargs = {field.name: field.previous for field in self.source}
+        return self.action(**kwargs)
+
+    def emit_many(self, number: int) -> List[OutputT]:
+        """Returns a list of emitted values.
+
+        Args:
+            number: See superclass.
+        """
+        return [self.emit()] * number
