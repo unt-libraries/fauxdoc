@@ -8,7 +8,7 @@ from fauxdoc.mixins import RandomMixin, ItemsMixin
 from fauxdoc.typing import Number, T
 
 
-class Choice(RandomMixin, ItemsMixin, Emitter):
+class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
     """Class for making random selections, optionally with weighting.
 
     This covers any kind of random choice and implements the most
@@ -71,11 +71,11 @@ class Choice(RandomMixin, ItemsMixin, Emitter):
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
         self.weights = weights
-        self.cum_weights = None
+        self.cum_weights: Optional[List[Number]] = None
         self.replace = replace or replace_only_after_call
         self.replace_only_after_call = replace_only_after_call
         self.noun = noun
-        self._shuffled = None
+        self._shuffled: List[T] = []
         super().__init__(items=items, rng_seed=rng_seed)
 
     def reset(self) -> None:
@@ -125,7 +125,7 @@ class Choice(RandomMixin, ItemsMixin, Emitter):
             # losing track of what has already been emitted.
             self._global_shuffle()
 
-    def _global_shuffle(self):
+    def _global_shuffle(self) -> None:
         weights = self.weights or [1] * len(self._items)
         self._shuffled = weighted_shuffle(self._items, weights, self.rng)
         self._shuffled_index = 0
@@ -165,7 +165,7 @@ class Choice(RandomMixin, ItemsMixin, Emitter):
         """
         return self._num_unique_items
 
-    def _choice_without_replacement(self, number: int):
+    def _choice_without_replacement(self, number: int) -> List[T]:
         """Makes choices without replacing items."""
         if number > self._num_unique_items:
             self.raise_uniqueness_violation(number)
@@ -186,7 +186,7 @@ class Choice(RandomMixin, ItemsMixin, Emitter):
         # One call without replacement, with weights.
         return weighted_shuffle(self._items, self.weights, self.rng, number)
 
-    def _choice_with_replacement(self, number: int):
+    def _choice_with_replacement(self, number: int) -> List[T]:
         """Makes non-unique choices (with replacement)."""
         if len(self._items) == 1:
             # No choice here.
@@ -221,7 +221,7 @@ def poisson_choice(items: Sequence[T],
                    replace: bool = True,
                    replace_only_after_call: bool = False,
                    noun: str = '',
-                   rng_seed: Any = None) -> Choice:
+                   rng_seed: Any = None) -> Choice[T]:
     """Returns a Choice emitter with a Poisson weight distribution.
 
     Args:
@@ -253,7 +253,7 @@ def gaussian_choice(items: Sequence[T],
                     replace: bool = True,
                     replace_only_after_call: bool = False,
                     noun: str = '',
-                    rng_seed: Any = None) -> None:
+                    rng_seed: Any = None) -> Choice[T]:
     """Returns a Choice emitter with a Gaussian weight distribution.
 
     Args:
@@ -284,7 +284,7 @@ def gaussian_choice(items: Sequence[T],
                   rng_seed)
 
 
-def chance(chance: Number, rng_seed: Any = None) -> None:
+def chance(chance: Number, rng_seed: Any = None) -> Choice[bool]:
     """Returns a Choice emitter with a certain chance of emitting True.
 
     Args:

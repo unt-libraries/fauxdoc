@@ -7,7 +7,7 @@ from fauxdoc.mixins import ItemsMixin
 from fauxdoc.typing import T
 
 
-class Static(ItemsMixin, Emitter):
+class Static(ItemsMixin[T], Emitter[T]):
     """Class for emitting static values.
 
     Attributes:
@@ -30,7 +30,7 @@ class Static(ItemsMixin, Emitter):
         return [self.value] * number
 
 
-class Iterative(Emitter):
+class Iterative(Emitter[T]):
     """Class for emitting values from an iterator.
 
     Iterative emitters are infinite and will restart from the
@@ -78,7 +78,7 @@ class Iterative(Emitter):
     """
 
     def __init__(self,
-                 iterator_factory: Callable[[], Iterator],
+                 iterator_factory: Callable[[], Iterator[T]],
                  reset_after_call: bool = False) -> None:
         """Inits a Iterative emitter.
 
@@ -91,11 +91,11 @@ class Iterative(Emitter):
         self.reset()
 
     @property
-    def iterator_factory(self) -> None:
+    def iterator_factory(self) -> Callable[[], Iterator[T]]:
         return self._iterator_factory
 
     @iterator_factory.setter
-    def iterator_factory(self, factory: Callable[[], Iterator]) -> None:
+    def iterator_factory(self, factory: Callable[[], Iterator[T]]) -> None:
         """Sets the iterator_factory property."""
         try:
             next(factory())
@@ -107,7 +107,7 @@ class Iterative(Emitter):
             )
         self._iterator_factory = factory
 
-    def _infinite_iterator(self):
+    def _infinite_iterator(self) -> Iterator[T]:
         """Returns an infinitely regenerating iterator."""
         while True:
             for item in self.iterator_factory():
@@ -136,7 +136,7 @@ class Iterative(Emitter):
         return ret_value
 
 
-class Sequential(ItemsMixin, Iterative):
+class Sequential(ItemsMixin[T], Iterative[T]):
     """Class for creating an Iterative emitter for a sequence.
 
     Although you can achieve this using a plain Iterative emitter:
@@ -153,7 +153,7 @@ class Sequential(ItemsMixin, Iterative):
     """
 
     def __init__(self,
-                 items: Sequence,
+                 items: Sequence[T],
                  reset_after_call: bool = False) -> None:
         """Inits a Sequential emitter instance.
 
