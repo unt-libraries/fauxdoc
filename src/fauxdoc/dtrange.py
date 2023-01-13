@@ -1,7 +1,6 @@
 """Contains an implementation of a custom date/time range type."""
-from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
-from typing import Optional, overload, Tuple, TypeVar, Union
+from typing import Optional, overload, Sequence, Tuple, TypeVar, Union
 
 
 DT = TypeVar('DT', date, datetime, time)

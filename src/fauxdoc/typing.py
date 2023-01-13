@@ -1,12 +1,38 @@
 """Contains constants/variables/etc. used for type hinting."""
+import collections
 import random
 import sys
-from typing import Any, List, Optional, overload, TypeVar, Union
+from typing import Any, List, Optional, overload, TYPE_CHECKING, TypeVar, Union
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
 else:
     from typing_extensions import Protocol
+
+# For Python 3.7 and 3.8: standard library ABC classes (including
+# collections) aren't subscriptable and don't accept e.g. UserList[T]
+# at runtime, although they're required for type hints. This is the
+# fix.
+#
+# On Python >= 3.9, or during type checking, the collections versions
+# of these classes work.
+if sys.version_info >= (3, 9) or TYPE_CHECKING:
+    OrderedDict = collections.OrderedDict
+    UserList = collections.UserList
+
+# Otherwise, we need to hack it so these classes are subscriptable but
+# are otherwise identical.
+else:
+    class _OrderedDict:
+        def __getitem__(self, *args):
+            return collections.OrderedDict
+
+    class _UserList:
+        def __getitem__(self, *args):
+            return collections.UserList
+
+    OrderedDict = _OrderedDict()
+    UserList = _UserList()
 
 
 # Type aliases defined here.
