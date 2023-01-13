@@ -12,6 +12,7 @@ else:
 # Type aliases defined here.
 
 T = TypeVar('T')
+F = TypeVar('F', bound=float)
 CT = TypeVar('CT', covariant=True)
 SourceT = TypeVar('SourceT', contravariant=True)
 OutputT = TypeVar('OutputT', covariant=True)
@@ -61,7 +62,7 @@ class ImplementsRNG(Protocol):
         ...
 
 
-class RandomEmitterLike(ImplementsRNG, EmitterLike[T]):
+class RandomEmitterLike(ImplementsRNG, EmitterLike[T], Protocol[T]):
     """Is like an emitter.RandomEmitter object."""
 
 

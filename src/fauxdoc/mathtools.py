@@ -3,7 +3,7 @@ import math
 import random
 from typing import List, Optional, Sequence
 
-from fauxdoc.typing import Number, T
+from fauxdoc.typing import F, Number, T
 
 
 def poisson(x: int, mu: Number = 1) -> float:
@@ -42,9 +42,7 @@ def gaussian(x: Number, mu: Number = 0, sigma: Number = 1) -> float:
     return term1 * term2
 
 
-def clamp(number: Number,
-          mn: Optional[Number] = None,
-          mx: Optional[Number] = None) -> Number:
+def clamp(number: F, mn: Optional[F] = None, mx: Optional[F] = None) -> F:
     """Limits a given number to a minimum and/or maximum value.
 
     Examples:

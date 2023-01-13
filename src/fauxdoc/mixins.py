@@ -119,7 +119,9 @@ class ChildrenMixin:
                 __init__. Optionally, if you include 'children', then
                 that is used to populate the private '_emitters' attr.
         """
-        self._emitters = ObjectMap(kwargs.pop('children', {}))
+        self._emitters: ObjectMap[EmitterLike[Any]] = ObjectMap(
+            kwargs.pop('children', {})
+        )
         super().__init__(*args, **kwargs)
 
     @property

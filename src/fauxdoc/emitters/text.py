@@ -1,13 +1,15 @@
 """Contains functions and emitters for emitting text data."""
-from typing import Any, Iterator, List, Optional, Sequence
+from typing import Any, Generator, Iterator, List, Optional, Sequence, Tuple
 
 from fauxdoc.emitter import Emitter
+from fauxdoc.emitters import Static
 from fauxdoc.mathtools import clamp
 from fauxdoc.mixins import RandomWithChildrenMixin
 from fauxdoc.typing import IntEmitterLike, StrEmitterLike
 
 
-def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
+def make_alphabet(uchar_ranges: Optional[Sequence[Tuple[int, int]]] = None
+                  ) -> List[str]:
     """Generates an alphabet from provided unicode character ranges.
 
     This creates a list of characters to use as an alphabet for string
@@ -36,7 +38,7 @@ def make_alphabet(uchar_ranges: Optional[Sequence[tuple]] = None) -> List[str]:
     ]
 
 
-class Word(RandomWithChildrenMixin, Emitter):
+class Word(RandomWithChildrenMixin, Emitter[str]):
     """Class for generating and emitting randomized words.
 
     Words that are emitted have a random variable length and characters
@@ -87,33 +89,31 @@ class Word(RandomWithChildrenMixin, Emitter):
             alphabet_emitter: See `alphabet_emitter` attribute.
             rng_seed (Optional.) See `rng_seed` attribute.
         """
-        children = {
-            'length': length_emitter,
-            'alphabet': alphabet_emitter
-        }
-        super().__init__(children=children, rng_seed=rng_seed)
+        self._length_emitter = length_emitter
+        self._alphabet_emitter = alphabet_emitter
+        super().__init__(children={
+            'length': self._length_emitter,
+            'alphabet': self._alphabet_emitter
+        }, rng_seed=rng_seed)
         self._update_num_unique_vals()
 
     @property
     def length_emitter(self) -> IntEmitterLike:
         """Returns the 'length_emitter' attribute."""
-        return self._emitters['length']
+        return self._length_emitter
 
     @property
-    def alphabet_emitter(self) -> None:
+    def alphabet_emitter(self) -> StrEmitterLike:
         """Returns the 'alphabet_emitter' attribute."""
-        return self._emitters['alphabet']
+        return self._alphabet_emitter
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
-        alpha = self._emitters.get('alphabet')
-        length = self._emitters.get('length')
-        if alpha and length:
-            nchars = alpha.num_unique_values
-            number = sum([nchars ** i for i in length.items])
-            self._num_unique_values = number
-            return
-        self._num_unique_values = None
+        self._num_unique_values: Optional[int] = None
+        nchars = self._alphabet_emitter.num_unique_values
+        if nchars is not None and hasattr(self._length_emitter, 'items'):
+            poss_items = self._length_emitter.items
+            self._num_unique_values = sum([nchars ** i for i in poss_items])
 
     def reset(self) -> None:
         """See superclass."""
@@ -127,7 +127,7 @@ class Word(RandomWithChildrenMixin, Emitter):
         self._emitters.do_method('seed', self.rng_seed)
 
     @property
-    def num_unique_values(self) -> int:
+    def num_unique_values(self) -> Optional[int]:
         """Returns the max number of unique values this can emit."""
         return self._num_unique_values
 
@@ -152,7 +152,7 @@ class Word(RandomWithChildrenMixin, Emitter):
         return words
 
 
-class Text(RandomWithChildrenMixin, Emitter):
+class Text(RandomWithChildrenMixin, Emitter[str]):
     """Class for emitting random text.
 
     "Text" in this case is defined very basically as a string of words,
@@ -168,10 +168,9 @@ class Text(RandomWithChildrenMixin, Emitter):
         word_emitter: An `Emitter`-like instance that emits words
             (strings.) Used to generate the list of words for each
             emitted text value. This should emit infinite values.
-        sep_emitter: (Optional.) An `Emitter`-like instance that emits
-            word separator character strings, used to generate the
-            characters between words. If not provided, words are simply
-            separated by a space (' ') value.
+        sep_emitter: An `Emitter`-like instance that emits word
+            separator character strings, used to generate characters
+            between words.
         rng_seed: (Optional.) Any valid seed value you'd provide to
             random.seed. Default is None.
     """
@@ -184,51 +183,53 @@ class Text(RandomWithChildrenMixin, Emitter):
         """Inits TextEmitter with word, separator, and text settings.
 
         Args:
-            numword_emitter: See `numword_emitter` attribute.
+            numwords_emitter: See `numwords_emitter` attribute.
             word_emitter: See `word_emitter` attribute.
             sep_emitter: (Optional.) See `sep_emitter` attribute.
+                Defaults to a Static emitter that emits a space (' ').
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        children = {
-            'numwords': numwords_emitter,
-            'word': word_emitter,
-            'sep': sep_emitter
-        }
-        super().__init__(children=children, rng_seed=rng_seed)
+        self._numwords_emitter = numwords_emitter
+        self._word_emitter = word_emitter
+        self._sep_emitter = sep_emitter or Static(' ')
+        super().__init__(children={
+            'numwords': self._numwords_emitter,
+            'word': self._word_emitter,
+            'sep': self._sep_emitter
+        }, rng_seed=rng_seed)
         self._update_num_unique_vals()
 
     @property
     def numwords_emitter(self) -> IntEmitterLike:
         """Returns the 'numwords_emitter' attribute."""
-        return self._emitters['numwords']
+        return self._numwords_emitter
 
     @property
     def word_emitter(self) -> StrEmitterLike:
         """Returns the 'word_emitter' attribute."""
-        return self._emitters['word']
+        return self._word_emitter
 
     @property
     def sep_emitter(self) -> StrEmitterLike:
         """Returns the 'sep_emitter' attribute."""
-        return self._emitters['sep']
+        return self._sep_emitter
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
-        word = self._emitters.get('word')
-        sep = self._emitters.get('sep')
-        numwords = self._emitters.get('numwords')
-        if word and numwords:
-            n_uw = word.num_unique_values
-            n_us = getattr(sep, 'num_unique_values', 1)
-            lengths = numwords.items
-            if n_uw is not None and n_us is not None:
-                num = sum([(n_uw ** i) * (n_us ** (i - 1)) for i in lengths])
-                self._num_unique_values = num
-                return
-        self._num_unique_values = None
+        self._num_unique_values: Optional[int] = None
+        numwords = self._numwords_emitter
+        word_em_has_uv = self._word_emitter.num_unique_values is not None
+        sep_em_has_uv = self._sep_emitter.num_unique_values is not None
+        if word_em_has_uv and sep_em_has_uv and hasattr(numwords, 'items'):
+            nums: List[int] = []
+            for length in numwords.items:
+                num_uwords = self._word_emitter.num_unique_values ** length
+                num_useps = self._sep_emitter.num_unique_values ** (length - 1)
+                nums.append(num_uwords * num_useps)
+            self._num_unique_values = sum(nums)
 
     @property
-    def num_unique_values(self) -> int:
+    def num_unique_values(self) -> Optional[int]:
         """Returns the max number of unique values this can produce."""
         return self._num_unique_values
 
@@ -243,7 +244,7 @@ class Text(RandomWithChildrenMixin, Emitter):
         super().seed(rng_seed)
         self._emitters.do_method('seed', self.rng_seed)
 
-    def _get_words_iterator(self, total: int) -> Iterator:
+    def _get_words_iterator(self, total: int) -> Iterator[str]:
         """Creates an iterator/generator for generating words."""
 
         # This addresses the edge case where the word_emitter for this
@@ -263,16 +264,16 @@ class Text(RandomWithChildrenMixin, Emitter):
         # `reset` call happens in the middle of a set of words, but
         # this is about the best we can do I think.
 
-        if getattr(self._emitters['word'], 'replace_only_after_call', False):
-            num_unique = self._emitters['word'].num_unique_items
-            if total > num_unique:
-                def generator():
+        if getattr(self._word_emitter, 'replace_only_after_call', False):
+            num_unique = self._word_emitter.num_unique_values or 0
+            if num_unique and total > num_unique:
+                def generator() -> Generator[str, None, None]:
                     remainder = total
                     while remainder > 0:
                         needed = clamp(num_unique, mx=remainder)
-                        for word in self._emitters['word'](needed):
+                        for word in self._word_emitter(needed):
                             yield word
-                        self._emitters['word'].reset()
+                        self._word_emitter.reset()
                         remainder -= needed
                 return generator()
         return iter(self._emitters['word'](total))
@@ -288,13 +289,10 @@ class Text(RandomWithChildrenMixin, Emitter):
             number: See superclass.
         """
         texts = []
-        lengths = self._emitters['numwords'](number)
+        lengths = self._numwords_emitter(number)
         total_words = sum(lengths)
         words = self._get_words_iterator(total_words)
-        try:
-            seps = iter(self._emitters['sep'](total_words - number))
-        except TypeError:
-            seps = iter([])
+        seps = iter(self._sep_emitter(total_words - number))
         for length in lengths:
             if length:
                 render = [next(words)]
