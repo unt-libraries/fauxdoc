@@ -5,7 +5,7 @@ from fauxdoc.emitter import Emitter
 from fauxdoc.emitters import Static
 from fauxdoc.mathtools import clamp
 from fauxdoc.mixins import RandomWithChildrenMixin
-from fauxdoc.typing import IntEmitterLike, StrEmitterLike
+from fauxdoc.typing import EmitterLike
 
 
 def make_alphabet(uchar_ranges: Optional[Sequence[Tuple[int, int]]] = None
@@ -79,8 +79,8 @@ class Word(RandomWithChildrenMixin, Emitter[str]):
     """
 
     def __init__(self,
-                 length_emitter: IntEmitterLike,
-                 alphabet_emitter: StrEmitterLike,
+                 length_emitter: EmitterLike[int],
+                 alphabet_emitter: EmitterLike[str],
                  rng_seed: Any = None) -> None:
         """Inits Word emitter with a length and alphabet emitter.
 
@@ -98,12 +98,12 @@ class Word(RandomWithChildrenMixin, Emitter[str]):
         self._update_num_unique_vals()
 
     @property
-    def length_emitter(self) -> IntEmitterLike:
+    def length_emitter(self) -> EmitterLike[int]:
         """Returns the 'length_emitter' attribute."""
         return self._length_emitter
 
     @property
-    def alphabet_emitter(self) -> StrEmitterLike:
+    def alphabet_emitter(self) -> EmitterLike[str]:
         """Returns the 'alphabet_emitter' attribute."""
         return self._alphabet_emitter
 
@@ -176,9 +176,9 @@ class Text(RandomWithChildrenMixin, Emitter[str]):
     """
 
     def __init__(self,
-                 numwords_emitter: IntEmitterLike,
-                 word_emitter: StrEmitterLike,
-                 sep_emitter: Optional[StrEmitterLike] = None,
+                 numwords_emitter: EmitterLike[int],
+                 word_emitter: EmitterLike[str],
+                 sep_emitter: Optional[EmitterLike[str]] = None,
                  rng_seed: Any = None) -> None:
         """Inits TextEmitter with word, separator, and text settings.
 
@@ -200,17 +200,17 @@ class Text(RandomWithChildrenMixin, Emitter[str]):
         self._update_num_unique_vals()
 
     @property
-    def numwords_emitter(self) -> IntEmitterLike:
+    def numwords_emitter(self) -> EmitterLike[int]:
         """Returns the 'numwords_emitter' attribute."""
         return self._numwords_emitter
 
     @property
-    def word_emitter(self) -> StrEmitterLike:
+    def word_emitter(self) -> EmitterLike[str]:
         """Returns the 'word_emitter' attribute."""
         return self._word_emitter
 
     @property
-    def sep_emitter(self) -> StrEmitterLike:
+    def sep_emitter(self) -> EmitterLike[str]:
         """Returns the 'sep_emitter' attribute."""
         return self._sep_emitter
 

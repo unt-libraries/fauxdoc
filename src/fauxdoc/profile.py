@@ -4,9 +4,7 @@ from typing import Any, Dict, Generic, List, Optional, Union
 from fauxdoc.group import ObjectMap
 from fauxdoc.emitters.fixed import Static
 from fauxdoc.mixins import RandomMixin
-from fauxdoc.typing import (
-    BoolEmitterLike, EmitterLike, FieldLike, IntEmitterLike, T
-)
+from fauxdoc.typing import EmitterLike, FieldLike, T
 
 
 class Field(RandomMixin, Generic[T]):
@@ -74,8 +72,8 @@ class Field(RandomMixin, Generic[T]):
     def __init__(self,
                  name: str,
                  emitter: EmitterLike[T],
-                 repeat: Optional[IntEmitterLike] = None,
-                 gate: Optional[BoolEmitterLike] = None,
+                 repeat: Optional[EmitterLike[int]] = None,
+                 gate: Optional[EmitterLike[bool]] = None,
                  hide: bool = False,
                  rng_seed: Any = None) -> None:
         """Inits a Field instance.

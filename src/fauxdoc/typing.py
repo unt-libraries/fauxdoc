@@ -48,11 +48,6 @@ class EmitterLike(Protocol[T]):
         ...
 
 
-BoolEmitterLike = EmitterLike[bool]
-IntEmitterLike = EmitterLike[int]
-StrEmitterLike = EmitterLike[str]
-
-
 class ImplementsRNG(Protocol):
     """Is a type that implements RNG."""
 
