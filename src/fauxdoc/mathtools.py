@@ -119,9 +119,9 @@ def weighted_shuffle(items: Sequence[T],
         return sample
 
     def _faster_for_high_k(items: Sequence[T],
-                          weights: Sequence[float],
-                          rng: random.Random,
-                          k: int) -> List[T]:
+                           weights: Sequence[float],
+                           rng: random.Random,
+                           k: int) -> List[T]:
         # I adapted this from https://stackoverflow.com/a/20548895.
         # This is more of an actual shuffle: we create a randomized
         # score for each item based on weight, and then reverse sort

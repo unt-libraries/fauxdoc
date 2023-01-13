@@ -1,7 +1,7 @@
 """Contains classes for grouping and operating on groups of objects."""
 from abc import ABC, abstractmethod
 from collections import OrderedDict, UserList
-from typing import Any, Generic, Iterable, Mapping, TypeVar
+from typing import Any, Generic, Iterable, Mapping
 
 from fauxdoc.typing import T
 

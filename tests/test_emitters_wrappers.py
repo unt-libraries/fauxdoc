@@ -81,7 +81,7 @@ def test_wrapone_emit_bad_wrapper_raises_error(wrapper, has_rng, problem):
     args = "'test'"
     kwargs = "rng=" if has_rng else ''
     with pytest.raises(TypeError) as excinfo:
-        em = WrapOne(Static('test'), wrapper)
+        WrapOne(Static('test'), wrapper)
     err_msg = str(excinfo.value)
     for blurb in (args, kwargs, problem):
         assert blurb in err_msg
@@ -153,7 +153,7 @@ def test_wrapmany_emit_bad_wrapper_raises_error(wrapper, has_rng, problem):
     kwargs_em = "a='test_a', b='test_b'"
     kwargs_rng = 'rng=' if has_rng else ''
     with pytest.raises(TypeError) as excinfo:
-        em = WrapMany({'a': Static('test_a'), 'b': Static('test_b')}, wrapper)
+        WrapMany({'a': Static('test_a'), 'b': Static('test_b')}, wrapper)
     err_msg = str(excinfo.value)
     for blurb in (kwargs_em, kwargs_rng, problem):
         assert blurb in err_msg

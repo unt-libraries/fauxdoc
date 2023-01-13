@@ -1,6 +1,6 @@
 """Contains mixin classes."""
 import random
-from typing import Any, Generic, List, Mapping, Sequence
+from typing import Any, Generic, Sequence
 
 from fauxdoc.group import ObjectMap
 from fauxdoc.typing import EmitterLike, T

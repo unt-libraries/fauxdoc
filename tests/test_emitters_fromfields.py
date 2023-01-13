@@ -222,7 +222,7 @@ def test_basedonfields_emit_bad_action_raises_error(source, action, has_rng,
         kwargs_sources = ', '.join([f"{f.name}='test'" for f in source])
     kwargs_rng = "rng=" if has_rng else ''
     with pytest.raises(TypeError) as excinfo:
-        em = BasedOnFields(source, action)
+        BasedOnFields(source, action)
     err_msg = str(excinfo.value)
     for blurb in (args, kwargs_sources, kwargs_rng, problem):
         assert blurb in err_msg

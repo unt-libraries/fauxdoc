@@ -1,15 +1,13 @@
 """Contains emitters that use Field data to generate output."""
-from inspect import signature
 from typing import (
-    Any, Callable, Generic, List, Mapping, Optional, Sequence, Union
+    Any, Callable, Generic, List, Optional, Sequence, Union
 )
-from unittest.mock import call
 
 from fauxdoc.group import ObjectGroup
 from fauxdoc.emitter import Emitter
 from fauxdoc.emitters.wrappers import BoundWrapper
 from fauxdoc.mixins import RandomMixin
-from fauxdoc.typing import CT, FieldLike, FieldReturn, OutputT, SourceT, T
+from fauxdoc.typing import FieldLike, FieldReturn, OutputT, SourceT, T
 
 
 class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
@@ -40,7 +38,10 @@ class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
     def single_valued(self) -> bool:
         """True if there is one source field that returns one value."""
         if len(self) == 1:
-            return not self[0].multi_valued
+            # pylint doesn't seem to like it if we don't do something
+            # to tell it `self` is indexable, like wrapping `self` in
+            # `list`.
+            return not list(self)[0].multi_valued
         return False
 
 
