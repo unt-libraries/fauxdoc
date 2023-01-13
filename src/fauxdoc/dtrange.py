@@ -3,8 +3,6 @@ from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 from typing import Optional, overload, Tuple, TypeVar, Union
 
-from fauxdoc.typing import Number
-
 
 DT = TypeVar('DT', date, datetime, time)
 DTS = TypeVar('DTS', date, datetime, time, str)
@@ -291,7 +289,7 @@ def _parse_user_date(val: Union[DT, str], label: str) -> DT:
     )
 
 
-def dtrange(start: Union[DT, str], stop: Union[DT, str], step: Number = 1,
+def dtrange(start: Union[DT, str], stop: Union[DT, str], step: float = 1,
             step_unit: Optional[str] = None) -> DateOrTimeRange[DT]:
     """Constructs and returns a DateOrTimeRange object.
 

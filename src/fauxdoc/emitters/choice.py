@@ -5,7 +5,7 @@ from typing import Any, Optional, List, Sequence
 from fauxdoc.emitter import Emitter
 from fauxdoc.mathtools import clamp, gaussian, poisson, weighted_shuffle
 from fauxdoc.mixins import RandomMixin, ItemsMixin
-from fauxdoc.typing import Number, T
+from fauxdoc.typing import T
 
 
 class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
@@ -54,7 +54,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
 
     def __init__(self,
                  items: Sequence[T],
-                 weights: Optional[Sequence[Number]] = None,
+                 weights: Optional[Sequence[float]] = None,
                  replace: bool = True,
                  replace_only_after_call: bool = False,
                  noun: str = '',
@@ -71,7 +71,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
         self.weights = weights
-        self.cum_weights: Optional[List[Number]] = None
+        self.cum_weights: Optional[List[float]] = None
         self.replace = replace or replace_only_after_call
         self.replace_only_after_call = replace_only_after_call
         self.noun = noun
@@ -217,7 +217,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
 
 def poisson_choice(items: Sequence[T],
                    mu: int = 1,
-                   weight_floor: Number = 0,
+                   weight_floor: float = 0,
                    replace: bool = True,
                    replace_only_after_call: bool = False,
                    noun: str = '',
@@ -247,9 +247,9 @@ def poisson_choice(items: Sequence[T],
 
 
 def gaussian_choice(items: Sequence[T],
-                    mu: Number = 0,
-                    sigma: Number = 1,
-                    weight_floor: Number = 0,
+                    mu: float = 0,
+                    sigma: float = 1,
+                    weight_floor: float = 0,
                     replace: bool = True,
                     replace_only_after_call: bool = False,
                     noun: str = '',
@@ -284,7 +284,7 @@ def gaussian_choice(items: Sequence[T],
                   rng_seed)
 
 
-def chance(chance: Number, rng_seed: Any = None) -> Choice[bool]:
+def chance(chance: float, rng_seed: Any = None) -> Choice[bool]:
     """Returns a Choice emitter with a certain chance of emitting True.
 
     Args:

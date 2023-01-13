@@ -16,7 +16,6 @@ F = TypeVar('F', bound=float)
 CT = TypeVar('CT', covariant=True)
 SourceT = TypeVar('SourceT', contravariant=True)
 OutputT = TypeVar('OutputT', covariant=True)
-Number = Union[int, float]
 FieldReturn = Optional[Union[T, List[T]]]
 
 

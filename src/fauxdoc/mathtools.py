@@ -3,10 +3,10 @@ import math
 import random
 from typing import List, Optional, Sequence
 
-from fauxdoc.typing import F, Number, T
+from fauxdoc.typing import F, T
 
 
-def poisson(x: int, mu: Number = 1) -> float:
+def poisson(x: int, mu: float = 1) -> float:
     """Applies a poisson probability distribution function.
 
     Args:
@@ -22,7 +22,7 @@ def poisson(x: int, mu: Number = 1) -> float:
     return (mu ** x) * (math.exp(-1 * mu)) / math.factorial(x)
 
 
-def gaussian(x: Number, mu: Number = 0, sigma: Number = 1) -> float:
+def gaussian(x: float, mu: float = 0, sigma: float = 1) -> float:
     """Applies a gaussian probability density function.
 
     Args:
@@ -71,7 +71,7 @@ def clamp(number: F, mn: Optional[F] = None, mx: Optional[F] = None) -> F:
 
 
 def weighted_shuffle(items: Sequence[T],
-                     weights: Sequence[Number],
+                     weights: Sequence[float],
                      rng: random.Random = random.Random(),
                      number: Optional[int] = None) -> List[T]:
     """Returns a list of items randomly shuffled based on weights.
@@ -94,7 +94,7 @@ def weighted_shuffle(items: Sequence[T],
             the full length of `items`.
     """
     def _faster_for_low_k(items: Sequence[T],
-                          weights: Sequence[Number],
+                          weights: Sequence[float],
                           rng: random.Random,
                           k: int) -> List[T]:
         # I adapted this from https://stackoverflow.com/a/43649323.
@@ -119,7 +119,7 @@ def weighted_shuffle(items: Sequence[T],
         return sample
 
     def _faster_for_high_k(items: Sequence[T],
-                          weights: Sequence[Number],
+                          weights: Sequence[float],
                           rng: random.Random,
                           k: int) -> List[T]:
         # I adapted this from https://stackoverflow.com/a/20548895.
