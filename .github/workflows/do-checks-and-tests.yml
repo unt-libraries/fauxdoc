@@ -15,7 +15,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install tox
       - name: Run linter
-        run: tox -e flake8,pylint_critical
+        run: tox -e flake8,pylint_critical,mypy_strict
 
   run-tests:
     runs-on: ubuntu-latest
