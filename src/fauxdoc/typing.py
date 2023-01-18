@@ -2,7 +2,10 @@
 import collections
 import random
 import sys
-from typing import Any, List, Optional, overload, TYPE_CHECKING, TypeVar, Union
+from typing import (
+    Any, Callable, List, Optional, overload, Sequence, TYPE_CHECKING, TypeVar,
+    Union
+)
 
 if sys.version_info >= (3, 8):
     from typing import Protocol
@@ -44,6 +47,12 @@ SourceT = TypeVar('SourceT', contravariant=True)
 OutputT = TypeVar('OutputT', covariant=True)
 FieldReturn = Optional[Union[T, List[T]]]
 
+# Deprecated (v2.0.0). Use `float` instead of `Number`.
+Number = float
+
+# Deprecated (v2.0.0). Just use `EmitterLike` instead.
+EmitterLikeCallable = Union[Callable[[int], Sequence[T]], 'EmitterLike[T]']
+
 
 # Protocols defined here.
 
@@ -71,6 +80,13 @@ class EmitterLike(Protocol[T]):
 
     def reset(self) -> None:
         ...
+
+
+# Deprecated (v2.0.0). Use e.g. `EmitterLike[str]` instead of
+# `StrEmitterLike`, etc.
+StrEmitterLike = EmitterLike[str]
+IntEmitterLike = EmitterLike[int]
+BoolEmitterLike = EmitterLike[bool]
 
 
 class ImplementsRNG(Protocol):
