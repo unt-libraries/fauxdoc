@@ -184,17 +184,41 @@ def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
     field = Field('test', emitter_unique(),
                   repeat=choice.Choice([1] * 12, replace=False),
                   gate=choice.chance(1.0), rng_seed=999)
-    [field() for _ in range(12)]
-    assert field.emitter.num_unique_values == 0
-    assert field.repeat_emitter.num_unique_values == 0
-
     field.emitter.seed(101010)
     field.repeat_emitter.seed(12345)
     field.gate_emitter.seed(54321)
+    [field() for _ in range(12)]
+    assert field.emitter.num_unique_values == 0
+    assert field.repeat_emitter.num_unique_values == 0
     field.reset()
     assert field.emitter.num_unique_values == 12
+    assert field.emitter.rng_seed == 999
     assert field.repeat_emitter.num_unique_values == 1
-    assert all([em.rng_seed == 999 for em in field._emitters.values()])
+    assert field.repeat_emitter.rng_seed == 999
+    assert field.gate_emitter.rng_seed == 999
+
+
+def test_field_reset_resets_and_reseeds_changed_emitters(emitter_unique):
+    # If we originally initialize a field using one set of emitters
+    # and then change those emitters by changing the applicable
+    # attributes, calling `field.reset()` should reset all of the new
+    # emitters.
+    field = Field('test', Static('invalid'), rng_seed=999)
+    field.emitter = emitter_unique()
+    field.repeat_emitter = choice.Choice([1] * 12, replace=False)
+    field.gate_emitter = choice.chance(1.0)
+    field.emitter.seed(101010)
+    field.repeat_emitter.seed(12345)
+    field.gate_emitter.seed(54321)
+    [field() for _ in range(12)]
+    assert field.emitter.num_unique_values == 0
+    assert field.repeat_emitter.num_unique_values == 0
+    field.reset()
+    assert field.emitter.num_unique_values == 12
+    assert field.emitter.rng_seed == 999
+    assert field.repeat_emitter.num_unique_values == 1
+    assert field.repeat_emitter.rng_seed == 999
+    assert field.gate_emitter.rng_seed == 999
 
 
 def test_field_seed_reseeds_all_emitters(emitter):
@@ -204,7 +228,27 @@ def test_field_seed_reseeds_all_emitters(emitter):
     field.repeat_emitter.seed(12345)
     field.gate_emitter.seed(54321)
     field.seed(999)
-    assert all([em.rng_seed == 999 for em in field._emitters.values()])
+    assert field.emitter.rng_seed == 999
+    assert field.repeat_emitter.rng_seed == 999
+    assert field.gate_emitter.rng_seed == 999
+
+
+def test_field_seed_reseeds_changed_emitters(emitter):
+    # If we originally initialize a field using one set of emitters
+    # and then change those emitters by changing the applicable
+    # attributes, calling `field.seed()` should seed all of the new
+    # emitters.
+    field = Field('test', Static('invalid'))
+    field.emitter = emitter()
+    field.repeat_emitter = choice.Choice(range(1, 13))
+    field.gate_emitter = choice.chance(0.75)
+    field.emitter.seed(101010)
+    field.repeat_emitter.seed(12345)
+    field.gate_emitter.seed(54321)
+    field.seed(999)
+    assert field.emitter.rng_seed == 999
+    assert field.repeat_emitter.rng_seed == 999
+    assert field.gate_emitter.rng_seed == 999
 
 
 @pytest.mark.parametrize('seed, repeat, gate, hide, expected', [
@@ -384,7 +428,7 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
         assert field.repeat_emitter.num_unique_values == 1
 
 
-def test_field_seedfields_reseeds_all_fields(emitter):
+def test_schema_seedfields_reseeds_all_fields(emitter):
     schema = Schema(
         Field('test', emitter(), repeat=choice.Choice(range(1, 13)),
               gate=choice.chance(0.75), rng_seed=12345),

@@ -89,30 +89,28 @@ class Word(RandomWithChildrenMixin, Emitter[str]):
             alphabet_emitter: See `alphabet_emitter` attribute.
             rng_seed (Optional.) See `rng_seed` attribute.
         """
-        self._length_emitter = length_emitter
-        self._alphabet_emitter = alphabet_emitter
         super().__init__(children={
-            'length': self._length_emitter,
-            'alphabet': self._alphabet_emitter
+            'length': length_emitter,
+            'alphabet': alphabet_emitter
         }, rng_seed=rng_seed)
         self._update_num_unique_vals()
 
     @property
     def length_emitter(self) -> EmitterLike[int]:
         """Returns the 'length_emitter' attribute."""
-        return self._length_emitter
+        return self._emitters['length']
 
     @property
     def alphabet_emitter(self) -> EmitterLike[str]:
         """Returns the 'alphabet_emitter' attribute."""
-        return self._alphabet_emitter
+        return self._emitters['alphabet']
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
         self._num_unique_values: Optional[int] = None
-        nchars = self._alphabet_emitter.num_unique_values
-        if nchars is not None and hasattr(self._length_emitter, 'items'):
-            poss_items = self._length_emitter.items
+        nchars = self._emitters['alphabet'].num_unique_values
+        if nchars is not None and hasattr(self._emitters['length'], 'items'):
+            poss_items = self._emitters['length'].items
             self._num_unique_values = sum([nchars ** i for i in poss_items])
 
     def reset(self) -> None:
@@ -189,43 +187,40 @@ class Text(RandomWithChildrenMixin, Emitter[str]):
                 Defaults to a Static emitter that emits a space (' ').
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        self._numwords_emitter = numwords_emitter
-        self._word_emitter = word_emitter
-        self._sep_emitter = sep_emitter or Static(' ')
         super().__init__(children={
-            'numwords': self._numwords_emitter,
-            'word': self._word_emitter,
-            'sep': self._sep_emitter
+            'numwords': numwords_emitter,
+            'word': word_emitter,
+            'sep': sep_emitter or Static(' ')
         }, rng_seed=rng_seed)
         self._update_num_unique_vals()
 
     @property
     def numwords_emitter(self) -> EmitterLike[int]:
         """Returns the 'numwords_emitter' attribute."""
-        return self._numwords_emitter
+        return self._emitters['numwords']
 
     @property
     def word_emitter(self) -> EmitterLike[str]:
         """Returns the 'word_emitter' attribute."""
-        return self._word_emitter
+        return self._emitters['word']
 
     @property
     def sep_emitter(self) -> EmitterLike[str]:
         """Returns the 'sep_emitter' attribute."""
-        return self._sep_emitter
+        return self._emitters['sep']
 
     def _update_num_unique_vals(self) -> None:
         """Updates the cached number of unique values this can emit."""
         self._num_unique_values: Optional[int] = None
-        numwords = self._numwords_emitter
-        word_em_has_uv = self._word_emitter.num_unique_values is not None
-        sep_em_has_uv = self._sep_emitter.num_unique_values is not None
+        numwords = self._emitters['numwords']
+        word_em_has_uv = self._emitters['word'].num_unique_values is not None
+        sep_em_has_uv = self._emitters['sep'].num_unique_values is not None
         if word_em_has_uv and sep_em_has_uv and hasattr(numwords, 'items'):
             nums: List[int] = []
             for length in numwords.items:
-                num_uwords = self._word_emitter.num_unique_values ** length
-                num_useps = self._sep_emitter.num_unique_values ** (length - 1)
-                nums.append(num_uwords * num_useps)
+                n_uw = self._emitters['word'].num_unique_values ** length
+                n_us = self._emitters['sep'].num_unique_values ** (length - 1)
+                nums.append(n_uw * n_us)
             self._num_unique_values = sum(nums)
 
     @property
@@ -264,16 +259,16 @@ class Text(RandomWithChildrenMixin, Emitter[str]):
         # `reset` call happens in the middle of a set of words, but
         # this is about the best we can do I think.
 
-        if getattr(self._word_emitter, 'replace_only_after_call', False):
-            num_unique = self._word_emitter.num_unique_values or 0
+        if getattr(self._emitters['word'], 'replace_only_after_call', False):
+            num_unique = self._emitters['word'].num_unique_values or 0
             if num_unique and total > num_unique:
                 def generator() -> Generator[str, None, None]:
                     remainder = total
                     while remainder > 0:
                         needed = clamp(num_unique, mx=remainder)
-                        for word in self._word_emitter(needed):
+                        for word in self._emitters['word'](needed):
                             yield word
-                        self._word_emitter.reset()
+                        self._emitters['word'].reset()
                         remainder -= needed
                 return generator()
         return iter(self._emitters['word'](total))
@@ -289,10 +284,10 @@ class Text(RandomWithChildrenMixin, Emitter[str]):
             number: See superclass.
         """
         texts = []
-        lengths = self._numwords_emitter(number)
+        lengths = self._emitters['numwords'](number)
         total_words = sum(lengths)
         words = self._get_words_iterator(total_words)
-        seps = iter(self._sep_emitter(total_words - number))
+        seps = iter(self._emitters['sep'](total_words - number))
         for length in lengths:
             if length:
                 render = [next(words)]

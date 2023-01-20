@@ -100,7 +100,9 @@ class Field(RandomWithChildrenMixin, Generic[T]):
     def __init__(self,
                  name: str,
                  emitter: EmitterLike[T],
-                 repeat: Optional[EmitterLike[int]] = None,
+                 repeat: Optional[
+                     Union[EmitterLike[None], EmitterLike[int]]
+                 ] = None,
                  gate: Optional[EmitterLike[bool]] = None,
                  hide: bool = False,
                  rng_seed: Any = None) -> None:
@@ -122,18 +124,20 @@ class Field(RandomWithChildrenMixin, Generic[T]):
             hidden: See `hidden` attribute.
             rng_seed: See `rng_seed` attribute.
         """
-        self.emitter = emitter
-        self.repeat_emitter = Static(None) if repeat is None else repeat
-        self.gate_emitter = Static(True) if gate is None else gate
-        self._emitters: ObjectMap[EmitterLike[Any]] = ObjectMap({
-            'emitter': self.emitter,
-            'repeat': self.repeat_emitter,
-            'gate': self.gate_emitter
-        })
-        self.emitter = emitter
         self.name = name
         self.hide = hide
-        super().__init__(rng_seed=rng_seed)
+        super().__init__(children={
+            'emitter': emitter,
+            'repeat': repeat or Static(None),
+            'gate': gate or Static(True)
+        }, rng_seed=rng_seed)
+
+    @property
+    def multi_valued(self) -> bool:
+        """See the 'multi_valued' attribute."""
+        if hasattr(self.repeat_emitter, 'items'):
+            return bool(self.repeat_emitter.items != [None])
+        return True
 
     @property
     def previous(self) -> Any:
@@ -141,42 +145,41 @@ class Field(RandomWithChildrenMixin, Generic[T]):
         return self._cache
 
     @property
+    def emitter(self) -> EmitterLike[T]:
+        """See the 'emitter' attribute."""
+        return self._emitters['emitter']
+
+    @emitter.setter
+    def emitter(self, emitter: EmitterLike[T]) -> None:
+        """Sets the 'emitter' attribute."""
+        self._emitters['emitter'] = emitter
+
+    @property
     def repeat_emitter(self) -> Union[EmitterLike[None], EmitterLike[int]]:
-        """Returns the 'repeat_emitter' attribute."""
-        return self._repeat_emitter
+        """See the 'repeat_emitter' attribute."""
+        return self._emitters['repeat']
 
     @repeat_emitter.setter
     def repeat_emitter(self,
                        repeat_emitter: Union[EmitterLike[None],
                                              EmitterLike[int]]) -> None:
-        """Sets the 'repeat_emitter' attribute.
+        """Sets the 'repeat_emitter' attribute."""
+        self._emitters['repeat'] = repeat_emitter
 
-        Also sets the 'multi_valued' attribute; False if the
-        repeat_emitter only emits None, otherwise True.
-        """
-        self._repeat_emitter = repeat_emitter
-        if hasattr(repeat_emitter, 'items'):
-            self.multi_valued = repeat_emitter.items != [None]
-        else:
-            self.multi_valued = True
+    @property
+    def gate_emitter(self) -> EmitterLike[bool]:
+        """See the 'gate_emitter' attribute."""
+        return self._emitters['gate']
+
+    @gate_emitter.setter
+    def gate_emitter(self, gate_emitter: EmitterLike[bool]) -> None:
+        """Sets the 'gate_emitter' attribute."""
+        self._emitters['gate'] = gate_emitter
 
     def reset(self) -> None:
         """Resets state on this field, including attached emitters."""
         super().reset()
         self._cache: Any = None
-        self._emitters.setattr('rng_seed', self.rng_seed)
-        self._emitters.do_method('reset')
-
-    def seed(self, rng_seed: Any) -> None:
-        """Seeds all RNGs associated with emitters on this field.
-
-        Args:
-            rng_seed: The new seed you want to set. Ultimately this is
-                passed to a random.Random instance, so it should be any
-                value valid for seeding random.Random.
-        """
-        super().seed(rng_seed)
-        self._emitters.do_method('seed', self.rng_seed)
 
     def __call__(self) -> Optional[Union[T, List[T]]]:
         """Generates one field value via the emitter.
@@ -190,7 +193,7 @@ class Field(RandomWithChildrenMixin, Generic[T]):
             then this returns None.
         """
         if self.gate_emitter():
-            self._cache = self.emitter(self._repeat_emitter())
+            self._cache = self.emitter(self.repeat_emitter())
         else:
             self._cache = None
         return self._cache
