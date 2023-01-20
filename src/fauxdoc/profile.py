@@ -3,35 +3,63 @@ from typing import Any, Dict, Generic, List, Optional, Union
 
 from fauxdoc.group import ObjectMap
 from fauxdoc.emitters.fixed import Static
-from fauxdoc.mixins import RandomMixin
+from fauxdoc.mixins import RandomWithChildrenMixin
 from fauxdoc.typing import EmitterLike, FieldLike, T
 
 
-class Field(RandomMixin, Generic[T]):
+class Field(RandomWithChildrenMixin, Generic[T]):
     """Class for representing a field in a schema.
 
     Each Field instance wraps an emitter and provides some additional
     metadata and convenience features to allow it to work well within a
-    schema. Like emitters, Field instances output a value each time
-    they are called. Unlike emitters, they can only output one field
-    value at a time (though, "one" value may be a list of emitted
-    values, e.g. for a multi-valued field). Conceptually, each call to
-    a field generates the data for that field for one record or doc.
+    schema. Like an emitter, calling a Field instance outputs field
+    data -- conceptually, each call generates the data for that field
+    for one record or document. Unlike an emitter, you cannot provide
+    an integer to output values for multiple records at a time. (Note:
+    if your Field is multi-valued, then one call gives you the full
+    list of values for that field for that record or document.)
 
-    Note: Field controls include a separate `repeat` (how many values
-    to output) AND `gate` (whether or not to output anything). You CAN
-    gate the output just using `repeat` by allowing your repeat_emitter
-    to output 0 -- e.g., a Choice(range(0, 5)) would output between 0
-    and 5 values. And you can even control the chances of a 0 selection
-    using weights. However, having a separate `gate` value makes it
-    easier to determine what weights to assign for each behavior --
-    especially if you are using a poisson or gaussian weight
-    distribution for repeat values, where 0 may not fall along the same
-    probability curve. Generally, my rule-of-thumb is never to use
-    `repeat` to control gating. (If you do, also be aware that a 0
-    repeat value will emit an empty list while a False gate value will
-    emit None. See the tests in `tests/test_profile.py for some
-    examples.)
+    A Field provides configuration for gating or repeating values from
+    a provided data emitter. As such, the implementation makes some
+    assumptions around what the output of one Field instance should be.
+
+    - A field is EITHER "single-valued" and emits one atomic value at a
+      time, OR it is "multi-valued" and emits a *list* of atomic
+      values. The same field instance should not be able to emit a
+      single value with one call and multiple values with another.
+    - One "atomic value" is relative to the field's data emitter. I.e.,
+      for single-valued fields, `field()` is equivalent to
+      `field.emitter()`, and for multi-valued fields, it is equivalent
+      to `field.emitter(int)`. (An atomic value could be of any type,
+      including a list, depending on the emitter. A multi-valued field
+      will output a list of whatever type of atomic value the emitter
+      outputs.)
+    - HOW MANY values a multi-valued field outputs can vary from call
+      to call.
+    - Both single- and multi-valued fields may sometimes emit NOTHING.
+      I.e., if, in a given collection of documents, a field is empty
+      half the time, then you may want half of the corresponding Field
+      instance calls to output None half the time. (Note that an empty
+      multi-valued field outputs None, not [None].)
+    - The `repeat_emitter` controls whether a field is single-valued or
+      multi-valued. AND it controls how many values a multi-valued
+      field emits on a given call. If the `repeat_emitter` is
+      `fauxdoc.emitters.Static(None)` (i.e., it ONLY emits None) then
+      the field is single-valued. If it emits integers, then the field
+      is multi-valued, and the emitted integers control how many values
+      are output.
+    - The `gate_emitter` controls how often a field emits nothing. If
+      calling the `gate_emitter` outputs True, then the field emits a
+      value; otherwise, it emits None.
+    - The edge case where `repeat_emitter` may emit integers 0 or 1 may
+      be confusing, given all of the above. In these cases, the Field
+      instance is still considered multi-valued and will always output
+      a list (0 => [] and 1 => [value]).
+    - Rules of thumb: 1) For a multi-valued field, `repeat_emitter`
+      should output integers, and for single-valued fields, it should
+      output None. 2) Always use `gate_emitter` to control whether or
+      not a Field outputs a value. For multi-valued fields,
+      `repeat_emitter` should output values >=1.
 
     Attributes:
         name: A string representing the name by which this field should

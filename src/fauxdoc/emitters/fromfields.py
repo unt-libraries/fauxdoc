@@ -21,7 +21,7 @@ class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
     - Your supplied field list can be one single FieldLike instance or
       a Sequence of them.
     - Provides a property that tells you if your source field(s) output
-      a single value, or not.
+      a single (singular) value, or a list of values.
     """
 
     def __init__(self, fields: Union[FieldLike[T], Sequence[FieldLike[T]]]):
@@ -31,16 +31,31 @@ class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
             fields: You can provide a single FieldLike instance or a
                 Sequence of them.
         """
-        args = fields if isinstance(fields, Sequence) else [fields]
-        super().__init__(*args)
+        if isinstance(fields, Sequence):
+            super().__init__(*fields)
+            self._init_as_single_valued = False
+        else:
+            super().__init__(fields)
+            self._init_as_single_valued = True
 
     @property
     def single_valued(self) -> bool:
-        """True if there is one source field that returns one value."""
-        if len(self) == 1:
-            # pylint doesn't seem to like it if we don't do something
-            # to tell it `self` is indexable, like wrapping `self` in
-            # `list`.
+        """True if there is one source field that is not multi-valued.
+
+        If False, then you can assume the output of the group will
+        always be a list of values.
+        """
+        # If there is one field in this group, it may have been
+        # initialized singularly (as `field`) or not (as `[field]`).
+        # Only the first is considered single-valued. The
+        # `_init_as_single_valued` tells us this. We assume that, if
+        # this is False, then it's intended to behave as multi-valued.
+        # (This way, `single_valued` will return a logical value if the
+        # field list is modified after it's created.)
+        if len(self) == 1 and self._init_as_single_valued:
+            # Note that pylint doesn't seem to like it if we don't do
+            # something to tell it `self` is indexable, like wrapping
+            # `self` in `list`.
             return not list(self)[0].multi_valued
         return False
 
@@ -97,6 +112,7 @@ class CopyFields(Generic[T], Emitter[Optional[Union[T, List[T], str]]]):
         """
         self.source.do_method('reset')
 
+    @property
     def single_valued(self) -> bool:
         """True if there is one source field that returns one value."""
         return self.source.single_valued

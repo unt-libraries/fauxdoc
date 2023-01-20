@@ -3,7 +3,9 @@ import pytest
 
 from fauxdoc.emitters.fixed import Static
 from fauxdoc.emitters.choice import chance, Choice
-from fauxdoc.emitters.fromfields import CopyFields, BasedOnFields
+from fauxdoc.emitters.fromfields import (
+    SourceFieldGroup, CopyFields, BasedOnFields
+)
 from fauxdoc.profile import Field
 
 
@@ -60,6 +62,136 @@ def multi_field_random(rng, **kwargs):
 
 # Tests
 
+@pytest.mark.parametrize('source, expected', [
+    # A SourceFieldGroup is only single-valued if the originally-
+    # provided Field is singular and not multi-valued.
+    (Field('test', Static('Test Val')), True),
+    (Field('test', Static('Test Val'), repeat=Static(0)), False),
+    (Field('test', Static('Test Val'), repeat=Static(1)), False),
+    (Field('test', Static('Test Val'), repeat=Static(2)), False),
+    ([Field('test', Static('Test Val'))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(0))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(1))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(2))], False),
+    ([Field('test1', Static('one')),
+      Field('test2', Static('two'))], False),
+    ([Field('test1', Static('one'), repeat=Static(0)),
+      Field('test2', Static('two'), repeat=Static(0))], False),
+    ([Field('test1', Static('one'), repeat=Static(1)),
+      Field('test2', Static('two'), repeat=Static(1))], False),
+    ([Field('test1', Static('one'), repeat=Static(2)),
+      Field('test2', Static('two'), repeat=Static(2))], False),
+])
+def test_sourcefieldgroup_singlevalued(source, expected):
+    sfgroup = SourceFieldGroup(source)
+    assert sfgroup.single_valued == expected
+
+
+def test_sourcefieldgroup_singlevalued_changes_start_singular():
+    # Edge Case. Normally modifying fields on a SourceFieldGroup isn't
+    # necessary, but, if you do, I've attempted to make the
+    # `single_valued` property behave logically. This tests behavior if
+    # your group starts out as single-valued.
+    sfgroup = SourceFieldGroup(Field('test1', Static('one')))
+    assert sfgroup.single_valued
+
+    # Appending a field makes it NOT single-valued.
+    sfgroup.append(Field('test2', Static('two')))
+    assert not sfgroup.single_valued
+
+    # Returning to a single, single-valued field makes it single-valued
+    # again.
+    sfgroup.pop()
+    assert sfgroup.single_valued
+
+    # Deleting all values and returning to a single, single-valued
+    # field makes it single-valued again.
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one')))
+    assert sfgroup.single_valued
+
+    # Deleting all values but adding a single multi-valued field makes
+    # it NOT single-valued.
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one'), repeat=Static(2)))
+    assert not sfgroup.single_valued
+
+
+def test_sourcefieldgroup_singlevalued_changes_start_singular_multi():
+    # Edge Case. Normally modifying fields on a SourceFieldGroup isn't
+    # necessary, but, if you do, I've attempted to make the
+    # `single_valued` property behave logically. This tests behavior if
+    # your group starts out as single multi-valued field.
+    sfgroup = SourceFieldGroup(Field('test1', Static('one'), repeat=Static(2)))
+    assert not sfgroup.single_valued
+
+    # Appending a field, still not single-valued.
+    sfgroup.append(Field('test2', Static('two')))
+    assert not sfgroup.single_valued
+
+    # Returning to the original field, still not single-valued.
+    sfgroup.pop()
+    assert not sfgroup.single_valued
+
+    # Removing the original field and adding a single single-valued
+    # field does make it single-valued.
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one')))
+    assert sfgroup.single_valued
+
+    # Deleting all values but adding a single multi-valued field makes
+    # it NOT single-valued.
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one'), repeat=Static(2)))
+    assert not sfgroup.single_valued
+
+
+def test_sourcefieldgroup_singlevalued_changes_start_multi():
+    # Edge Case. Normally modifying fields on a SourceFieldGroup isn't
+    # necessary, but, if you do, I've attempted to make the
+    # `single_valued` property behave logically. If your group starts
+    # out as a list, then it's never considered single-valued.
+    # Returning to one field assumes it's a list with one value,
+    # e.g. [field].
+    sfgroup = SourceFieldGroup([Field('test1', Static('one'))])
+    assert not sfgroup.single_valued
+    sfgroup.append(Field('test2', Static('two')))
+    assert not sfgroup.single_valued
+    sfgroup.pop()
+    assert not sfgroup.single_valued
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one')))
+    assert not sfgroup.single_valued
+    sfgroup.pop()
+    sfgroup.append(Field('test1', Static('one'), repeat=Static(2)))
+    assert not sfgroup.single_valued
+
+
+@pytest.mark.parametrize('source, expected', [
+    # A CopyField is only single-valued if it is not based on a list of
+    # Fields and its source Field is not multi-valued.
+    (Field('test', Static('Test Val')), True),
+    (Field('test', Static('Test Val'), repeat=Static(0)), False),
+    (Field('test', Static('Test Val'), repeat=Static(1)), False),
+    (Field('test', Static('Test Val'), repeat=Static(2)), False),
+    ([Field('test', Static('Test Val'))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(0))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(1))], False),
+    ([Field('test', Static('Test Val'), repeat=Static(2))], False),
+    ([Field('test1', Static('one')),
+      Field('test2', Static('two'))], False),
+    ([Field('test1', Static('one'), repeat=Static(0)),
+      Field('test2', Static('two'), repeat=Static(0))], False),
+    ([Field('test1', Static('one'), repeat=Static(1)),
+      Field('test2', Static('two'), repeat=Static(1))], False),
+    ([Field('test1', Static('one'), repeat=Static(2)),
+      Field('test2', Static('two'), repeat=Static(2))], False),
+])
+def test_copyfields_singlevalued(source, expected):
+    em = CopyFields(source)
+    assert em.single_valued == expected
+
+
 @pytest.mark.parametrize('source, separator, expected', [
     # Single-field tests
     (Field('test', Static('Test Val')), None, 'Test Val'),
@@ -73,6 +205,7 @@ def multi_field_random(rng, **kwargs):
     (Field('test', Static('one'), repeat=Static(0)), None, None),
 
     # Multi-field tests
+    ([Field('test', Static('Test Val'))], None, ['Test Val']),
     ([Field('test1', Static('one')),
       Field('test2', Static('two')),
       Field('test3', Static('three'))], None, ['one', 'two', 'three']),
