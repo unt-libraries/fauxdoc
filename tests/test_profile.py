@@ -5,7 +5,8 @@ import pytest
 
 from fauxdoc.dtrange import dtrange
 from fauxdoc.emitters import choice, text
-from fauxdoc.emitters.fixed import Static
+from fauxdoc.emitters.fixed import Sequential, Static
+from fauxdoc.group import ObjectMap
 from fauxdoc.profile import Field, Schema
 
 
@@ -132,6 +133,38 @@ def test_field_output_repeat_and_gate(seed, repeat, gate, expected, emitter):
     assert [field() for _ in range(len(expected))] == expected
 
 
+def test_field_change_emitter():
+    field = Field('test', Static('initialized'))
+    field.emitter = Static('changed')
+    assert field() == 'changed'
+
+
+def test_field_change_repeat_emitter():
+    field = Field('test', Static('test'), repeat=Static(1))
+    field.repeat_emitter = Static(2)
+    assert field() == ['test', 'test']
+
+
+def test_field_change_gate_emitter():
+    field = Field('test', Static('test'), gate=Static(False))
+    field.gate_emitter = Static(True)
+    assert field() == 'test'
+
+
+def test_field_change_name():
+    field = Field('test', Static('test'))
+    assert field.name == 'test'
+    field.name = 'new'
+    assert field.name == 'new'
+
+
+def test_field_change_hide():
+    field = Field('test', Static('test'), hide=True)
+    assert field.hide
+    field.hide = False
+    assert not field.hide
+
+
 def test_field_single_value_global_unique_violation(emitter_unique):
     field = Field('subject', emitter_unique(), rng_seed=999)
     assert [field() for _ in range(12)] == [
@@ -180,6 +213,12 @@ def test_field_multi_value_each_unique_violation(emitter_each_unique):
 ])
 def test_field_multivalued_attribute(field, expected):
     assert field.multi_valued == expected
+
+
+def test_field_multivalued_attribute_is_readonly():
+    field = Field('test', Static('test'))
+    with pytest.raises(AttributeError):
+        field.multi_valued = False
 
 
 def test_field_reset_resets_and_reseeds_all_emitters(emitter_unique):
@@ -290,6 +329,13 @@ def test_field_caches_previous_value(seed, repeat, gate, hide, expected,
         assert exp_prev_val == field.previous
         field()
         assert exp_val == field.previous
+
+
+def test_field_previous_is_readonly():
+    field = Field('test', Static('test'))
+    field()
+    with pytest.raises(AttributeError):
+        field.previous = 'test'
 
 
 def test_schema_generates_record_dict(name_emitter, date_emitter,
@@ -406,18 +452,232 @@ def test_schema_hidden_and_public_fields(name_emitter, date_emitter,
     }
 
 
+def test_schema_hiddenfields_is_readonly():
+    test_schema = Schema(
+        Field('test1', Static('test')),
+        Field('test2', Static('test')),
+        Field('test3', Static('test'), hide=True)
+    )
+    with pytest.raises(AttributeError):
+        test_schema.hidden_fields = {}
+
+
+def test_schema_hiddenfields_cannot_be_changed():
+    test_schema = Schema(
+        Field('test1', Static('test')),
+        Field('test2', Static('test')),
+        Field('test3', Static('test'), hide=True)
+    )
+
+    # The `hidden_fields` attribute is not meant to be changed; it is
+    # not technically immutable, and so this does not raise an error...
+    test_schema.hidden_fields['test4'] = Field('test4', Static('test'),
+                                               hide=True)
+
+    # ...BUT it does not actually change the value of the attribute.
+    # This is a read-only, calculated attribute based on `fields`. If
+    # you want to add a hidden field, just add it to `fields`.
+    assert test_schema.hidden_fields == {
+        'test3': test_schema.fields['test3']
+    }
+    assert test_schema.fields == {
+        'test1': test_schema.fields['test1'],
+        'test2': test_schema.fields['test2'],
+        'test3': test_schema.fields['test3']
+    }
+
+
+def test_schema_publicfields_is_readonly():
+    test_schema = Schema(
+        Field('test1', Static('test')),
+        Field('test2', Static('test')),
+        Field('test3', Static('test'), hide=True)
+    )
+    with pytest.raises(AttributeError):
+        test_schema.public_fields = {}
+
+
+def test_schema_publicfields_cannot_be_changed():
+    test_schema = Schema(
+        Field('test1', Static('test')),
+        Field('test2', Static('test')),
+        Field('test3', Static('test'), hide=True)
+    )
+    # The `public_fields` attribute is not meant to be changed; it is
+    # not technically immutable, and so this does not raise an error...
+    test_schema.public_fields['test4'] = Field('test4', Static('test'))
+
+    # ...BUT it does not actually change the value of the attribute.
+    # This is a read-only, calculated attribute based on `fields`. If
+    # you want to add a public field, just add it to `fields`.
+    assert test_schema.public_fields == {
+        'test1': test_schema.fields['test1'],
+        'test2': test_schema.fields['test2']
+    }
+    assert test_schema.fields == {
+        'test1': test_schema.fields['test1'],
+        'test2': test_schema.fields['test2'],
+        'test3': test_schema.fields['test3']
+    }
+
+
+def test_schema_can_set_fields_directly():
+    test_schema = Schema()
+    test_schema.fields = {
+        'id': Field('id', Sequential(range(1, 10000))),
+        'title': Field('title', Static('A Title')),
+        'hidden1': Field('hidden1', Static('TEST'), hide=True),
+        'author': Field('author', Static('An Author')),
+        'hidden2': Field('hidden2', Static('TEST'), hide=True)
+    }
+    assert isinstance(test_schema.fields, ObjectMap)
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'title': test_schema.fields['title'],
+        'author': test_schema.fields['author']
+    }
+    assert test_schema.hidden_fields == {
+        'hidden1': test_schema.fields['hidden1'],
+        'hidden2': test_schema.fields['hidden2']
+    }
+    assert test_schema() == {
+        'id': 1,
+        'title': 'A Title',
+        'author': 'An Author'
+    }
+
+
+def test_schema_can_modify_fields_directly():
+    test_schema = Schema(
+        Field('id', Sequential(range(1, 10000)))
+    )
+    test_schema.fields['title'] = Field('title', Static('A Title'))
+    test_schema.fields['hidden1'] = Field('hidden1', Static('TEST'), hide=True)
+    test_schema.fields['author'] = Field('author', Static('An Author'))
+    test_schema.fields['hidden2'] = Field('hidden2', Static('TEST'), hide=True)
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'title': test_schema.fields['title'],
+        'author': test_schema.fields['author']
+    }
+    assert test_schema.hidden_fields == {
+        'hidden1': test_schema.fields['hidden1'],
+        'hidden2': test_schema.fields['hidden2']
+    }
+    assert test_schema() == {
+        'id': 1,
+        'title': 'A Title',
+        'author': 'An Author'
+    }
+
+
+def test_schema_fields_key_name_mismatch_is_fine():
+    # Generally the `fields` mapping should have dict keys that match
+    # each `field.name`. If they don't match it doesn't directly cause
+    # any problems; the key value will be used in all Schema methods.
+    test_schema = Schema()
+    test_schema.fields = {
+        'id': Field('the', Sequential(range(1, 10000))),
+        'title': Field('field', Static('A Title')),
+        'hidden1': Field('name', Static('TEST'), hide=True),
+        'author': Field('does not', Static('An Author')),
+        'hidden2': Field('matter', Static('TEST'), hide=True)
+    }
+    assert isinstance(test_schema.fields, ObjectMap)
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'title': test_schema.fields['title'],
+        'author': test_schema.fields['author']
+    }
+    assert test_schema.hidden_fields == {
+        'hidden1': test_schema.fields['hidden1'],
+        'hidden2': test_schema.fields['hidden2']
+    }
+    assert test_schema() == {
+        'id': 1,
+        'title': 'A Title',
+        'author': 'An Author'
+    }
+
+
+def test_schema_can_hide_or_unhide_fields_dynamically():
+    test_schema = Schema(
+        Field('id', Sequential(range(1, 10000))),
+        Field('one', Static('field one')),
+        Field('two', Static('field two')),
+        Field('three', Static('field three'), hide=True),
+        Field('four', Static('field four'))
+    )
+    assert test_schema() == {
+        'id': 1,
+        'one': 'field one',
+        'two': 'field two',
+        'four': 'field four'
+    }
+    test_schema.fields['one'].hide = True
+    test_schema.fields['two'].hide = True
+    test_schema.fields['three'].hide = False
+    assert test_schema.hidden_fields == {
+        'one': test_schema.fields['one'],
+        'two': test_schema.fields['two']
+    }
+    assert test_schema.public_fields == {
+        'id': test_schema.fields['id'],
+        'three': test_schema.fields['three'],
+        'four': test_schema.fields['four']
+    }
+    assert test_schema() == {
+        'id': 2,
+        'three': 'field three',
+        'four': 'field four'
+    }
+
+
+def test_schema_hidden_fields_are_still_evaluated():
+    test_schema = Schema(
+        Field('id', Sequential(range(1, 10000))),
+        Field('one', Static('field one'), hide=True),
+        Field('two', Static('field two')),
+        Field('three', Static('field three'), hide=True),
+        Field('four', Static('field four'))
+    )
+    for field in test_schema.fields.values():
+        assert field.previous is None
+    test_schema()
+    prev = {key: field.previous for key, field in test_schema.fields.items()}
+    assert prev == {
+        'id': 1,
+        'one': 'field one',
+        'two': 'field two',
+        'three': 'field three',
+        'four': 'field four'
+    }
+
+
 def test_schema_resetfields_resets_all_fields(emitter_unique):
-    schema = Schema(
-        Field('test', emitter_unique(),
-              repeat=choice.Choice([1] * 12, replace=False),
-              gate=choice.chance(1.0)),
-        Field('test2', emitter_unique(),
-              repeat=choice.Choice([1] * 12, replace=False),
-              gate=choice.chance(1.0)),
-        Field('test3', emitter_unique(),
-              repeat=choice.Choice([1] * 12, replace=False),
-              gate=choice.chance(1.0),
-              hide=True)
+    schema = Schema()
+    schema.fields = {
+        'test': Field(
+            'test',
+            emitter_unique(),
+            repeat=choice.Choice([1] * 12, replace=False),
+            gate=choice.chance(1.0)
+        )
+    }
+    schema.add_fields(
+        Field(
+            'test2',
+            emitter_unique(),
+            repeat=choice.Choice([1] * 12, replace=False),
+            gate=choice.chance(1.0)
+        )
+    )
+    schema.fields['test3'] = Field(
+        'test3',
+        emitter_unique(),
+        repeat=choice.Choice([1] * 12, replace=False),
+        gate=choice.chance(1.0),
+        hide=True
     )
     [schema() for _ in range(12)]
     for field in schema.fields.values():
@@ -431,13 +691,31 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
 
 
 def test_schema_seedfields_reseeds_all_fields(emitter):
-    schema = Schema(
-        Field('test', emitter(), repeat=choice.Choice(range(1, 13)),
-              gate=choice.chance(0.75), rng_seed=12345),
-        Field('test2', emitter(), repeat=choice.Choice(range(1, 13)),
-              gate=choice.chance(0.75), rng_seed=54321),
-        Field('test4', emitter(), repeat=choice.Choice(range(1, 13)),
-              gate=choice.chance(0.75), hide=True, rng_seed=212121),
+    schema = Schema()
+    schema.fields = {
+        'test': Field(
+            'test',
+            emitter(),
+            repeat=choice.Choice(range(1, 13)),
+            gate=choice.chance(0.75), rng_seed=12345
+        )
+    }
+    schema.add_fields(
+        Field(
+            'test2',
+            emitter(),
+            repeat=choice.Choice(range(1, 13)),
+            gate=choice.chance(0.75),
+            rng_seed=54321
+        )
+    )
+    schema.fields['test4'] = Field(
+        'test4',
+        emitter(),
+        repeat=choice.Choice(range(1, 13)),
+        gate=choice.chance(0.75),
+        hide=True,
+        rng_seed=212121
     )
     schema.seed_fields(999)
     for field in schema.fields.values():

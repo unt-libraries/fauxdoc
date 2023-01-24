@@ -1,5 +1,5 @@
 """Contains classes for creating faux-data-generation profiles."""
-from typing import Any, Dict, Generic, List, Optional, Union
+from typing import Any, Dict, Generic, List, Mapping, Optional, Union
 
 from fauxdoc.group import ObjectMap
 from fauxdoc.emitters.fixed import Static
@@ -80,8 +80,8 @@ class Field(RandomWithChildrenMixin, Generic[T]):
             False if no.) E.g., for a field in your schema that is
             populated in ~10 percent of records or docs, an emitter
             instance like emitters.choice.chance(0.1) would work.
-        multi_valued: True if this Field can emit multiple values at
-            once; False if it only emits one at a time.
+        multi_valued: (Read-only.) True if this Field can emit multiple
+            values at once; False if it only emits one at a time.
         hide: If True, the field generates and caches a value but is
             not included in schema output. This is for generating data
             to use as a basis for `BasedOnFields` emitters that *are*
@@ -90,11 +90,10 @@ class Field(RandomWithChildrenMixin, Generic[T]):
             random.seed. This value is used to reset any RNGs on the
             three emitter instances attached to this field. Pass the
             seed value you want during __init__, and/or set a new value
-            via the `seed` method.
-        previous: A read-only attribute storing the previous value
-            emitted by this field. (Fields may generate data based on
-            values from other fields; this provides that access for
-            other fields or emitters.)
+            via the `seed` method. You can set this independently, but
+            it won't take effect until you reset.
+        previous: (Read-only.) Stores the previous value emitted by
+            this field.
     """
 
     def __init__(self,
@@ -213,10 +212,10 @@ class Schema:
             order. (If you have a field with an emitter that uses the
             cached data values from other fields, be sure it appears
             after the fields it copies data from.)
-        hidden_fields: An ObjectMap that maps field names to field
-            objects, where `field.hide` is True.
-        public_fields: An ObjectMap that maps field names to field
-            objects, where `field.hide` is False.
+        hidden_fields: (Read-only. Immutable.) An ObjectMap that maps
+            field names to field objects, where `field.hide` is True.
+        public_fields: (Read-only. Immutable.) An ObjectMap that maps
+            field names to field objects, where `field.hide` is False.
     """
 
     def __init__(self, *fields: FieldLike[Any]) -> None:
@@ -231,36 +230,66 @@ class Schema:
         self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
         self.add_fields(*fields)
 
+    @property
+    def fields(self) -> ObjectMap[FieldLike[Any]]:
+        """See 'fields' attribute."""
+        return self._fields
+
+    @fields.setter
+    def fields(self, fields: Mapping[str, FieldLike[Any]]) -> None:
+        """Sets the 'fields' attribute.
+
+        Args:
+            fields: A mapping (i.e., dict) that maps field names to
+                Field objects. If an ObjectMap is not provided, it is
+                converted to an ObjectMap. See the 'fields' attribute.
+        """
+        self._fields = ObjectMap(fields)
+
     def add_fields(self, *fields: FieldLike[Any]) -> None:
         """Adds fields to your schema, in the order provided.
 
         Args:
             *fields: The Field instances to add. Note this is a star
-                argument, so provided your fields as args.
+                argument, so provide your fields as args.
         """
-        self.fields.update({field.name: field for field in fields})
-        self._hidden_fields: Optional[ObjectMap[FieldLike[Any]]] = None
-        self._public_fields: Optional[ObjectMap[FieldLike[Any]]] = None
+        self._fields.update({field.name: field for field in fields})
 
     @property
     def hidden_fields(self) -> ObjectMap[FieldLike[Any]]:
-        if self._hidden_fields is None:
-            self._hidden_fields = ObjectMap({
-                fn: fd for fn, fd in self.fields.items() if fd.hide
-            })
-        return self._hidden_fields
+        """See `hidden_fields` attribute.
+
+        Note that this is a read-only calculated attribute. It gives
+        an ObjectMap that is technically mutable, but because it
+        doesn't actually store the ObjectMap, changes made to that obj
+        aren't saved, so the attribute itself is effectively immutable.
+
+        Use the `fields` attribute instead to change the fields in a
+        schema.
+        """
+        return ObjectMap({
+            fn: fd for fn, fd in self._fields.items() if fd.hide
+        })
 
     @property
     def public_fields(self) -> ObjectMap[FieldLike[Any]]:
-        if self._public_fields is None:
-            self._public_fields = ObjectMap({
-                fn: fd for fn, fd in self.fields.items() if not fd.hide
-            })
-        return self._public_fields
+        """See `public_fields` attribute.
+
+        Note that this is a read-only calculated attribute. It gives
+        an ObjectMap that is technically mutable, but because it
+        doesn't actually store the ObjectMap, changes made to that obj
+        aren't saved, so the attribute itself is effectively immutable.
+
+        Use the `fields` attribute instead to change the fields in a
+        schema.
+        """
+        return ObjectMap({
+            fn: fd for fn, fd in self._fields.items() if not fd.hide
+        })
 
     def reset_fields(self) -> None:
         """Resets state on all schema fields."""
-        self.fields.do_method('reset')
+        self._fields.do_method('reset')
 
     def seed_fields(self, rng_seed: Any) -> None:
         """Seeds all RNGs on all schema fields.
@@ -270,7 +299,7 @@ class Schema:
                 passed to a random.Random instance, so it should be any
                 value valid for seeding random.Random.
         """
-        self.fields.do_method('seed', rng_seed)
+        self._fields.do_method('seed', rng_seed)
 
     def __call__(self) -> Dict[str, Any]:
         """Generates field values for one record or doc.
@@ -279,7 +308,13 @@ class Schema:
             A dict, where field names are keys and field values are
             values.
         """
-        doc = {fname: field() for fname, field in self.fields.items()}
-        for field in self.hidden_fields:
-            del doc[field]
+        doc = {}
+        # We have to make sure hidden fields are evaluated even though
+        # their output is not added directly to the doc. (Output from
+        # hidden fields can be used in e.g. `fromfields` emitters.)
+        # This is why we don't simply skip them, here.
+        for fname, field in self._fields.items():
+            val = field()
+            if not field.hide:
+                doc[fname] = val
         return doc
