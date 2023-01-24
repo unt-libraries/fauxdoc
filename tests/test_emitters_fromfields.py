@@ -192,6 +192,18 @@ def test_copyfields_singlevalued(source, expected):
     assert em.single_valued == expected
 
 
+def test_copyfields_multi_with_separator_not_singlevalued():
+    # Edge Case. The CopyFields `single_valued` attribute is based on
+    # the source data, not the output. A CopyFields emitter that is set
+    # to concatenate multiple values is not `single_valued`, even
+    # though it emits one string value.
+    em = CopyFields([
+        Field('test1', Static('one')),
+        Field('test2', Static('two')),
+    ], separator=' | ')
+    assert not em.single_valued
+
+
 @pytest.mark.parametrize('source, separator, expected', [
     # Single-field tests
     (Field('test', Static('Test Val')), None, 'Test Val'),

@@ -170,6 +170,8 @@ def test_field_multi_value_each_unique_violation(emitter_each_unique):
 
 @pytest.mark.parametrize('field, expected', [
     (Field('test', Static('test')), False),
+    (Field('test', Static(['test'])), False),
+    (Field('test', Static(['test1', 'test2'])), False),
     (Field('test', Static('test'), repeat=None), False),
     (Field('test', Static('test'), repeat=Static(None)), False),
     (Field('test', Static('test'), repeat=Static(1)), True),
