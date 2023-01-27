@@ -1,5 +1,6 @@
 """Contains tests for the fauxdoc.emitters.choice module."""
 import datetime
+import random
 
 import pytest
 
@@ -8,93 +9,55 @@ from fauxdoc.emitters.choice import chance, Choice, gaussian_choice,\
                                     poisson_choice
 
 
-@pytest.mark.parametrize('seed, items, weights, unq, num, repeat, expected', [
-    (999, range(2), None, False, 10, 0, [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]),
-    (999, range(2), None, False, None, 10, [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
-    (999, range(1, 2), None, False, 10, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-    (999, range(1, 2), None, False, None, 10, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-    (999, range(5, 6), None, False, 10, 0, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
-    (999, range(1, 11), None, False, 10, 0, [8, 1, 9, 6, 5, 2, 8, 4, 8, 9]),
-    (999, 'abcde', None, False, 10, 0,
+@pytest.mark.parametrize('seed, items, weights, repl, num, repeat, expected', [
+    (999, range(2), None, True, 10, 0, [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]),
+    (999, range(2), None, True, None, 10, [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
+    (999, range(1, 2), None, True, 10, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, range(1, 2), None, True, None, 10, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, range(5, 6), None, True, 10, 0, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
+    (999, range(1, 11), None, True, 10, 0, [8, 1, 9, 6, 5, 2, 8, 4, 8, 9]),
+    (999, 'abcde', None, True, 10, 0,
      ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
-    (999, ['H', 'T'], [80, 20], False, 10, 0,
+    (999, ['H', 'T'], [80, 20], True, 10, 0,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, ['H', 'T'], [80, 20], False, None, 10,
+    (999, ['H', 'T'], [80, 20], True, None, 10,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, ['H', 'T'], [20, 80], False, 10, 0,
+    (999, ['H', 'T'], [20, 80], True, 10, 0,
      ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
-    (999, 'TTHHHHHHHH', None, 'each', 10, 0,
+    (999, 'TTHHHHHHHH', None, 'after_call', 10, 0,
      ['T', 'H', 'H', 'H', 'H', 'H', 'T', 'H', 'H', 'H']),
-    (999, 'HHHHT', None, 'each', None, 10,
+    (999, 'HHHHT', None, 'after_call', None, 10,
      ['H', 'T', 'T', 'T', 'H', 'H', 'H', 'H', 'H', 'H']),
-    (999, 'HT', [80, 20], 'each', None, 10,
+    (999, 'HT', [80, 20], 'after_call', None, 10,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, 'HT', [20, 80], 'each', None, 10,
+    (999, 'HT', [20, 80], 'after_call', None, 10,
      ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
-    (999, range(5), [70, 20, 7, 2, 1], 'each', 3, 10,
+    (999, range(5), [70, 20, 7, 2, 1], 'after_call', 3, 10,
      [[0, 2, 1], [1, 0, 3], [1, 0, 2], [0, 3, 2], [0, 4, 1], [0, 2, 1],
       [1, 0, 2], [1, 0, 2], [1, 0, 3], [0, 2, 1]]),
-    (999, range(5), [70, 20, 7, 2, 1], False, 3, 10,
+    (999, range(5), [70, 20, 7, 2, 1], True, 3, 10,
      [[1, 0, 1], [0, 0, 0], [1, 0, 1], [1, 0, 4], [0, 0, 0], [1, 0, 1],
       [3, 0, 0], [0, 0, 0], [2, 0, 0], [0, 0, 1]]),
-    (999, range(25), None, True, 5, 5,
+    (999, range(25), None, False, 5, 5,
      [[11, 18, 24, 17, 2], [9, 6, 8, 0, 15], [20, 3, 14, 4, 7],
       [13, 16, 19, 23, 12], [5, 10, 1, 21, 22]]),
-    (999, range(25), None, True, None, 25,
+    (999, range(25), None, False, None, 25,
      [11, 18, 24, 17, 2, 9, 6, 8, 0, 15, 20, 3, 14, 4, 7, 13, 16, 19, 23, 12,
       5, 10, 1, 21, 22]),
-    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, True, 5, 5,
+    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, False, 5, 5,
      [[0, 3, 7, 12, 4], [6, 1, 2, 9, 8], [22, 14, 5, 18, 11],
       [20, 24, 13, 23, 16], [21, 17, 19, 15, 10]]),
-    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, True, None, 25,
+    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, False, None, 25,
      [0, 3, 7, 12, 4, 6, 1, 2, 9, 8, 22, 14, 5, 18, 11, 20, 24, 13, 23, 16, 21,
       17, 19, 15, 10]),
 ])
-def test_choice(seed, items, weights, unq, num, repeat, expected):
-    each_unique = unq == 'each'
-    replace = not unq or each_unique
+def test_choice(seed, items, weights, repl, num, repeat, expected):
+    after_call = repl == 'after_call'
+    replace = repl or after_call
     ce = Choice(items, weights=weights, replace=replace,
-                replace_only_after_call=each_unique, rng_seed=seed)
+                replace_only_after_call=after_call, rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
     assert result == expected
-
-
-def test_choice_empty_items():
-    with pytest.raises(ValueError):
-        Choice(range(0))
-
-
-@pytest.mark.parametrize('items, unq, num, repeat, exp_error', [
-    (range(9), 'each', 10, 0,
-     '10 new unique values were requested, out of 9 possible selections.'),
-    (range(9), True, 10, 0,
-     '10 new unique values were requested, out of 9 possible selections.'),
-    (range(9), True, None, 10,
-     '1 new unique value was requested, out of 0 possible selections.'),
-    (range(9), True, 3, 4,
-     '3 new unique values were requested, out of 0 possible selections.'),
-    (range(10), True, 3, 4,
-     '3 new unique values were requested, out of 1 possible selection.'),
-])
-def test_choice_too_many_unique(items, unq, num, repeat, exp_error):
-    each_unique = unq == 'each'
-    replace = not unq or each_unique
-    ce = Choice(items, replace=replace, replace_only_after_call=each_unique)
-    with pytest.raises(ValueError) as excinfo:
-        [ce(num) for _ in range(repeat)] if repeat else ce(num)
-    assert exp_error in str(excinfo.value)
-
-
-@pytest.mark.parametrize('items, weights', [
-    ([0, 1, 2, 3], [40, 50]),
-    ([0, 1], [50, 10, 2])
-])
-def test_choice_incorrect_weights(items, weights):
-    with pytest.raises(ValueError) as excinfo:
-        Choice(items, weights=weights)
-    error_msg = str(excinfo.value)
-    assert f"({len(items)}" in error_msg
-    assert f"({len(weights)}" in error_msg
 
 
 @pytest.mark.parametrize(
@@ -128,6 +91,385 @@ def test_choice_uniqueness_properties(emitter, exp_unique_vals,
     assert emitter.num_unique_values == exp_unique_vals
     assert emitter.num_unique_items == exp_unique_items
     assert emitter.emits_unique_values == exp_emits_unique
+
+
+@pytest.mark.parametrize('items, repl, num, repeat, exp_error', [
+    (range(9), 'after_call', 10, 0,
+     '10 new unique values were requested, out of 9 possible selections.'),
+    (range(9), False, 10, 0,
+     '10 new unique values were requested, out of 9 possible selections.'),
+    (range(9), False, None, 10,
+     '1 new unique value was requested, out of 0 possible selections.'),
+    (range(9), False, 3, 4,
+     '3 new unique values were requested, out of 0 possible selections.'),
+    (range(10), False, 3, 4,
+     '3 new unique values were requested, out of 1 possible selection.'),
+])
+def test_choice_not_enough_unique_values(items, repl, num, repeat, exp_error):
+    after_call = repl == 'after_call'
+    replace = repl or after_call
+    ce = Choice(items, replace=replace, replace_only_after_call=after_call)
+    with pytest.raises(ValueError) as excinfo:
+        [ce(num) for _ in range(repeat)] if repeat else ce(num)
+    assert exp_error in str(excinfo.value)
+
+
+def test_choice_reset_reshuffles_when_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    assert ce(4) == [0, 2, 3, 1]
+    ce.reset()
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce(4) == [0, 2, 3, 1]
+
+
+def test_choice_seed_reseeds_and_reshuffles_when_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    assert ce.rng_seed == 999
+    assert ce(4) == [0, 2, 3, 1]
+    ce.seed(9999)
+    assert ce.rng_seed == 9999
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce(4) == [0, 3, 1, 2]
+
+
+def test_choice_setting_rngseed_does_not_reshuffle_when_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    assert ce(2) == [0, 2]
+    ce.rng_seed = 9999
+    assert ce.num_unique_values == 2
+    assert ce.num_unique_items == 2
+    assert ce(2) == [3, 1]
+
+
+def test_choice_setting_rng_does_not_reshuffle_when_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    assert ce(2) == [0, 2]
+    ce.rng = random.Random(9999)
+    assert ce.num_unique_values == 2
+    assert ce.num_unique_items == 2
+    assert ce(2) == [3, 1]
+
+
+def test_choice_setting_rngseed_does_not_change_output_until_reset():
+    ce = Choice(range(4), replace=True, rng_seed=999)
+    assert ce(10) == [3, 0, 3, 2, 1, 0, 3, 1, 3, 3]
+    ce.reset()
+    ce.rng_seed = 9999
+    assert ce(10) == [3, 0, 3, 2, 1, 0, 3, 1, 3, 3]
+    ce.reset()
+    assert ce(10) == [3, 0, 0, 3, 1, 0, 3, 3, 1, 2]
+
+
+def test_choice_setting_rng_immediately_changes_output():
+    ce = Choice(range(4), replace=True, rng_seed=999)
+    assert ce(10) == [3, 0, 3, 2, 1, 0, 3, 1, 3, 3]
+    ce.reset()
+    ce.rng = random.Random(9999)
+    assert ce(10) == [3, 0, 0, 3, 1, 0, 3, 3, 1, 2]
+
+
+def test_choice_items_is_readonly():
+    ce = Choice(range(4))
+    assert ce.items == range(4)
+    with pytest.raises(AttributeError):
+        ce.items = range(4)
+
+
+def test_choice_emitsuniquevalues_is_readonly():
+    ce = Choice(range(4))
+    assert not ce.emits_unique_values
+    with pytest.raises(AttributeError):
+        ce.emits_unique_values = False
+
+
+def test_choice_numuniquevalues_is_readonly():
+    ce = Choice(range(4))
+    assert ce.num_unique_values == 4
+    with pytest.raises(AttributeError):
+        ce.num_unique_values = 4
+
+
+def test_choice_numuniqueitems_is_readonly():
+    ce = Choice(range(4))
+    assert ce.num_unique_items == 4
+    with pytest.raises(AttributeError):
+        ce.num_unique_items = 4
+
+
+def test_choice_weights_is_immutable():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    assert ce.weights == (97, 1, 1, 1)
+    with pytest.raises(TypeError):
+        ce.weights[0] = 1
+
+
+def test_choice_cumweights_is_readonly_and_immutable():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    assert ce.cum_weights == (97, 98, 99, 100)
+    with pytest.raises(AttributeError):
+        ce.cum_weights = [1, 2, 3, 4]
+    with pytest.raises(TypeError):
+        ce.cum_weights[0] = 1
+
+
+def test_choice_remove_weights_with_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    ce(2)
+    ce.weights = None
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(10) == [3, 2, 1, 0, 3, 1, 3, 3, 0, 3]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_remove_weights_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    ce(2)
+    ce.weights = None
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce.emits_unique_values
+    assert ce(4) == [2, 0, 3, 1]
+    assert ce.num_unique_values == 0
+    assert ce.num_unique_items == 0
+
+
+def test_choice_remove_weights_only_replace_after_call():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace_only_after_call=True,
+                rng_seed=999)
+    ce(2)
+    ce.weights = None
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(4) == [3, 1, 0, 2]
+    assert ce(4) == [0, 2, 3, 1]
+    assert ce(4) == [2, 3, 0, 1]
+    assert ce(4) == [3, 0, 1, 2]
+    assert ce(4) == [2, 0, 3, 1]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_add_weights_with_replacement():
+    ce = Choice(range(4), replace=True, rng_seed=999)
+    ce(2)
+    ce.weights = [97, 1, 1, 1]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(10) == [0, 0, 0, 0, 0, 0, 0, 0, 0, 3]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_add_weights_no_replacement():
+    ce = Choice(range(4), replace=False, rng_seed=999)
+    ce(2)
+    ce.weights = [97, 1, 1, 1]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce.emits_unique_values
+    assert ce(4) == [0, 2, 3, 1]
+    assert ce.num_unique_values == 0
+    assert ce.num_unique_items == 0
+
+
+def test_choice_add_weights_only_replace_after_call():
+    ce = Choice(range(4), replace_only_after_call=True, rng_seed=999)
+    ce(2)
+    ce.weights = [97, 1, 1, 1]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(4) == [0, 3, 1, 2]
+    assert ce(4) == [0, 2, 1, 3]
+    assert ce(4) == [0, 3, 2, 1]
+    assert ce(4) == [0, 3, 2, 1]
+    assert ce(4) == [0, 1, 2, 3]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_change_weights_with_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    ce(2)
+    ce.weights = [1, 1, 1, 97]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(10) == [3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_change_weights_no_replacement():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    ce(2)
+    ce.weights = [1, 1, 1, 97]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce.emits_unique_values
+    assert ce(4) == [3, 2, 0, 1]
+    assert ce.num_unique_values == 0
+    assert ce.num_unique_items == 0
+
+
+def test_choice_change_weights_only_replace_after_call():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace_only_after_call=True,
+                rng_seed=999)
+    ce(2)
+    ce.weights = [1, 1, 1, 97]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(4) == [3, 2, 0, 1]
+    assert ce(4) == [3, 1, 0, 2]
+    assert ce(4) == [3, 2, 1, 0]
+    assert ce(4) == [2, 3, 1, 0]
+    assert ce(4) == [3, 0, 1, 2]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_change_replacement__replace_to_replace_only_after_call():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    ce(10)
+    ce.replace_only_after_call = True
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(4) == [1, 0, 3, 2]
+    assert ce(4) == [0, 3, 1, 2]
+    assert ce(4) == [0, 2, 1, 3]
+    assert ce(4) == [2, 0, 3, 1]
+    assert ce(4) == [0, 3, 1, 2]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    with pytest.raises(ValueError):
+        ce(5)
+
+
+def test_choice_change_replacement__replace_to_none():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    ce(10)
+    ce.replace = False
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce.emits_unique_values
+    assert ce(4) == [1, 0, 3, 2]
+    assert ce.num_unique_values == 0
+    assert ce.num_unique_items == 0
+    with pytest.raises(ValueError):
+        ce()
+
+
+def test_choice_change_replacement__replace_only_after_call_to_replace():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace_only_after_call=True,
+                rng_seed=999)
+    ce(4)
+    ce.replace_only_after_call = False
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(10) == [0, 0, 0, 0, 0, 0, 0, 3, 0, 0]
+
+
+def test_choice_change_replacement__replace_only_after_call_to_none():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace_only_after_call=True,
+                rng_seed=999)
+    ce(4)
+    ce.replace = False
+    assert not ce.replace_only_after_call
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert ce.emits_unique_values
+    assert ce(4) == [0, 2, 3, 1]
+    assert ce.num_unique_values == 0
+    assert ce.num_unique_items == 0
+    with pytest.raises(ValueError):
+        ce()
+
+
+def test_choice_change_replacement__none_to_replace():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False, rng_seed=999)
+    ce(2)
+    ce.replace = True
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(10) == [0, 0, 0, 0, 0, 0, 0, 3, 0, 0]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+
+
+def test_choice_change_replacement__none_to_replace_only_after_call():
+    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=False,
+                replace_only_after_call=False, rng_seed=999)
+    ce(2)
+    ce.replace_only_after_call = True
+    assert ce.replace
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    assert not ce.emits_unique_values
+    assert ce(4) == [0, 2, 3, 1]
+    assert ce(4) == [0, 3, 1, 2]
+    assert ce(4) == [0, 3, 2, 1]
+    assert ce(4) == [0, 2, 1, 3]
+    assert ce(4) == [0, 3, 1, 2]
+    assert ce.num_unique_values == 4
+    assert ce.num_unique_items == 4
+    with pytest.raises(ValueError):
+        ce(5)
+
+
+def test_choice_empty_items():
+    with pytest.raises(ValueError):
+        Choice(range(0))
+
+
+@pytest.mark.parametrize('items, bad_weights, noun', [
+    ([0, 1, 2, 3], [40, 50], 'item'),
+    ([0, 1], [50, 10, 2], None)
+])
+def test_choice_incorrect_weights(items, bad_weights, noun):
+    with pytest.raises(ValueError) as excinfo:
+        Choice(items, weights=bad_weights, noun=noun)
+    error_msg = str(excinfo.value)
+    assert f"({len(items)}" in error_msg
+    assert f"({len(bad_weights)}" in error_msg
+    if noun:
+        assert f"{noun} choices" in error_msg
+
+
+@pytest.mark.parametrize('items, bad_weights', [
+    ([0, 1, 2, 3], [40, 50]),
+    ([0, 1], [50, 10, 2])
+])
+def test_choice_change_weights_to_incorrect_weights(items, bad_weights):
+    ce = Choice(items, weights=[10] * len(items))
+    with pytest.raises(ValueError) as excinfo:
+        ce.weights = bad_weights
+    error_msg = str(excinfo.value)
+    assert f"({len(items)}" in error_msg
+    assert f"({len(bad_weights)}" in error_msg
+
+
+def test_choice_change_noun():
+    ce = Choice(range(4), noun='name')
+    with pytest.raises(ValueError) as excinfo1:
+        ce.weights = [1]
+    error_msg1 = str(excinfo1.value)
+    assert 'name choices' in error_msg1
+    ce.noun = 'title'
+    with pytest.raises(ValueError) as excinfo2:
+        ce.weights = [1]
+    error_msg2 = str(excinfo2.value)
+    assert 'title choices' in error_msg2
 
 
 @pytest.mark.parametrize('seed, mn, mx, weights, expected', [

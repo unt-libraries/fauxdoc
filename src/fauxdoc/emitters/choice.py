@@ -1,6 +1,6 @@
 """Contains emitters for choosing random data values."""
 import itertools
-from typing import Any, Optional, List, Sequence
+from typing import Any, Optional, List, Sequence, Tuple
 
 from fauxdoc.emitter import Emitter
 from fauxdoc.mathtools import clamp, gaussian, poisson, weighted_shuffle
@@ -28,28 +28,54 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
     must contain unique values, such as ['A', 'B', 'C', 'D', 'E'].
 
     Attributes:
-        rng: Random Number Generator, inherited from superclass.
-        items: A sequence of values you wish to choose from.
-        weights: (Optional.) A sequence of weights, one per item, for
-            controlling the probability of selections. This *must* be
-            the same length as `items`. Weights should *not* be
-            cumulative. Default is None.
-        cum_weights: (Optional.) Cumulative weights are calculated from
-            `weights`, if provided.
-        replace: (Optional.) A bool value; False if selecting an
-            item should prevent it from being selected again. Default
-            is True.
-        replace_only_after_call: (Optional.) A bool value; True if you
-            only want items replaced after each call. I.e., with a
-            call that requests multiple items, items will be unique,
-            but items are reused for each such call. Default is False.
-            If this is True, `replace` is set to True.
-        noun: (Optional.) A string representing a singular noun or
-            noun-phrase that describes what each item is. Used in
-            raising a more informative error if weights and items don't
-            match. Default is an empty string.
+        rng: Random Number Generator, inherited from superclass. Should
+            be a random.Random instance.
+        items: (Read-only.) A sequence of values you wish to choose
+            from.
+        weights: (Optional, Immutable.) A tuple of weights, one per
+            item, for controlling the probability of selections. This
+            *must* be the same length as `items`. Weights should *not*
+            be cumulative. If None, then choices are made randomly
+            without weights. Default is None.
+        cum_weights: (Optional, Read-only, Immutable.) Cumulative
+            weights are calculated from `weights`, if provided. Default
+            is None.
+        replace: A bool value. True if items can be chosen multiple
+            times; False if each item can be chosen ONCE. Default is
+            True. Note the interaction with `replace_only_after_call`
+            -- the latter defines WHEN replacement happens, the former
+            defines IF it happens. So if `replace` is False, then
+            `replace_only_after_call` is automatically switched to
+            False. If `replace_only_after_call` is True, then `replace`
+            is switched to True.
+        replace_only_after_call: A bool value. True if items should
+            only be replaced after each call; False otherwise. I.e.,
+            if this is True, then each call that requests multiple
+            items ensures that all items in each call are unique, but
+            items are reused from call to call. Default is False.
+            If this is True, then `replace` is set to True.
+        noun: A string representing a singular noun or noun-phrase that
+            describes what each item is. Used in raising a more
+            informative error if weights and items don't match. Default
+            is an empty string.
+        emits_unique_values: (Read-only.) A bool value. True if this
+            emitter will only emit unique values given the current
+            state. (If an emitter without replacement starts out with
+            duplicate items but then emits all the duplicates, this
+            changes from False to True.)
+        num_unique_values: (Read-only.) An int representing the number
+            of unique values that this emitter can emit given the
+            current state. If replace is False, and some values have
+            already been emitted, this tells you how many unique values
+            remain.
+        num_unique_items: (Read-only.) An int representing the number
+            of unique items that this emitter can emit given the
+            current state. If replace is False, and some items have
+            already been emitted, this tells you how many items remain.
         rng_seed: (Optional.) Any valid seed value you'd provide to
-            random.seed. Default is None.
+            random.seed. Default is None. Note: if you want seed the
+            RNG, use the `seed` method -- setting the `rng_seed`
+            attribute by itself does nothing.
     """
 
     def __init__(self,
@@ -70,81 +96,151 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
             noun: (Optional.) See `noun` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
-        self.weights = weights
-        self.cum_weights: Optional[List[float]] = None
-        self.replace = replace or replace_only_after_call
-        self.replace_only_after_call = replace_only_after_call
-        self.noun = noun
-        self._shuffled: List[T] = []
-        super().__init__(items=items, rng_seed=rng_seed)
-
-    def reset(self) -> None:
-        """Reset state and calculated attributes.
-
-        If `replace` is False, this resets the emitter so that it loses
-        track of what has already been emitted.
-
-        It also resets `cum_weights`.
-        """
-        super().reset()
-        if not self._items:
+        if not items or not isinstance(items, Sequence):
             raise ValueError(
                 f"The 'items' attribute must be a non-empty sequence. "
-                f"(Provided: {self._items})"
+                f"(Provided: {items})"
             )
-        self._num_unique_items = len(self._items)
-        if self.weights is not None:
-            nitems = len(self._items)
-            nweights = len(self.weights)
+        self._num_unique_items = len(items)
+        self._shuffled: List[T] = []
+        self._replace = replace or replace_only_after_call
+        self._replace_only_after_call = replace_only_after_call
+        self.noun = noun
+        self._set_all_weights(weights, items)
+        super().__init__(items=items, rng_seed=rng_seed)
+
+    def _set_all_weights(self,
+                         weights: Optional[Sequence[float]] = None,
+                         items: Optional[Sequence[T]] = None) -> None:
+        cum_weights = None
+        if weights is not None:
+            items = items or self._items
+            nitems = len(items)
+            nweights = len(weights)
             if nitems != nweights:
                 noun_phr = f"{self.noun} choices" if self.noun else "choices"
                 raise ValueError(
                     f"Mismatched number of {noun_phr} ({nitems}) to choice "
                     f"weights ({nweights}). These amounts must match."
                 )
-            self.cum_weights = list(itertools.accumulate(self.weights))
+            cum_weights = tuple(itertools.accumulate(weights))
+            weights = tuple(weights)
+        self._weights = weights
+        self._cum_weights = cum_weights
 
-        if not self.replace:
+    @property
+    def weights(self) -> Optional[Tuple[float, ...]]:
+        """See the `weights` attribute."""
+        return self._weights
+
+    @weights.setter
+    def weights(self, weights: Optional[Sequence[float]]) -> None:
+        """Sets the `weights` attribute.
+
+        WARNING: Changing weights on an emitter where `replace` is
+        False invalidates the previous random shuffle, causing it to be
+        reset, losing track of which values have already been emitted.
+        """
+        self._set_all_weights(weights)
+        if not self._replace:
+            self._global_shuffle()
+
+    @property
+    def cum_weights(self) -> Optional[Tuple[float, ...]]:
+        """See the `cum_weights` attribute."""
+        return self._cum_weights
+
+    @property
+    def replace(self) -> bool:
+        """See the `replace` attribute."""
+        return self._replace
+
+    @replace.setter
+    def replace(self, replace: bool) -> None:
+        """Sets the `replace` attribute.
+
+        Setting this to False means you want no replacement at all, and
+        so also sets `replace_only_after_call` to False.
+
+        WARNING: Changing `replace` to False resets the previous random
+        shuffle, losing track of which values have already been
+        emitted.
+        """
+        if replace != self._replace:
+            self._replace = replace
+            if replace:
+                self._num_unique_items = len(self._items)
+            else:
+                self._replace_only_after_call = False
+                self._global_shuffle()
+
+    @property
+    def replace_only_after_call(self) -> bool:
+        """See the `replace_only_after_call` attribute."""
+        return self._replace_only_after_call
+
+    @replace_only_after_call.setter
+    def replace_only_after_call(self, replace_only_after_call: bool) -> None:
+        """Sets the `replace_only_after_call` attribute.
+
+        Setting this to True also sets `replace` to True.
+        """
+        self._replace_only_after_call = replace_only_after_call
+        if replace_only_after_call:
+            self.replace = True
+
+    def reset(self) -> None:
+        """Resets state.
+
+        If `replace` is False, this resets the emitter so that it loses
+        track of what has already been emitted.
+        """
+        super().reset()
+        if not self._replace:
             # For emitters without replacement, it's most efficient to
             # pre-shuffle items ONCE. Then you just return items in
-            # shuffled order as they're requested. Resetting and
-            # reseeding both regenerate this shuffle.
+            # shuffled order as they're requested. This shuffle gets
+            # regenerated when `reset` is called. It's also regenerated
+            # any time changing object state invalidates the shuffle:
+            # setting `weights`, setting `replace` to False, and
+            # reseeding.
             self._global_shuffle()
 
     def seed(self, rng_seed: Any) -> None:
         """See superclass.
 
-        WARNING: Reseeding an emitter where `replace` is False resets
-        the random shuffle, losing track of what has already been
-        emitted, if anything. I think this is what would be expected.
+        WARNING: Reseeding an emitter where `replace` is False
+        invalidates the previous random shuffle, causing it to be
+        reset, losing track of which values have already been emitted.
         """
         super().seed(rng_seed)
-        if not self.replace:
-            # For emitters without replacement: the new seed isn't
-            # applied to what we emit until we regenerate the shuffle,
-            # losing track of what has already been emitted.
+        if not self._replace:
             self._global_shuffle()
 
     def _global_shuffle(self) -> None:
-        weights = self.weights or [1] * len(self._items)
+        num_items = len(self._items)
+        weights = self.weights or [1] * num_items
         self._shuffled = weighted_shuffle(self._items, weights, self.rng)
         self._shuffled_index = 0
+        self._num_unique_items = num_items
 
     @property
     def emits_unique_values(self) -> bool:
-        """Returns True if this emitter only emits unique values.
+        """True if this emitter only emits unique values.
 
         If `self.replace` is False, then this is based on the items
-        that are left. This may change from False to True if an emitter
-        without replacement has already emitted all the duplicates.
+        that are left. So -- if an emitter without replacement starts
+        out with some duplicate values in `items`, this is False. Once
+        all duplicate items have been emitted and only unique values
+        remain, this becomes True.
         """
-        if not self.replace:
+        if not self._replace:
             return self.num_unique_items == self.num_unique_values
         return False
 
     @property
     def num_unique_values(self) -> int:
-        """Returns the number of unique values that can be emitted.
+        """The number of unique values that can be emitted.
 
         Use this to sanity-check an `emit` call if unique values are
         required. If `self.replace` is False, then this gives you the
@@ -152,16 +248,20 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
         it gives you the total number of unique values that can be
         selected.
         """
-        if getattr(self, '_shuffled', None):
+        if not self._replace:
             return len(set(self._shuffled[self._shuffled_index:]))
         return super().num_unique_values
 
     @property
     def num_unique_items(self) -> int:
-        """Returns the number of unique items that can be emitted.
+        """The number of unique items that can be emitted.
 
         If `self.replace` is False, then this gives you the number of
         items that remain to be selected.
+
+        Note the difference between "items" and "values." An emitter
+        with items [1, 1, 1, 2, 3] has 5 unique items and 3 unique
+        values.
         """
         return self._num_unique_items
 
@@ -169,7 +269,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
         """Makes choices without replacing items."""
         if number > self._num_unique_items:
             self.raise_uniqueness_violation(number)
-        if not self.replace:
+        if not self._replace:
             # No replacement, with/without weights.
             if number == 1:
                 items = [self._shuffled[self._shuffled_index]]
@@ -180,22 +280,22 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
             self._shuffled_index += number
             self._num_unique_items -= number
             return items
-        if self.weights is None:
+        if self._weights is None:
             # One call without replacement, without weights.
             return self.rng.sample(self._items, k=number)
         # One call without replacement, with weights.
-        return weighted_shuffle(self._items, self.weights, self.rng, number)
+        return weighted_shuffle(self._items, self._weights, self.rng, number)
 
     def _choice_with_replacement(self, number: int) -> List[T]:
         """Makes non-unique choices (with replacement)."""
         if len(self._items) == 1:
             # No choice here.
             return list(self._items) * number
-        if self.weights is None and number == 1:
+        if self._weights is None and number == 1:
             # `choice` is fastest if there are no weights and we just
             # need 1.
             return [self.rng.choice(self._items)]
-        return self.rng.choices(self._items, cum_weights=self.cum_weights,
+        return self.rng.choices(self._items, cum_weights=self._cum_weights,
                                 k=number)
 
     def emit(self) -> T:
@@ -210,7 +310,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
         Args:
             number: See superclass.
         """
-        if not self.replace or (self.replace_only_after_call and number > 1):
+        if not self._replace or (self._replace_only_after_call and number > 1):
             return self._choice_without_replacement(number)
         return self._choice_with_replacement(number)
 
