@@ -11,23 +11,47 @@ class Static(ItemsMixin[T], Emitter[T]):
     """Class for emitting static values.
 
     Attributes:
+        items: (Read-only.) See superclass (ItemsMixin).
         value: The static value that is emitted.
+        emits_unique_values: (Read-only.) See superclass (Emitter). A
+            Static emitter emits infinite values, so this is always
+            False.
+        num_unique_values: (Read-only.) See superclass (Emitter). A
+            Static emitter always emits only one value, so this is
+            always 1.
     """
 
     def __init__(self, value: T) -> None:
         """Inits a Static instance with the given value.
 
         Args:
-            value: See `value` attribute.
+            value: See 'value' attribute.
         """
-        self.value = value
+        self._value = value
         super().__init__(items=[value])
 
+    @property
+    def value(self) -> T:
+        """See the 'value' attribute."""
+        return self._value
+
+    @value.setter
+    def value(self, value: T) -> None:
+        """Sets the 'value' attribute."""
+        self._value = value
+        self._items = [value]
+
     def emit(self) -> T:
-        return self.value
+        """Returns the static value."""
+        return self._value
 
     def emit_many(self, number: int) -> List[T]:
-        return [self.value] * number
+        """Returns a list with `number` copies of the static value.
+
+        Args:
+            number: See superclass.
+        """
+        return [self._value] * number
 
 
 class Iterative(Emitter[T]):
@@ -71,10 +95,16 @@ class Iterative(Emitter[T]):
     Attributes:
         iterator_factory: A callable that takes no args and returns an
             iterator.
-        iterator: The currently active iterator, generated from the
-            iterator_factory.
+        iterator: (Read-only.) The currently active iterator, generated
+            from the iterator_factory.
         reset_after_call: If True, the emitter automatically resets
             after each call.
+        emits_unique_values: (Read-only.) See superclass. Iterative
+            emitters emit infinite values, so this is always False.
+        num_unique_values: (Read-only.) See superclass. The number of
+            unique values is not universally knowable, since the
+            iterator that `iterator_factory` creates may generate
+            infinite values, so this is None.
     """
 
     def __init__(self,
@@ -86,40 +116,57 @@ class Iterative(Emitter[T]):
             iterator_factory: See `iterator_factory` attribute.
             reset_after_call: See `reset_after_call` attribute.
         """
-        self.iterator_factory = iterator_factory
         self.reset_after_call = reset_after_call
-        self.reset()
+        self.iterator_factory = iterator_factory
 
-    @property
-    def iterator_factory(self) -> Callable[[], Iterator[T]]:
-        return self._iterator_factory
-
-    @iterator_factory.setter
-    def iterator_factory(self, factory: Callable[[], Iterator[T]]) -> None:
-        """Sets the iterator_factory property."""
+    @staticmethod
+    def check_iter_factory(factory: Callable[[], Iterator[T]]) -> None:
+        """Checks a user-provided iterator factory for errors."""
         try:
             next(factory())
         except StopIteration:
             raise ValueError(
-                "The provided 'iterator_factory' appears to return an empty "
-                "iterator. This will result in an infinite loop while trying "
-                "to emit values."
+                'The provided iterator factory appears to return an empty '
+                'iterator. This will result in an infinite loop while trying '
+                'to emit values.'
             )
-        self._iterator_factory = factory
 
-    def _infinite_iterator(self) -> Iterator[T]:
-        """Returns an infinitely regenerating iterator."""
+    @staticmethod
+    def make_infinite_iter(factory: Callable[[], Iterator[T]]) -> Iterator[T]:
+        """Creates an infinitely regenerating iterator.
+
+        Args:
+            factory: A callable that takes no args and returns an
+                iterator.
+        """
         while True:
-            for item in self.iterator_factory():
+            for item in factory():
                 yield item
+
+    @property
+    def iterator_factory(self) -> Callable[[], Iterator[T]]:
+        """See the 'iterator_factory' attribute."""
+        return self._iterator_factory
+
+    @iterator_factory.setter
+    def iterator_factory(self, factory: Callable[[], Iterator[T]]) -> None:
+        """Sets the 'iterator_factory' attribute."""
+        self.check_iter_factory(factory)
+        self._iterator_factory = factory
+        self.reset()
+
+    @property
+    def iterator(self) -> Iterator[T]:
+        """See the 'iterator' attribute."""
+        return self._iterator
 
     def reset(self) -> None:
         """Resets self.iterator to the initial state."""
-        self.iterator = self._infinite_iterator()
+        self._iterator = self.make_infinite_iter(self.iterator_factory)
 
     def emit(self) -> T:
         """Returns one emitted value."""
-        ret_value = next(self.iterator)
+        ret_value = next(self._iterator)
         if self.reset_after_call:
             self.reset()
         return ret_value
@@ -130,14 +177,28 @@ class Iterative(Emitter[T]):
         Args:
             number: See superclass.
         """
-        ret_value = list(itertools.islice(self.iterator, 0, number))
+        ret_value = list(itertools.islice(self._iterator, 0, number))
         if self.reset_after_call:
             self.reset()
         return ret_value
 
 
-class Sequential(ItemsMixin[T], Iterative[T]):
-    """Class for creating an Iterative emitter for a sequence.
+# TODO: Revisit Sequential in the future and reimplement it so that (at
+# minimum) 'iterator_factory' is not mutable. This does not make sense
+# for the Sequential emitter, but it was part of the v1.0.0 API, so I
+# won't change it until v2.0.0.
+#
+# Background: In v1.0.0 Sequential was implemented as a subclass of
+# Iterative. As such, the 'iterator_factory' attribute was mutable,
+# although I didn't recognize or deal with any of the implications.
+# Now that I'm going back and refactoring to make sure these kinds of
+# things are explicit, I'm realizing it doesn't make much sense. But,
+# for now, I'm implementing a mutable 'iterator_factory' as best as I
+# can, for v1.1.0. Also: Sequential should not be a subclass of
+# Iterative, as this violates LSP.
+
+class Sequential(ItemsMixin[T], Emitter[T]):
+    """Class for creating an emitter that iterates over a sequence.
 
     Although you can achieve this using a plain Iterative emitter:
         Iterative(lambda: iter(sequence))
@@ -145,11 +206,27 @@ class Sequential(ItemsMixin[T], Iterative[T]):
     ... this class also stores the sequence in self.items so that all
     available choices can be accessed as a finite set of values.
 
+    Like Iterative, Sequential is infinite: it repeats when it runs out
+    of items.
+
+    Note that, although this class uses nearly the same interface as
+    Iterative, it is not a subclass of Iterative, since it can only
+    handle sequences, and not any iterator. (This would violate LSP.)
+
     Attributes:
-        iterator_factory: See superclass (Iterative).
-        iterator: See superclass (Iterative).
-        items: The sequence of values this emitter emits.
-        reset_after_call: See superclass (Iterative).
+        items: (Read-only.) See superclass (ItemsMixin).
+        iterator_factory: A callable that takes no args and returns an
+            iterator. The returned iterator MUST iterate over a
+            sequence. Setting this changes the `items` attribute so
+            that it contains all items output by the iterator.
+        iterator: (Read-only.) The currently active iterator, generated
+            from the iterator_factory.
+        reset_after_call: If True, the emitter automatically resets
+            after each call.
+        emits_unique_values: (Read-only.) See superclass (Emitter).
+            Sequential emitters emit infinite values, so this is always
+            False.
+        num_unique_values: (Read-only.) See superclass (ItemsMixin).
     """
 
     def __init__(self,
@@ -158,8 +235,68 @@ class Sequential(ItemsMixin[T], Iterative[T]):
         """Inits a Sequential emitter instance.
 
         Args:
-            items: See `items` attribute.
+            items: The sequence of items you with to emit. It cannot be
+                empty. (See `items` attribute.)
             reset_after_call: See `reset_after_call` attribute.
         """
-        super().__init__(lambda: iter(self.items),
-                         reset_after_call=reset_after_call, items=items)
+        if not items:
+            raise ValueError(
+                'The supplied `items` sequence cannot be empty. This will '
+                'result in an infinite loop when emitting items.'
+            )
+        super().__init__(items=items)
+        self.reset_after_call = reset_after_call
+        self._iterator_factory = lambda: iter(self.items)
+        self.reset()
+
+    @staticmethod
+    def check_seq_iter_factory(factory: Callable[[], Iterator[T]]) -> None:
+        """Checks to see if an iter factory probably returns sequence."""
+        len_hint = getattr(factory(), '__length_hint__', lambda: None)()
+        if not isinstance(len_hint, int):
+            raise ValueError(
+                'The provided iterator factory appears not to return a '
+                'sequence iterator. The returned iterator must iterate over a '
+                'finite sequence.'
+            )
+
+    def reset(self) -> None:
+        """Resets self.iterator to the initial state."""
+        self._iterator = Iterative.make_infinite_iter(self.iterator_factory)
+
+    @property
+    def iterator(self) -> Iterator[T]:
+        """See the 'iterator' attribute."""
+        return self._iterator
+
+    @property
+    def iterator_factory(self) -> Callable[[], Iterator[T]]:
+        """See the 'iterator_factory' attribute."""
+        return self._iterator_factory
+
+    @iterator_factory.setter
+    def iterator_factory(self, factory: Callable[[], Iterator[T]]) -> None:
+        """Sets the iterator_factory property."""
+        Iterative.check_iter_factory(factory)
+        self.check_seq_iter_factory(factory)
+        self._items = tuple([item for item in factory()])
+        self._iterator_factory = factory
+        self.reset()
+
+    def emit(self) -> T:
+        """Returns one emitted value."""
+        ret_value = next(self._iterator)
+        if self.reset_after_call:
+            self.reset()
+        return ret_value
+
+    def emit_many(self, number: int) -> List[T]:
+        """Returns a list of emitted values.
+
+        Args:
+            number: See superclass (Emitter).
+        """
+        ret_value = list(itertools.islice(self._iterator, 0, number))
+        if self.reset_after_call:
+            self.reset()
+        return ret_value
