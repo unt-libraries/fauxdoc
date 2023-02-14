@@ -51,13 +51,13 @@ class BoundWrapper(Generic[SourceT, OutputT]):
             must implement RNG (see the typing.ImplementsRNG protocol).
             E.g., this will be the WrapOne or WrapMany instance that
             instantiates this wrapper.
-        signature: An inspect.Signature object for the wrapped
-            function's signature. If your wrapped function is a built-
-            in method or type, then the signature cannot be determined,
-            and it will be None.
-        wants_rng: True if this wrapper has an `rng` kwarg in its call
-            signature and therefore expects an RNG (random.Random obj)
-            to be provided.
+        signature: (Read-only). An inspect.Signature object for the
+            wrapped function's signature. If your wrapped function is a
+            built-in method or type, then the signature cannot be
+            determined, and it will be None.
+        wants_rng: (Read-only). True if this wrapper has an `rng` kwarg
+            in its call signature and therefore expects an RNG
+            (random.Random obj) to be provided.
     """
 
     def __init__(self,
@@ -67,24 +67,58 @@ class BoundWrapper(Generic[SourceT, OutputT]):
 
         Args:
             function: See 'function' attribute.
-            bound_to:
+            bound_to: See 'bound_to' attribute.
         """
-        self.function = function
+        if hasattr(function, 'function'):
+            # Account for trying to create a new BoundWrapper instance
+            # using an existing BoundWrapper instance as the `function`
+            # argument. In this case we'd want to rebind the unbound
+            # version of the actual function, in function.function.
+            self.function = function.function
+        else:
+            self.function = function
         self.bound_to = bound_to
+
+    @property
+    def function(self) -> Callable[..., OutputT]:
+        """The 'function' attribute."""
+        return self._function
+
+    @function.setter
+    def function(self, function: Callable[..., OutputT]) -> None:
+        """Sets the 'function' attribute.
+
+        Also sets the 'signature' and 'wants_rng' attributes, based on
+        the provided function.
+
+        Args:
+            function: See the 'function' attribute.
+        """
+        self._function = function
         try:
-            self.signature: Optional[Signature] = signature(function)
+            self._signature: Optional[Signature] = signature(function)
         except ValueError:
             # We get a ValueError if we try to use builtin methods or
             # types, like `str`.
-            self.signature = None
-            self.wants_rng = False
+            self._signature = None
+            self._wants_rng = False
         else:
-            self.wants_rng = 'rng' in self.signature.parameters
+            self._wants_rng = 'rng' in self._signature.parameters
+
+    @property
+    def signature(self) -> Optional[Signature]:
+        """The 'signature' attribute."""
+        return self._signature
+
+    @property
+    def wants_rng(self) -> bool:
+        """The 'wants_rng' attribute."""
+        return self._wants_rng
 
     def __call__(self, *args: SourceT, **kwargs: SourceT) -> OutputT:
-        if self.wants_rng:
-            return self.function(*args, rng=self.bound_to.rng, **kwargs)
-        return self.function(*args, **kwargs)
+        if self._wants_rng:
+            return self._function(*args, rng=self.bound_to.rng, **kwargs)
+        return self._function(*args, **kwargs)
 
     def try_mock_call(self, *args: Any, **kwargs: Any) -> None:
         """Tests the wrapped function signature by trying a mock call.
@@ -103,13 +137,13 @@ class BoundWrapper(Generic[SourceT, OutputT]):
         Raises:
             TypeError: If the mock call fails.
         """
-        if self.wants_rng:
+        if self._wants_rng:
             kwargs['rng'] = self.bound_to.rng
         try:
-            if self.signature is None:
-                self.function(*args, **kwargs)
+            if self._signature is None:
+                self._function(*args, **kwargs)
             else:
-                self.signature.bind(*args, **kwargs)
+                self._signature.bind(*args, **kwargs)
         except TypeError as e:
             call_str = str(call(*args, **kwargs))[4:]
             raise TypeError(
@@ -142,6 +176,12 @@ class Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             it may also take an 'rng' kwarg.
         rng: See superclass (RandomWithChildrenMixin).
         rng_seed: See superclass (RandomWithChildrenMixin).
+        emits_unique_values: (Read-only.) See superclass (Emitter).
+            False, because it is impossible to know. Even with source
+            emitters that emit unique values, the wrapper may translate
+            or combine these in a way that makes them non-unique.
+        num_unique_values: (Read-only.) See superclass (Emitter).
+            None. The wrapper makes it impossible to know.
     """
 
     def __init__(self,
@@ -156,7 +196,21 @@ class Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             rng_seed: See 'rng_seed' attribute.
         """
         super().__init__(children=source, rng_seed=rng_seed)
-        self.wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
+        self.wrapper = wrapper
+
+    @property
+    def wrapper(self) -> Callable[..., OutputT]:
+        """The 'wrapper' attribute."""
+        return self._wrapper
+
+    @wrapper.setter
+    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
+        """Sets the 'wrapper' attribute.
+
+        Args:
+            wrapper: See the 'wrapper' attribute.
+        """
+        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
             wrapper, self
         )
 
@@ -189,6 +243,12 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             it may also take an 'rng' kwarg.
         rng: See mixins.RandomMixin.rng.
         rng_seed: See mixins.RandomMixin.rng_seed.
+        emits_unique_values: (Read-only.) See superclass (Emitter).
+            False, because it is impossible to know. Even with a source
+            emitter that emits unique values, the wrapper may translate
+            these in a way that makes them non-unique.
+        num_unique_values: (Read-only.) See superclass (Emitter).
+            None. The wrapper makes it impossible to know.
     """
 
     def __init__(self,
@@ -203,11 +263,25 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             rng_seed: See 'rng_seed' attribute.
         """
         super().__init__(children={'source': source}, rng_seed=rng_seed)
-        self.wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
+        self.wrapper = wrapper
+
+    @property
+    def wrapper(self) -> Callable[..., OutputT]:
+        """The 'wrapper' attribute."""
+        return self._wrapper
+
+    @wrapper.setter
+    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
+        """Sets the 'wrapper' attribute.
+
+        Args:
+            wrapper: See the 'wrapper' attribute.
+        """
+        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
             wrapper, self
         )
         try:
-            self.wrapper.try_mock_call(self._emitters['source']())
+            self._wrapper.try_mock_call(self._emitters['source']())
         except TypeError:
             raise
         finally:
@@ -215,7 +289,7 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
 
     def emit(self) -> OutputT:
         """Returns an emitted value, run through `self.wrapper`."""
-        return self.wrapper(self._emitters['source']())
+        return self._wrapper(self._emitters['source']())
 
     def emit_many(self, number: int) -> List[OutputT]:
         """Returns a list of emitted, wrapped values.
@@ -223,7 +297,7 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
         Args:
             number: See superclass (Emitter).
         """
-        return [self.wrapper(v) for v in self._emitters['source'](number)]
+        return [self._wrapper(v) for v in self._emitters['source'](number)]
 
 
 class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
@@ -274,14 +348,34 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
                 kwarg names in your wrapper.
             wrapper: See 'wrapper' attribute.
             rng_seed: See 'rng_seed' attribute.
+        emits_unique_values: (Read-only.) See superclass (Emitter).
+            False, because it is impossible to know. Even with source
+            emitters that emit unique values, the wrapper may translate
+            or combine these in a way that makes them non-unique.
+        num_unique_values: (Read-only.) See superclass (ItemsMixin).
+            None. The wrapper makes it impossible to know.
         """
         super().__init__(children=sources, rng_seed=rng_seed)
-        self.wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
+        self.wrapper = wrapper
+
+    @property
+    def wrapper(self) -> Callable[..., OutputT]:
+        """The 'wrapper' attribute."""
+        return self._wrapper
+
+    @wrapper.setter
+    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
+        """Sets the 'wrapper' attribute.
+
+        Args:
+            wrapper: See the 'wrapper' attribute.
+        """
+        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
             wrapper, self
         )
         kwargs = {k: v() for k, v in self._emitters.items()}
         try:
-            self.wrapper.try_mock_call(**kwargs)
+            self._wrapper.try_mock_call(**kwargs)
         except TypeError:
             raise
         finally:
@@ -290,7 +384,7 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
     def emit(self) -> OutputT:
         """Returns an emitted value, run through `self.wrapper`."""
         kwargs = {k: em() for k, em in self._emitters.items()}
-        return self.wrapper(**kwargs)
+        return self._wrapper(**kwargs)
 
     def emit_many(self, number: int) -> List[OutputT]:
         """Returns a list of emitted, wrapped values.
@@ -300,6 +394,6 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
         """
         emdata = [(k, em(number)) for k, em in self._emitters.items()]
         return [
-            self.wrapper(**{k: v[i] for k, v in emdata})
+            self._wrapper(**{k: v[i] for k, v in emdata})
             for i in range(number)
         ]

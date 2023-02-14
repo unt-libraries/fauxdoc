@@ -6,7 +6,7 @@ import pytest
 from fauxdoc.emitter import Emitter
 from fauxdoc.emitters.choice import Choice
 from fauxdoc.emitters.fixed import Static
-from fauxdoc.emitters.wrappers import WrapOne, WrapMany
+from fauxdoc.emitters.wrappers import BoundWrapper, WrapOne, WrapMany
 
 
 # Fixtures and test data
@@ -26,6 +26,92 @@ class NumberEmitter(Emitter):
 
 
 # Tests
+
+def test_boundwrapper_setting_function_sets_wantsrng():
+    wrapper = BoundWrapper(lambda val: f'{val}', Mock())
+    assert not wrapper.wants_rng
+    wrapper.function = lambda val, rng: f'{val}'
+    assert wrapper.wants_rng
+
+
+def test_boundwrapper_setting_function_sets_signature():
+    wrapper = BoundWrapper(lambda val: f'{val}', Mock())
+    wrapper.signature.bind(1)
+    wrapper.function = lambda val1, val2: f'{val1} {val2}'
+    wrapper.signature.bind(1, 2)
+    assert True
+
+
+def test_boundwrapper_can_init_other_boundwrapper():
+    def func(val):
+        return f'{val}'
+
+    obj_a = Mock()
+    obj_b = Mock()
+    wrapper_a = BoundWrapper(func, obj_a)
+    wrapper_b = BoundWrapper(wrapper_a, obj_b)
+    assert wrapper_a.function == func
+    assert wrapper_a.bound_to == obj_a
+    assert wrapper_b.function == func
+    assert wrapper_b.bound_to == obj_b
+    assert not hasattr(wrapper_b.function, 'function')
+
+
+def test_boundwrapper_setting_function_to_builtin():
+    wrapper = BoundWrapper(str, Mock())
+    assert wrapper.signature is None
+    assert not wrapper.wants_rng
+
+
+def test_boundwrapper_call_no_rng():
+    wrapper = BoundWrapper(lambda val: f'{val}', object())
+    assert not wrapper.wants_rng
+    assert wrapper(1) == '1'
+
+
+def test_boundwrapper_call_w_rng():
+    em = Mock()
+    em.rng.randint.side_effect = lambda a, b: 1
+    wrapper = BoundWrapper(lambda val, rng: f'{val} {rng.randint(1, 5)}', em)
+    assert wrapper.wants_rng
+    assert wrapper('a') == 'a 1'
+    em.rng.randint.assert_called_once_with(1, 5)
+
+
+def test_boundwrapper_call_missing_expected_rng_raises_error():
+    em = object()  # no rng attribute
+    wrapper = BoundWrapper(lambda val, rng: f'{val} {rng.randint(1, 5)}', em)
+    assert wrapper.wants_rng
+    with pytest.raises(AttributeError):
+        wrapper(1)
+
+
+def test_boundwrapper_trymockcall_passes_no_rng():
+    wrapper = BoundWrapper(lambda val: f'{val}', object())
+    wrapper.try_mock_call(1)
+    assert True
+
+
+def test_boundwrapper_trymockcall_passes_w_rng():
+    wrapper = BoundWrapper(lambda val, rng: f'{val}', Mock())
+    wrapper.try_mock_call('a')
+    assert True
+
+
+def test_boundwrapper_trymockcall_passes_using_builtin():
+    wrapper = BoundWrapper(str, object())
+    wrapper.try_mock_call(1)
+    assert True
+
+
+def test_boundwrapper_trymockcall_fails():
+    wrapper = BoundWrapper(lambda val: f'{val}', object())
+    with pytest.raises(TypeError) as excinfo:
+        wrapper.try_mock_call(1, 2)
+    error_msg = str(excinfo.value)
+    assert 'callback provided to object' in error_msg
+    assert '(1, 2) raised a TypeError' in error_msg
+
 
 @pytest.mark.parametrize('source, wrapper, expected', [
     (Static(1000), str, ['1000']),
@@ -103,6 +189,22 @@ def test_wrapone_seed_does_seed_source_emitter():
     mock_em.seed.assert_called_once_with(999)
 
 
+def test_wrapone_wrapper_is_settable():
+    em = Static(1)
+    wrapped_em = WrapOne(em, lambda val: None)
+    wrapped_em()
+    wrapped_em.wrapper = lambda val: f'{val}'
+    assert wrapped_em() == '1'
+    assert wrapped_em.wrapper.bound_to == wrapped_em
+
+
+def test_wrapone_setting_wrapper_w_invalid_callable_raises_error():
+    em = Static(1)
+    wrapped_em = WrapOne(em, lambda val: None)
+    with pytest.raises(TypeError):
+        wrapped_em.wrapper = lambda val1, val2: f'{val1} {val2}'
+
+
 @pytest.mark.parametrize('sources, wrapper, expected', [
     ({'a': Static(1000)}, lambda a: str(a), ['1000', '1000']),
     ({'a': Static('A'), 'b': NumberEmitter()}, lambda a, b: f"{a} -- {b}",
@@ -177,3 +279,19 @@ def test_wrapmany_seed_seeds_all_source_emitters():
     wrapped_em.seed(999)
     for m in mock_ems.values():
         m.seed.assert_called_once_with(999)
+
+
+def test_wrapmany_wrapper_is_settable():
+    ems = {'one': Static(1), 'two': Static(2)}
+    wrapped_em = WrapMany(ems, lambda one, two: None)
+    wrapped_em()
+    wrapped_em.wrapper = lambda one, two: f'{one} {two}'
+    assert wrapped_em() == '1 2'
+    assert wrapped_em.wrapper.bound_to == wrapped_em
+
+
+def test_wrapmany_setting_wrapper_w_invalid_callable_raises_error():
+    ems = {'one': Static(1), 'two': Static(2)}
+    wrapped_em = WrapMany(ems, lambda one, two: None)
+    with pytest.raises(TypeError):
+        wrapped_em.wrapper = lambda val1, val2, val3: f'{val1} {val2} {val3}'
