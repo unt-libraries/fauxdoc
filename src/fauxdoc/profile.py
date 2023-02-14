@@ -227,11 +227,11 @@ class Schema:
                 args. The `fields` attribute is generated from this.
                 Your field names become keys.
         """
-        self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
+        self.fields = ObjectMap({})
         self.add_fields(*fields)
 
     @property
-    def fields(self) -> ObjectMap[FieldLike[Any]]:
+    def fields(self) -> Mapping[str, FieldLike[Any]]:
         """See 'fields' attribute."""
         return self._fields
 

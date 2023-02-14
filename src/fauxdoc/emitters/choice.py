@@ -129,7 +129,7 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
         self._cum_weights = cum_weights
 
     @property
-    def weights(self) -> Optional[Tuple[float, ...]]:
+    def weights(self) -> Optional[Sequence[float]]:
         """See the `weights` attribute."""
         return self._weights
 
