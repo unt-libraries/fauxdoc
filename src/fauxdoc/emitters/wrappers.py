@@ -21,6 +21,7 @@ from unittest.mock import call
 from fauxdoc.emitter import Emitter
 from fauxdoc.mixins import RandomWithChildrenMixin
 from fauxdoc.typing import EmitterLike, ImplementsRNG, OutputT, SourceT
+from fauxdoc.warn import get_deprecated_attr
 
 
 class BoundWrapper(Generic[SourceT, OutputT]):
@@ -153,8 +154,8 @@ class BoundWrapper(Generic[SourceT, OutputT]):
             ) from e
 
 
-class Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
-           Emitter[OutputT]):
+class _deprecated_Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
+                       Emitter[OutputT]):
     """(Deprecated) Abstract base class for creating wrapper emitters.
 
     I've moved the specific functionality that the Wrap ABC *used* to
@@ -165,7 +166,7 @@ class Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
     also a lot cleaner.)
 
     Because `Wrap` is part of the v1.0.0 API, I'm deprecating it rather
-    than removing it. It will be removed in a future update.
+    than removing it. It will be removed in the next major version.
 
     Attributes:
         emitters: (From RandomWithChildrenMixin.) This is a
@@ -397,3 +398,15 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             self._wrapper(**{k: v[i] for k, v in emdata})
             for i in range(number)
         ]
+
+
+DEPRECATED = {
+    'Wrap': ('WrapOne or WrapMany', _deprecated_Wrap)
+}
+
+_deprecated_Wrap.__name__ = 'Wrap'
+_deprecated_Wrap.__qualname__ = 'Wrap'
+
+
+def __getattr__(name: str) -> Any:
+    return get_deprecated_attr(name, __name__, 'module', DEPRECATED)

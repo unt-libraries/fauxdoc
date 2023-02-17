@@ -1,6 +1,7 @@
 """Contains tests for fauxdoc.emitters.fixed."""
 import itertools
 import pytest
+import warnings
 
 from fauxdoc.emitters import fixed
 
@@ -174,7 +175,9 @@ def test_sequential_set_iterator_factory():
     em = fixed.Sequential([1, 2])
     _ = em()    # 1
     _ = em(2)   # 2, 1
-    em.iterator_factory = lambda: iter([4, 5, 6])
+    # This will throw a deprecation warning, which we ignore here:
+    with warnings.catch_warnings(record=True):
+        em.iterator_factory = lambda: iter([4, 5, 6])
     assert em.items == (4, 5, 6)
     assert em.num_unique_values == 3
     assert em() == 4
@@ -185,7 +188,9 @@ def test_sequential_set_nonseq_iterator_factory_raises_error():
     em = fixed.Sequential([1, 2, 3])
     _ = em()
     with pytest.raises(ValueError) as excinfo:
-        em.iterator_factory = lambda: itertools.count()
+        # This also throws a deprecation warning, which we ignore here:
+        with warnings.catch_warnings(record=True):
+            em.iterator_factory = lambda: itertools.count()
     assert 'sequence iterator' in str(excinfo.value)
 
 

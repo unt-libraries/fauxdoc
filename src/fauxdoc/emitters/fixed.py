@@ -1,6 +1,7 @@
 """Contains functions and classes for implementing static emitters."""
 import itertools
 from typing import Callable, Iterator, List, Sequence
+import warnings
 
 from fauxdoc.emitter import Emitter
 from fauxdoc.mixins import ItemsMixin
@@ -276,7 +277,23 @@ class Sequential(ItemsMixin[T], Emitter[T]):
 
     @iterator_factory.setter
     def iterator_factory(self, factory: Callable[[], Iterator[T]]) -> None:
-        """Sets the iterator_factory property."""
+        """Sets the 'iterator_factory' attribute.
+
+        Setting 'iterator_factory' for Sequential emitters is now
+        deprecated, since it's not a very intuitive way to set the
+        emitted sequence, and it's impossible to ensure that the set
+        factory actually returns a sequence. From now on, if you need
+        to emit a different sequence, you should create a new
+        Sequential emitter instance. The 'iterator_factory' attribute
+        will become read-only in v2.0.0.
+        """
+        warnings.warn(
+            f'Setting {type(self).__name__}.iterator_factory is deprecated; '
+            f'in the next major version release this will be changed to a '
+            f'read-only attribute. If you need to emit a different sequence, '
+            f'please create a new {type(self).__name__} instance instead.',
+            DeprecationWarning
+        )
         Iterative.check_iter_factory(factory)
         self.check_seq_iter_factory(factory)
         self._items = tuple([item for item in factory()])

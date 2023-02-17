@@ -46,7 +46,7 @@ repository = "https://github.com/unt-libraries/fauxdoc"
 [project.optional-dependencies]
 dev = [
     'pytest >= 6.2.4; python_version >= "3.10"',
-    'pytest >= 3.0.0; python_version < "3.10"'
+    'pytest >= 3.8.0; python_version < "3.10"'
 ]
 
 [tool.setuptools_scm]
@@ -66,13 +66,13 @@ commands =
 
 [testenv:py37-oldest]
 deps =
-    pytest==3.0.0
+    pytest==3.8.0
     typing_extensions==3.6.5
     importlib_metadata==2.0.0
 
 [testenv:py{38,39}-oldest]
 deps =
-    pytest==3.0.0
+    pytest==3.8.0
 
 [testenv:py{310,311}-oldest]
 deps =
