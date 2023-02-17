@@ -410,3 +410,7 @@ _deprecated_Wrap.__qualname__ = 'Wrap'
 
 def __getattr__(name: str) -> Any:
     return get_deprecated_attr(name, __name__, 'module', DEPRECATED)
+
+
+def __dir__() -> List[str]:
+    return sorted(list(globals()) + list(DEPRECATED.keys()))

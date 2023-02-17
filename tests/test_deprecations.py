@@ -1,4 +1,4 @@
-"""Contains tests for package deprecation warnings."""
+"""Contains tests for deprecations."""
 from typing import Callable, Sequence, Union
 import warnings
 
@@ -63,6 +63,13 @@ def test_typing_boolemitterlike_warning():
         assert BoolEmitterLike == EmitterLike[bool]
 
 
+def test_typing_dir_contains_deprecated_things():
+    import fauxdoc
+    dir_listing = dir(fauxdoc.typing)
+    for item in fauxdoc.typing.DEPRECATED.keys():
+        assert item in dir_listing
+
+
 def test_wrappers_wrap_warning():
     with warnings.catch_warnings(record=True) as caught:
         from fauxdoc.emitters.wrappers import Wrap
@@ -73,6 +80,13 @@ def test_wrappers_wrap_warning():
         assert 'use WrapOne or WrapMany instead' in msg
         assert Wrap.__name__ == 'Wrap'
         assert Wrap.__qualname__ == 'Wrap'
+
+
+def test_wrappers_dir_contains_deprecated_things():
+    import fauxdoc
+    dir_listing = dir(fauxdoc.emitters.wrappers)
+    for item in fauxdoc.emitters.wrappers.DEPRECATED.keys():
+        assert item in dir_listing
 
 
 def test_emitters_wrap_warning():
@@ -96,6 +110,13 @@ def test_emitters_wrap_warning():
             assert 'use WrapOne or WrapMany instead' in msg
         assert Wrap.__name__ == 'Wrap'
         assert Wrap.__qualname__ == 'Wrap'
+
+
+def test_emitters_dir_contains_deprecated_things():
+    import fauxdoc
+    dir_listing = dir(fauxdoc.emitters)
+    for item in fauxdoc.emitters.DEPRECATED.keys():
+        assert item in dir_listing
 
 
 def test_fixed_sequential_set_iteratorfactory_warning():

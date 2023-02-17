@@ -5,7 +5,7 @@ and then call repeatedly to generate output data. Each different type
 of emitter is built to create a specific type of data or be configured
 in a specific way.
 """
-from typing import Any
+from typing import Any, List
 
 from fauxdoc.warn import get_deprecated_attr
 
@@ -35,8 +35,8 @@ __all__ = [
 ]
 
 
-ALL_DEPRECATED = {}
-ALL_DEPRECATED.update(WRAPPERS_DEPRECATED)
+DEPRECATED = {}
+DEPRECATED.update(WRAPPERS_DEPRECATED)
 
 
 def __getattr__(name: str) -> Any:
@@ -47,4 +47,8 @@ def __getattr__(name: str) -> Any:
     # call before accessing the attribute, which results in two calls.
     # I don't think there is a way around this, but it doesn't hurt
     # anything.
-    return get_deprecated_attr(name, __name__, 'module', ALL_DEPRECATED)
+    return get_deprecated_attr(name, __name__, 'module', DEPRECATED)
+
+
+def __dir__() -> List[str]:
+    return sorted(list(globals()) + list(DEPRECATED.keys()))
