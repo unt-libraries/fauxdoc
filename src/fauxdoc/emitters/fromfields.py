@@ -10,6 +10,10 @@ from fauxdoc.mixins import RandomMixin
 from fauxdoc.typing import FieldLike, FieldReturn, OutputT, SourceT, T
 
 
+# Local type alias -- not needed in other modules
+SourceFields = Union[FieldLike[T], Sequence[FieldLike[T]]]
+
+
 class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
     """Provide utility features for groups of source fields.
 
@@ -24,7 +28,7 @@ class SourceFieldGroup(ObjectGroup[FieldLike[T]]):
       a single (singular) value, or a list of values.
     """
 
-    def __init__(self, fields: Union[FieldLike[T], Sequence[FieldLike[T]]]):
+    def __init__(self, fields: SourceFields[T]):
         """Inits a SourceFieldGroup instance.
 
         Args:
@@ -92,7 +96,7 @@ class CopyFields(Generic[T], Emitter[Optional[Union[T, List[T], str]]]):
     """
 
     def __init__(self,
-                 source: Union[FieldLike[T], Sequence[FieldLike[T]]],
+                 source: SourceFields[T],
                  separator: Optional[str] = None) -> None:
         """Inits a CopyFields obj with source fields and separator.
 
@@ -102,7 +106,19 @@ class CopyFields(Generic[T], Emitter[Optional[Union[T, List[T], str]]]):
             separator: (Optional.) See `separator` attribute.
         """
         self.separator = separator
-        self.source = SourceFieldGroup(source)
+        self.set_source_fields(source)
+
+    def set_source_fields(self, fields: SourceFields[T]) -> None:
+        """Sets the 'source' attr from a Field or Field sequence.
+
+        This is a convenience method -- you can set 'source' directly,
+        but in that case it must be a SourceFieldGroup instance.
+
+        Args:
+            fields: One or a sequence of Field instances to serve as
+                the data source.
+        """
+        self.source: SourceFieldGroup[T] = SourceFieldGroup(fields)
 
     def reset_source(self) -> None:
         """Calls `reset` on all source fields.
@@ -167,23 +183,22 @@ class BasedOnFields(Generic[SourceT, OutputT], RandomMixin, Emitter[OutputT]):
         source: A SourceFieldGroup containing the Field instance(s) to
             copy data from. Values are sent to the 'action' function in
             Field order.
-        action: A callable that takes data from the source field(s) and
-            returns some output value(s) based on the source data. The
-            appropriate call signature depends on your source fields
-            and whether your function requires RNG. 1) If you have one
-            source field, the first positional arg provided will be the
-            output value for that field. 2) Or, if you have multiple
-            source fields, one kwarg for each source field will be
-            provided, where the kwarg name is the field name and the
-            value is the output value. 3) If you need RNG, supply an
-            'rng' kwarg, and the RNG (random.Random) instance attached
-            to the BasedOnFields instance will be provided.
+        action: A BoundWrapper callable that takes data from the source
+            field(s) and returns some output value(s). The appropriate
+            call signature depends on your source fields and whether
+            your function requires RNG. 1) If you have one source
+            field, the first positional arg provided will be the output
+            value for that field. 2) Or, if you have multiple source
+            fields, one kwarg for each source field will be provided,
+            where the kwarg name is the field name and the value is the
+            output value. 3) If you need RNG, supply an 'rng' kwarg,
+            and the RNG (random.Random) instance attached to the
+            BasedOnFields instance will be provided.
         rng_seed: (Optional.) See parent class (RandomMixin).
     """
 
     def __init__(self,
-                 source: Union[FieldLike[SourceT],
-                               Sequence[FieldLike[SourceT]]],
+                 source: SourceFields[SourceT],
                  action: Callable[..., OutputT],
                  rng_seed: Any = None) -> None:
         """Inits a BasedOnFields instance.
@@ -195,11 +210,47 @@ class BasedOnFields(Generic[SourceT, OutputT], RandomMixin, Emitter[OutputT]):
             rng_seed: (Optional.) See `rng_seed` attribute.
         """
         super().__init__(rng_seed=rng_seed)
-        self.source = SourceFieldGroup(source)
-        self.action: BoundWrapper[
-            FieldReturn[SourceT],
-            OutputT
-        ] = BoundWrapper(action, self)
+        self.set_source_fields(source)
+        self.set_action_function(action)
+
+    def set_source_fields(self, fields: SourceFields[SourceT]) -> None:
+        """Sets the 'source' attr given a Field or Fields sequence.
+
+        This is a convenience method -- you can set 'source' directly,
+        but in that case it must be a SourceFieldGroup instance.
+
+        Args:
+            fields: One or a sequence of Field instances to serve as
+                the data source.
+        """
+        self.source: SourceFieldGroup[SourceT] = SourceFieldGroup(fields)
+
+    def set_action_function(self, function: Callable[..., OutputT]) -> None:
+        """Sets the 'action' attr from a given function.
+
+        This is a convenience method -- you can set 'action' directly,
+        but in that case it must be a BoundWrapper instance.
+
+        Args:
+            function: A callable that gets passed to BoundWrapper to
+                create the 'action' attribute.
+        """
+        self.action = BoundWrapper(function, self)
+
+    @property
+    def action(self) -> BoundWrapper[FieldReturn[SourceT], OutputT]:
+        """The 'action' attribute."""
+        return self._action
+
+    @action.setter
+    def action(self,
+               action: BoundWrapper[FieldReturn[SourceT], OutputT]) -> None:
+        """Sets the 'action' attribute.
+
+        Args:
+            action: See the 'action' attribute.
+        """
+        self._action = action
         if len(self.source) == 1:
             args = [self.source[0]()]
             kwargs = {}
@@ -207,7 +258,7 @@ class BasedOnFields(Generic[SourceT, OutputT], RandomMixin, Emitter[OutputT]):
             args = []
             kwargs = {field.name: field() for field in self.source}
         try:
-            self.action.try_mock_call(*args, **kwargs)
+            self._action.try_mock_call(*args, **kwargs)
         except TypeError:
             raise
         finally:
@@ -236,9 +287,9 @@ class BasedOnFields(Generic[SourceT, OutputT], RandomMixin, Emitter[OutputT]):
     def emit(self) -> OutputT:
         """Returns one emitted value."""
         if len(self.source) == 1:
-            return self.action(self.source[0].previous)
+            return self._action(self.source[0].previous)
         kwargs = {field.name: field.previous for field in self.source}
-        return self.action(**kwargs)
+        return self._action(**kwargs)
 
     def emit_many(self, number: int) -> List[OutputT]:
         """Returns a list of emitted values.

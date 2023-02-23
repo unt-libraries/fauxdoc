@@ -1,11 +1,12 @@
 """Contains tests for fauxdoc.emitters.fromfields emitters."""
 import pytest
 
-from fauxdoc.emitters.fixed import Static
 from fauxdoc.emitters.choice import chance, Choice
+from fauxdoc.emitters.fixed import Static
 from fauxdoc.emitters.fromfields import (
     SourceFieldGroup, CopyFields, BasedOnFields
 )
+from fauxdoc.emitters.wrappers import BoundWrapper
 from fauxdoc.profile import Field
 
 
@@ -204,6 +205,34 @@ def test_copyfields_multi_with_separator_not_singlevalued():
     assert not em.single_valued
 
 
+def test_copyfields_source_is_settable():
+    # If setting `source` directly, you must use an
+    # `emitters.fromfields.SourceFieldGroup` instance.
+    em = CopyFields(Field('test', Static('one')))
+    em.source = SourceFieldGroup([
+        Field('test1', Static('one')),
+        Field('test2', Static('two')),
+    ])
+    em.source[0]()
+    em.source[1]()
+    assert em() == ['one', 'two']
+    assert not em.single_valued
+
+
+@pytest.mark.parametrize('fields', [
+    Field('new_test', Static('foo')),
+    [Field('test1', Static('one')), Field('test2', Static('two'))]
+])
+def test_copyfields_setsourcefields(fields):
+    # The `set_source_fields` method is a more convenient way to set
+    # `source` -- it takes one or a list of fields.
+    em = CopyFields(Field('test', Static('one')))
+    em.set_source_fields(fields)
+    exp = fields if isinstance(fields, list) else [fields]
+    assert isinstance(em.source, SourceFieldGroup)
+    assert list(em.source) == exp
+
+
 @pytest.mark.parametrize('source, separator, expected', [
     # Single-field tests
     (Field('test', Static('Test Val')), None, 'Test Val'),
@@ -371,3 +400,69 @@ def test_basedonfields_emit_bad_action_raises_error(source, action, has_rng,
     err_msg = str(excinfo.value)
     for blurb in (args, kwargs_sources, kwargs_rng, problem):
         assert blurb in err_msg
+
+
+def test_basedonfields_source_is_settable():
+    em = BasedOnFields(Field('test', Static('one')), lambda val: val)
+    em.source = SourceFieldGroup([
+        Field('test1', Static('one')),
+        Field('test2', Static('two')),
+    ])
+    em.source[0]()
+    em.source[1]()
+
+    # NOTE: When we set the source to use a different number of fields,
+    # it invalidates the given action (which still expects one field),
+    # but it DOES NOT raise an error unless you try to call the
+    # emitter.
+    with pytest.raises(TypeError):
+        em()
+
+    # If we set `action` now, then it validates against the new source
+    # fields and works as expected.
+    em.action = BoundWrapper(lambda test1, test2: f'{test1} {test2}', em)
+    assert em() == 'one two'
+    assert not em.source.single_valued
+
+
+@pytest.mark.parametrize('fields', [
+    Field('new_test', Static('foo')),
+    [Field('test1', Static('one')), Field('test2', Static('two'))]
+])
+def test_basedonfields_setsourcefields(fields):
+    # The `set_source_fields` method is a more convenient way to set
+    # `source` -- it takes one or a list of fields.
+    em = BasedOnFields(Field('test', Static('one')), lambda val: None)
+    em.set_source_fields(fields)
+    exp = fields if isinstance(fields, list) else [fields]
+    assert isinstance(em.source, SourceFieldGroup)
+    assert list(em.source) == exp
+
+
+def test_basedonfields_action_is_settable():
+    # The `action` attribute can be set directly but requires an
+    # `emitters.wrappers.BoundWrapper` instance.
+    field = Field('test', Static(1))
+    em = BasedOnFields(field, lambda val: None)
+    field()
+    em.action = BoundWrapper(lambda val: f'{val}', em)
+    assert em() == '1'
+    assert em.action.bound_to == em
+
+
+def test_basedonfields_setting_action_w_invalid_callable_raises_error():
+    field = Field('test', Static(1))
+    em = BasedOnFields(field, lambda val: None)
+    with pytest.raises(TypeError):
+        em.action = BoundWrapper(lambda val1, val2: f'{val1} {val2}', em)
+
+
+def test_basedonfields_setactionfunction():
+    # The `set_action_function` method is a more convenient way to set
+    # `action` -- it just takes your function and wraps it in
+    # BoundWrapper for you.
+    field = Field('test', Static(1))
+    em = BasedOnFields(field, lambda val: None)
+    em.set_action_function(lambda val: 'new action')
+    assert isinstance(em.action, BoundWrapper)
+    assert em.action(None) == 'new action'
