@@ -193,7 +193,7 @@ def test_wrapone_wrapper_is_settable():
     em = Static(1)
     wrapped_em = WrapOne(em, lambda val: None)
     wrapped_em()
-    wrapped_em.wrapper = lambda val: f'{val}'
+    wrapped_em.wrapper = BoundWrapper(lambda val: f'{val}', wrapped_em)
     assert wrapped_em() == '1'
     assert wrapped_em.wrapper.bound_to == wrapped_em
 
@@ -202,7 +202,16 @@ def test_wrapone_setting_wrapper_w_invalid_callable_raises_error():
     em = Static(1)
     wrapped_em = WrapOne(em, lambda val: None)
     with pytest.raises(TypeError):
-        wrapped_em.wrapper = lambda val1, val2: f'{val1} {val2}'
+        wrapped_em.wrapper = BoundWrapper(lambda val1, val2: f'{val1} {val2}',
+                                          wrapped_em)
+
+
+def test_wrapone_setwrapperfunction():
+    em = Static(1)
+    wrapped_em = WrapOne(em, lambda val: None)
+    wrapped_em.set_wrapper_function(lambda val: 'new function')
+    assert isinstance(wrapped_em.wrapper, BoundWrapper)
+    assert wrapped_em.wrapper(None) == 'new function'
 
 
 @pytest.mark.parametrize('sources, wrapper, expected', [
@@ -285,7 +294,8 @@ def test_wrapmany_wrapper_is_settable():
     ems = {'one': Static(1), 'two': Static(2)}
     wrapped_em = WrapMany(ems, lambda one, two: None)
     wrapped_em()
-    wrapped_em.wrapper = lambda one, two: f'{one} {two}'
+    wrapped_em.wrapper = BoundWrapper(lambda one, two: f'{one} {two}',
+                                      wrapped_em)
     assert wrapped_em() == '1 2'
     assert wrapped_em.wrapper.bound_to == wrapped_em
 
@@ -294,4 +304,15 @@ def test_wrapmany_setting_wrapper_w_invalid_callable_raises_error():
     ems = {'one': Static(1), 'two': Static(2)}
     wrapped_em = WrapMany(ems, lambda one, two: None)
     with pytest.raises(TypeError):
-        wrapped_em.wrapper = lambda val1, val2, val3: f'{val1} {val2} {val3}'
+        wrapped_em.wrapper = BoundWrapper(
+            lambda val1, val2, val3: f'{val1} {val2} {val3}',
+            wrapped_em
+        )
+
+
+def test_wrapmany_setwrapperfunction():
+    ems = {'one': Static(1), 'two': Static(2)}
+    wrapped_em = WrapMany(ems, lambda one, two: None)
+    wrapped_em.set_wrapper_function(lambda one, two: 'new function')
+    assert isinstance(wrapped_em.wrapper, BoundWrapper)
+    assert wrapped_em.wrapper(None, None) == 'new function'

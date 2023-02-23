@@ -172,9 +172,10 @@ class _deprecated_Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
         emitters: (From RandomWithChildrenMixin.) This is a
             group.ObjectMap containing the source emitter-like
             instance(s) to wrap.
-        wrapper: A callable that takes input values from the source
-            emitter(s) and returns a corresponding value. Optionally,
-            it may also take an 'rng' kwarg.
+        wrapper: A BoundWrapper instance, bound to the corresponding
+            `Wrap` instance, whose 'function' is a callable that takes
+            input values from the source emitter(s) and returns the
+            desired value. Optionally, it may also take an 'rng' kwarg.
         rng: See superclass (RandomWithChildrenMixin).
         rng_seed: See superclass (RandomWithChildrenMixin).
         emits_unique_values: (Read-only.) See superclass (Emitter).
@@ -193,25 +194,12 @@ class _deprecated_Wrap(Generic[SourceT, OutputT], RandomWithChildrenMixin,
         Args:
             source: A dict that maps labels to wrapped source emitters,
                 used to populate the 'emitter' attribute.
-            wrapper: See 'wrapper' attribute.
+            wrapper: The function to provide for the BoundWrapper
+                instance that will populate the 'wrapper' attribute.
             rng_seed: See 'rng_seed' attribute.
         """
         super().__init__(children=source, rng_seed=rng_seed)
-        self.wrapper = wrapper
-
-    @property
-    def wrapper(self) -> Callable[..., OutputT]:
-        """The 'wrapper' attribute."""
-        return self._wrapper
-
-    @wrapper.setter
-    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
-        """Sets the 'wrapper' attribute.
-
-        Args:
-            wrapper: See the 'wrapper' attribute.
-        """
-        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
+        self.wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
             wrapper, self
         )
 
@@ -239,9 +227,10 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
 
     Attributes:
         emitters: See mixins.ChildrenMixin.emitters.
-        wrapper: A callable that takes one input value from the source
-            emitter and returns a corresponding value. Optionally,
-            it may also take an 'rng' kwarg.
+        wrapper: A BoundWrapper instance, bound to the corresponding
+            `WrapOne` instance, whose 'function' is a callable that
+            takes input values from the source emitter and returns the
+            desired value. Optionally, it may also take an 'rng' kwarg.
         rng: See mixins.RandomMixin.rng.
         rng_seed: See mixins.RandomMixin.rng_seed.
         emits_unique_values: (Read-only.) See superclass (Emitter).
@@ -260,32 +249,43 @@ class WrapOne(Generic[SourceT, OutputT], RandomWithChildrenMixin,
 
         Args:
             source: The emitter to wrap.
-            wrapper: See 'wrapper' attribute.
+            wrapper: The function to provide for the BoundWrapper
+                instance that will populate the 'wrapper' attribute.
             rng_seed: See 'rng_seed' attribute.
         """
         super().__init__(children={'source': source}, rng_seed=rng_seed)
-        self.wrapper = wrapper
+        self.set_wrapper_function(wrapper)
+
+    def set_wrapper_function(self, function: Callable[..., OutputT]) -> None:
+        """Sets the 'wrapper' attribute from the provided function.
+
+        This is a convenience method -- you can set 'wrapper' directly,
+        but in that case you must provide a BoundWrapper instance.
+
+        Args:
+            function: A function (or other callable) to use for the
+                BoundWrapper instance used to set the 'wrapper' attr.
+        """
+        self.wrapper = BoundWrapper(function, self)
 
     @property
-    def wrapper(self) -> Callable[..., OutputT]:
+    def wrapper(self) -> BoundWrapper[SourceT, OutputT]:
         """The 'wrapper' attribute."""
         return self._wrapper
 
     @wrapper.setter
-    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
+    def wrapper(self, wrapper: BoundWrapper[SourceT, OutputT]) -> None:
         """Sets the 'wrapper' attribute.
 
         Args:
             wrapper: See the 'wrapper' attribute.
         """
-        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
-            wrapper, self
-        )
         try:
-            self._wrapper.try_mock_call(self._emitters['source']())
+            wrapper.try_mock_call(self._emitters['source']())
         except TypeError:
             raise
         finally:
+            self._wrapper = wrapper
             self.reset()
 
     def emit(self) -> OutputT:
@@ -328,11 +328,13 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
 
     Attributes:
         emitters: See mixins.ChildrenMixin.emitters.
-        wrapper: A callable that takes one kwarg from each source
-            emitter, using the label from the 'emitters' ObjectMap as
-            the kwarg name. Optionally, it may take an addition 'rng'
-            kwarg. It should return a final value based on the source
-            emitter values.
+        wrapper: A BoundWrapper instance, bound to the corresponding
+            `WrapMany` instance, whose 'function' is a callable that
+            takes one kwarg from each source emitter, using the label
+            from the 'emitters' ObjectMap as the kwarg name.
+            Optionally, it may take an additional 'rng' kwarg. It
+            should return a final value based on the source emitter
+            values.
         rng: See mixins.RandomMixin.rng.
         rng_seed: See mixins.RandomMixin.rng_seed.
     """
@@ -347,7 +349,8 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             sources: The emitters to wrap, as a dict that maps kwarg
                 names to emitters. The dict keys should correspond to
                 kwarg names in your wrapper.
-            wrapper: See 'wrapper' attribute.
+            wrapper: The function to provide for the BoundWrapper
+                instance that will populate the 'wrapper' attribute.
             rng_seed: See 'rng_seed' attribute.
         emits_unique_values: (Read-only.) See superclass (Emitter).
             False, because it is impossible to know. Even with source
@@ -357,29 +360,39 @@ class WrapMany(Generic[SourceT, OutputT], RandomWithChildrenMixin,
             None. The wrapper makes it impossible to know.
         """
         super().__init__(children=sources, rng_seed=rng_seed)
-        self.wrapper = wrapper
+        self.set_wrapper_function(wrapper)
+
+    def set_wrapper_function(self, function: Callable[..., OutputT]) -> None:
+        """Sets the 'wrapper' attribute from the provided function.
+
+        This is a convenience method -- you can set 'wrapper' directly,
+        but in that case you must provide a BoundWrapper instance.
+
+        Args:
+            function: A function (or other callable) to use for the
+                BoundWrapper instance used to set the 'wrapper' attr.
+        """
+        self.wrapper = BoundWrapper(function, self)
 
     @property
-    def wrapper(self) -> Callable[..., OutputT]:
+    def wrapper(self) -> BoundWrapper[SourceT, OutputT]:
         """The 'wrapper' attribute."""
         return self._wrapper
 
     @wrapper.setter
-    def wrapper(self, wrapper: Callable[..., OutputT]) -> None:
+    def wrapper(self, wrapper: BoundWrapper[SourceT, OutputT]) -> None:
         """Sets the 'wrapper' attribute.
 
         Args:
             wrapper: See the 'wrapper' attribute.
         """
-        self._wrapper: BoundWrapper[SourceT, OutputT] = BoundWrapper(
-            wrapper, self
-        )
         kwargs = {k: v() for k, v in self._emitters.items()}
         try:
-            self._wrapper.try_mock_call(**kwargs)
+            wrapper.try_mock_call(**kwargs)
         except TypeError:
             raise
         finally:
+            self._wrapper = wrapper
             self.reset()
 
     def emit(self) -> OutputT:
