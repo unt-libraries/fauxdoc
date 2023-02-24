@@ -1,5 +1,5 @@
 """Contains classes for creating faux-data-generation profiles."""
-from typing import Any, Dict, Generic, List, Mapping, Optional, Union
+from typing import Any, Dict, Generic, List, Optional, Union
 
 from fauxdoc.group import ObjectMap
 from fauxdoc.emitters.fixed import Static
@@ -227,33 +227,19 @@ class Schema:
                 args. The `fields` attribute is generated from this.
                 Your field names become keys.
         """
-        self.fields = ObjectMap({})
-        self.add_fields(*fields)
+        self.add_fields(*fields, reset=True)
 
-    @property
-    def fields(self) -> Mapping[str, FieldLike[Any]]:
-        """See 'fields' attribute."""
-        return self._fields
-
-    @fields.setter
-    def fields(self, fields: Mapping[str, FieldLike[Any]]) -> None:
-        """Sets the 'fields' attribute.
-
-        Args:
-            fields: A mapping (i.e., dict) that maps field names to
-                Field objects. If an ObjectMap is not provided, it is
-                converted to an ObjectMap. See the 'fields' attribute.
-        """
-        self._fields = ObjectMap(fields)
-
-    def add_fields(self, *fields: FieldLike[Any]) -> None:
-        """Adds fields to your schema, in the order provided.
+    def add_fields(self, *fields: FieldLike[Any], reset: bool = False) -> None:
+        """Adds or sets schema fields, in the order provided.
 
         Args:
             *fields: The Field instances to add. Note this is a star
                 argument, so provide your fields as args.
+            reset: If True, existing fields will be overwritten.
         """
-        self._fields.update({field.name: field for field in fields})
+        if reset:
+            self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
+        self.fields.update({field.name: field for field in fields})
 
     @property
     def hidden_fields(self) -> ObjectMap[FieldLike[Any]]:
@@ -268,7 +254,7 @@ class Schema:
         schema.
         """
         return ObjectMap({
-            fn: fd for fn, fd in self._fields.items() if fd.hide
+            fn: fd for fn, fd in self.fields.items() if fd.hide
         })
 
     @property
@@ -284,12 +270,12 @@ class Schema:
         schema.
         """
         return ObjectMap({
-            fn: fd for fn, fd in self._fields.items() if not fd.hide
+            fn: fd for fn, fd in self.fields.items() if not fd.hide
         })
 
     def reset_fields(self) -> None:
         """Resets state on all schema fields."""
-        self._fields.do_method('reset')
+        self.fields.do_method('reset')
 
     def seed_fields(self, rng_seed: Any) -> None:
         """Seeds all RNGs on all schema fields.
@@ -299,7 +285,7 @@ class Schema:
                 passed to a random.Random instance, so it should be any
                 value valid for seeding random.Random.
         """
-        self._fields.do_method('seed', rng_seed)
+        self.fields.do_method('seed', rng_seed)
 
     def __call__(self) -> Dict[str, Any]:
         """Generates field values for one record or doc.
@@ -313,7 +299,7 @@ class Schema:
         # their output is not added directly to the doc. (Output from
         # hidden fields can be used in e.g. `fromfields` emitters.)
         # This is why we don't simply skip them, here.
-        for fname, field in self._fields.items():
+        for fname, field in self.fields.items():
             val = field()
             if not field.hide:
                 doc[fname] = val

@@ -522,15 +522,16 @@ def test_schema_publicfields_cannot_be_changed():
 
 
 def test_schema_can_set_fields_directly():
+    # Schema.fields can be set directly -- but, we have to provide an
+    # ObjectMap.
     test_schema = Schema()
-    test_schema.fields = {
+    test_schema.fields = ObjectMap({
         'id': Field('id', Sequential(range(1, 10000))),
         'title': Field('title', Static('A Title')),
         'hidden1': Field('hidden1', Static('TEST'), hide=True),
         'author': Field('author', Static('An Author')),
         'hidden2': Field('hidden2', Static('TEST'), hide=True)
-    }
-    assert isinstance(test_schema.fields, ObjectMap)
+    })
     assert test_schema.public_fields == {
         'id': test_schema.fields['id'],
         'title': test_schema.fields['title'],
@@ -544,6 +545,31 @@ def test_schema_can_set_fields_directly():
         'id': 1,
         'title': 'A Title',
         'author': 'An Author'
+    }
+
+
+def test_schema_addfields_can_set_fields():
+    test_schema = Schema(
+        Field('one', Static(1)),
+        Field('two', Static(2)),
+        Field('three', Static(3), hide=True)
+    )
+    test_schema.add_fields(
+        Field('a', Static('a')),
+        Field('b', Static('b'), hide=True),
+        Field('c', Static('c')),
+        reset=True
+    )
+    assert test_schema.public_fields == {
+        'a': test_schema.fields['a'],
+        'c': test_schema.fields['c']
+    }
+    assert test_schema.hidden_fields == {
+        'b': test_schema.fields['b']
+    }
+    assert test_schema() == {
+        'a': 'a',
+        'c': 'c'
     }
 
 
@@ -576,13 +602,13 @@ def test_schema_fields_key_name_mismatch_is_fine():
     # each `field.name`. If they don't match it doesn't directly cause
     # any problems; the key value will be used in all Schema methods.
     test_schema = Schema()
-    test_schema.fields = {
+    test_schema.fields = ObjectMap({
         'id': Field('the', Sequential(range(1, 10000))),
         'title': Field('field', Static('A Title')),
         'hidden1': Field('name', Static('TEST'), hide=True),
         'author': Field('does not', Static('An Author')),
         'hidden2': Field('matter', Static('TEST'), hide=True)
-    }
+    })
     assert isinstance(test_schema.fields, ObjectMap)
     assert test_schema.public_fields == {
         'id': test_schema.fields['id'],
@@ -656,14 +682,14 @@ def test_schema_hidden_fields_are_still_evaluated():
 
 def test_schema_resetfields_resets_all_fields(emitter_unique):
     schema = Schema()
-    schema.fields = {
+    schema.fields = ObjectMap({
         'test': Field(
             'test',
             emitter_unique(),
             repeat=choice.Choice([1] * 12, replace=False),
             gate=choice.chance(1.0)
         )
-    }
+    })
     schema.add_fields(
         Field(
             'test2',
@@ -692,14 +718,14 @@ def test_schema_resetfields_resets_all_fields(emitter_unique):
 
 def test_schema_seedfields_reseeds_all_fields(emitter):
     schema = Schema()
-    schema.fields = {
+    schema.fields = ObjectMap({
         'test': Field(
             'test',
             emitter(),
             repeat=choice.Choice(range(1, 13)),
             gate=choice.chance(0.75), rng_seed=12345
         )
-    }
+    })
     schema.add_fields(
         Field(
             'test2',
