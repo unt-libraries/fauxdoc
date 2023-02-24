@@ -1,6 +1,6 @@
 """Contains emitters for choosing random data values."""
 import itertools
-from typing import Any, Optional, List, Sequence, Tuple
+from typing import Any, Optional, List, Sequence
 
 from fauxdoc.emitter import Emitter
 from fauxdoc.mathtools import clamp, gaussian, poisson, weighted_shuffle
@@ -34,12 +34,18 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
             from.
         weights: (Optional, Immutable.) A tuple of weights, one per
             item, for controlling the probability of selections. This
-            *must* be the same length as `items`. Weights should *not*
-            be cumulative. If None, then choices are made randomly
+            *must* be the same length as `items`. Weights are *not*
+            cumulative -- the 'cum_weights' attribute contains
+            cumulative weights. When weights are set, cum_weights are
+            calculated accordingly, and vice-versa. If weights and
+            cum_weights are None, then choices are made randomly
             without weights. Default is None.
-        cum_weights: (Optional, Read-only, Immutable.) Cumulative
-            weights are calculated from `weights`, if provided. Default
-            is None.
+        cum_weights: (Optional, Immutable.) A tuple of cumulative
+            weights, one per item, for controlling the probability of
+            selections. This *must* be the same length as `items`. When
+            cum_weights are set, weights are calculated accordingly,
+            and vice-versa. If weights and cum_weights are None, then
+            choices are made randomly without weights. Default is None.
         replace: A bool value. True if items can be chosen multiple
             times; False if each item can be chosen ONCE. Default is
             True. Note the interaction with `replace_only_after_call`
@@ -84,47 +90,70 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
                  replace: bool = True,
                  replace_only_after_call: bool = False,
                  noun: str = '',
-                 rng_seed: Any = None) -> None:
+                 rng_seed: Any = None,
+                 cum_weights: Optional[Sequence[float]] = None) -> None:
         """Inits a Choice emitter with items, weights, and settings.
 
         Args:
             items: See `items` attribute.
-            weights: (Optional.) See `weights` attribute.
+            weights: (Optional.) See `weights` attribute. Note: you may
+                supply either weights or cum_weights, not both.
             replace: (Optional.) See `replace` attribute.
             replace_only_after_call: (Optional.) See
                 `replace_only_after_call` attribute.
             noun: (Optional.) See `noun` attribute.
             rng_seed: (Optional.) See `rng_seed` attribute.
+            cum_weights: (Optional.) See `cum_weights` attribute. Note:
+                you may supply either weights or cum_weights, not both.
         """
         if not items or not isinstance(items, Sequence):
             raise ValueError(
-                f"The 'items' attribute must be a non-empty sequence. "
+                f"The 'items' argument must be a non-empty sequence. "
                 f"(Provided: {items})"
+            )
+        if weights and cum_weights:
+            raise TypeError(
+                "Only one of 'weights' or 'cum_weights' (cumulative weights) "
+                "may be supplied -- not both."
             )
         self._num_unique_items = len(items)
         self._shuffled: List[T] = []
         self._replace = replace or replace_only_after_call
         self._replace_only_after_call = replace_only_after_call
         self.noun = noun
-        self._set_all_weights(weights, items)
+        weights_to_set = weights or cum_weights
+        weights_are_cumulative = bool(cum_weights)
+        self._set_all_weights(weights_to_set, weights_are_cumulative, items)
         super().__init__(items=items, rng_seed=rng_seed)
 
     def _set_all_weights(self,
-                         weights: Optional[Sequence[float]] = None,
+                         weights_to_set: Optional[Sequence[float]] = None,
+                         weights_are_cumulative: bool = False,
                          items: Optional[Sequence[T]] = None) -> None:
+        weights = None
         cum_weights = None
-        if weights is not None:
+        if weights_to_set is not None:
             items = items or self._items
             nitems = len(items)
-            nweights = len(weights)
+            nweights = len(weights_to_set)
             if nitems != nweights:
                 noun_phr = f"{self.noun} choices" if self.noun else "choices"
+                v_phr = 'cum_weights' if weights_are_cumulative else 'weights'
                 raise ValueError(
                     f"Mismatched number of {noun_phr} ({nitems}) to choice "
-                    f"weights ({nweights}). These amounts must match."
+                    f"{v_phr} ({nweights}). These amounts must match."
                 )
-            cum_weights = tuple(itertools.accumulate(weights))
-            weights = tuple(weights)
+            if weights_are_cumulative:
+                cum_weights = tuple(weights_to_set)
+                de_cum_weights = []
+                prev: float = 0
+                for weight in cum_weights:
+                    de_cum_weights.append(weight - prev)
+                    prev = weight
+                weights = tuple(de_cum_weights)
+            else:
+                cum_weights = tuple(itertools.accumulate(weights_to_set))
+                weights = tuple(weights_to_set)
         self._weights = weights
         self._cum_weights = cum_weights
 
@@ -146,9 +175,21 @@ class Choice(RandomMixin, ItemsMixin[T], Emitter[T]):
             self._global_shuffle()
 
     @property
-    def cum_weights(self) -> Optional[Tuple[float, ...]]:
+    def cum_weights(self) -> Optional[Sequence[float]]:
         """See the `cum_weights` attribute."""
         return self._cum_weights
+
+    @cum_weights.setter
+    def cum_weights(self, cum_weights: Optional[Sequence[float]]) -> None:
+        """Sets the `cum_weights` attribute.
+
+        WARNING: Changing cum_weights on an emitter where `replace` is
+        False invalidates the previous random shuffle, causing it to be
+        reset, losing track of which values have already been emitted.
+        """
+        self._set_all_weights(cum_weights, weights_are_cumulative=True)
+        if not self._replace:
+            self._global_shuffle()
 
     @property
     def replace(self) -> bool:

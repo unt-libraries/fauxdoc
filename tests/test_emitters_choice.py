@@ -9,55 +9,64 @@ from fauxdoc.emitters.choice import chance, Choice, gaussian_choice,\
                                     poisson_choice
 
 
-@pytest.mark.parametrize('seed, items, weights, repl, num, repeat, expected', [
-    (999, range(2), None, True, 10, 0, [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]),
-    (999, range(2), None, True, None, 10, [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
-    (999, range(1, 2), None, True, 10, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-    (999, range(1, 2), None, True, None, 10, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-    (999, range(5, 6), None, True, 10, 0, [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
-    (999, range(1, 11), None, True, 10, 0, [8, 1, 9, 6, 5, 2, 8, 4, 8, 9]),
-    (999, 'abcde', None, True, 10, 0,
+@pytest.mark.parametrize('seed, items, weights, cw, repl, num, repeat, exp', [
+    (999, range(2), None, None, True, 10, 0, [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]),
+    (999, range(2), None, None, True, None, 10,
+     [0, 1, 1, 0, 1, 0, 0, 0, 1, 0]),
+    (999, range(1, 2), None, None, True, 10, 0,
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, range(1, 2), None, None, True, None, 10,
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    (999, range(5, 6), None, None, True, 10, 0,
+     [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]),
+    (999, range(1, 11), None, None, True, 10, 0,
+     [8, 1, 9, 6, 5, 2, 8, 4, 8, 9]),
+    (999, 'abcde', None, None, True, 10, 0,
      ['d', 'a', 'e', 'c', 'c', 'a', 'd', 'b', 'd', 'e']),
-    (999, ['H', 'T'], [80, 20], True, 10, 0,
+    (999, ['H', 'T'], [80, 20], None, True, 10, 0,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, ['H', 'T'], [80, 20], True, None, 10,
+    (999, ['H', 'T'], None, [80, 100], True, 10, 0,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, ['H', 'T'], [20, 80], True, 10, 0,
+    (999, ['H', 'T'], [80, 20], None, True, None, 10,
+     ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
+    (999, ['H', 'T'], [20, 80], None, True, 10, 0,
      ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
-    (999, 'TTHHHHHHHH', None, 'after_call', 10, 0,
+    (999, ['H', 'T'], None, [20, 100], True, 10, 0,
+     ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
+    (999, 'TTHHHHHHHH', None, None, 'after_call', 10, 0,
      ['T', 'H', 'H', 'H', 'H', 'H', 'T', 'H', 'H', 'H']),
-    (999, 'HHHHT', None, 'after_call', None, 10,
+    (999, 'HHHHT', None, None, 'after_call', None, 10,
      ['H', 'T', 'T', 'T', 'H', 'H', 'H', 'H', 'H', 'H']),
-    (999, 'HT', [80, 20], 'after_call', None, 10,
+    (999, 'HT', [80, 20], None, 'after_call', None, 10,
      ['H', 'H', 'T', 'H', 'H', 'H', 'H', 'H', 'H', 'T']),
-    (999, 'HT', [20, 80], 'after_call', None, 10,
+    (999, 'HT', [20, 80], None, 'after_call', None, 10,
      ['T', 'H', 'T', 'T', 'T', 'H', 'T', 'T', 'T', 'T']),
-    (999, range(5), [70, 20, 7, 2, 1], 'after_call', 3, 10,
+    (999, range(5), [70, 20, 7, 2, 1], None, 'after_call', 3, 10,
      [[0, 2, 1], [1, 0, 3], [1, 0, 2], [0, 3, 2], [0, 4, 1], [0, 2, 1],
       [1, 0, 2], [1, 0, 2], [1, 0, 3], [0, 2, 1]]),
-    (999, range(5), [70, 20, 7, 2, 1], True, 3, 10,
+    (999, range(5), [70, 20, 7, 2, 1], None, True, 3, 10,
      [[1, 0, 1], [0, 0, 0], [1, 0, 1], [1, 0, 4], [0, 0, 0], [1, 0, 1],
       [3, 0, 0], [0, 0, 0], [2, 0, 0], [0, 0, 1]]),
-    (999, range(25), None, False, 5, 5,
+    (999, range(25), None, None, False, 5, 5,
      [[11, 18, 24, 17, 2], [9, 6, 8, 0, 15], [20, 3, 14, 4, 7],
       [13, 16, 19, 23, 12], [5, 10, 1, 21, 22]]),
-    (999, range(25), None, False, None, 25,
+    (999, range(25), None, None, False, None, 25,
      [11, 18, 24, 17, 2, 9, 6, 8, 0, 15, 20, 3, 14, 4, 7, 13, 16, 19, 23, 12,
       5, 10, 1, 21, 22]),
-    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, False, 5, 5,
+    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, None, False, 5, 5,
      [[0, 3, 7, 12, 4], [6, 1, 2, 9, 8], [22, 14, 5, 18, 11],
       [20, 24, 13, 23, 16], [21, 17, 19, 15, 10]]),
-    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, False, None, 25,
+    (9999, range(25), [50] * 5 + [10] * 5 + [1] * 15, None, False, None, 25,
      [0, 3, 7, 12, 4, 6, 1, 2, 9, 8, 22, 14, 5, 18, 11, 20, 24, 13, 23, 16, 21,
       17, 19, 15, 10]),
 ])
-def test_choice(seed, items, weights, repl, num, repeat, expected):
+def test_choice(seed, items, weights, cw, repl, num, repeat, exp):
     after_call = repl == 'after_call'
     replace = repl or after_call
-    ce = Choice(items, weights=weights, replace=replace,
+    ce = Choice(items, weights=weights, cum_weights=cw, replace=replace,
                 replace_only_after_call=after_call, rng_seed=seed)
     result = [ce(num) for _ in range(repeat)] if repeat else ce(num)
-    assert result == expected
+    assert result == exp
 
 
 @pytest.mark.parametrize(
@@ -199,19 +208,41 @@ def test_choice_numuniqueitems_is_readonly():
 
 
 def test_choice_weights_is_immutable():
-    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+    ce = Choice(range(4), weights=[97, 1, 1, 1])
     assert ce.weights == (97, 1, 1, 1)
     with pytest.raises(TypeError):
         ce.weights[0] = 1
 
 
-def test_choice_cumweights_is_readonly_and_immutable():
-    ce = Choice(range(4), weights=[97, 1, 1, 1], replace=True, rng_seed=999)
+def test_choice_cumweights_is_immutable():
+    ce = Choice(range(4), cum_weights=[97, 98, 99, 100])
     assert ce.cum_weights == (97, 98, 99, 100)
-    with pytest.raises(AttributeError):
-        ce.cum_weights = [1, 2, 3, 4]
     with pytest.raises(TypeError):
         ce.cum_weights[0] = 1
+
+
+def test_choice_setting_weights_sets_cumweights():
+    ce = Choice(range(4))
+    ce.weights = [97, 1, 1, 1]
+    assert ce.cum_weights == (97, 98, 99, 100)
+
+
+def test_choice_setting_cumweights_sets_weights():
+    ce = Choice(range(4))
+    ce.cum_weights = [97, 98, 99, 100]
+    assert ce.weights == (97, 1, 1, 1)
+
+
+def test_choice_removing_weights_removes_cumweights():
+    ce = Choice(range(4), weights=[97, 1, 1, 1])
+    ce.weights = None
+    assert ce.cum_weights is None
+
+
+def test_choice_removing_cumweights_removes_weights():
+    ce = Choice(range(4), weights=[97, 1, 1, 1])
+    ce.cum_weights = None
+    assert ce.weights is None
 
 
 def test_choice_remove_weights_with_replacement():
@@ -427,33 +458,53 @@ def test_choice_change_replacement__none_to_replace_only_after_call():
         ce(5)
 
 
-def test_choice_empty_items():
+def test_choice_cannot_init_empty_items():
     with pytest.raises(ValueError):
         Choice(range(0))
 
 
-@pytest.mark.parametrize('items, bad_weights, noun', [
-    ([0, 1, 2, 3], [40, 50], 'item'),
-    ([0, 1], [50, 10, 2], None)
+def test_choice_cannot_init_weights_and_cumweights():
+    with pytest.raises(TypeError) as excinfo:
+        Choice(['abc'], weights=[10, 50, 40], cum_weights=[10, 60, 100])
+    assert "Only one of 'weights' or 'cum_weights'" in str(excinfo.value)
+
+
+@pytest.mark.parametrize('items, bad_weights, are_cumulative, noun', [
+    ([0, 1, 2, 3], [40, 50], False, 'item'),
+    ([0, 1, 2, 3], [40, 50], True, 'item'),
+    ([0, 1], [50, 10, 2], False, None),
+    ([0, 1], [50, 10, 2], True, None)
 ])
-def test_choice_incorrect_weights(items, bad_weights, noun):
+def test_choice_incorrect_weights(items, bad_weights, are_cumulative, noun):
+    kwargs = {
+        'cum_weights' if are_cumulative else 'weights': bad_weights,
+        'noun': noun
+    }
     with pytest.raises(ValueError) as excinfo:
-        Choice(items, weights=bad_weights, noun=noun)
+        Choice(items, **kwargs)
     error_msg = str(excinfo.value)
     assert f"({len(items)}" in error_msg
     assert f"({len(bad_weights)}" in error_msg
     if noun:
         assert f"{noun} choices" in error_msg
+    if are_cumulative:
+        assert "choice cum_weights" in error_msg
+    else:
+        assert "choice weights" in error_msg
 
 
-@pytest.mark.parametrize('items, bad_weights', [
-    ([0, 1, 2, 3], [40, 50]),
-    ([0, 1], [50, 10, 2])
+@pytest.mark.parametrize('items, bad_weights, are_cumulative', [
+    ([0, 1, 2, 3], [40, 50], False),
+    ([0, 1, 2, 3], [40, 50], True),
+    ([0, 1], [50, 10, 2], False),
+    ([0, 1], [50, 10, 2], True),
 ])
-def test_choice_change_weights_to_incorrect_weights(items, bad_weights):
-    ce = Choice(items, weights=[10] * len(items))
+def test_choice_change_weights_to_incorrect_weights(items, bad_weights,
+                                                    are_cumulative):
+    attr = 'cum_weights' if are_cumulative else 'weights'
+    ce = Choice(items, **{attr: [10] * len(items)})
     with pytest.raises(ValueError) as excinfo:
-        ce.weights = bad_weights
+        setattr(ce, attr, bad_weights)
     error_msg = str(excinfo.value)
     assert f"({len(items)}" in error_msg
     assert f"({len(bad_weights)}" in error_msg
