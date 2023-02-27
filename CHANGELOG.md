@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [v1.1.0](https://github.com/unt-libraries/fauxdoc/compare/v1.0.0...v1.1.0)
+## [v1.1.0](https://github.com/unt-libraries/fauxdoc/compare/v1.0.0...v1.1.0) — 2023-02-27
 
 Overview of what's new in this version:
 - `fauxdoc` is now fully typed and passes `mypy --strict` checks.
@@ -15,8 +15,8 @@ Overview of what's new in this version:
 
 ### Added
 
-- New `mypy_strict` tox environment for running `mypy` tests.
 - A `py.typed` file to indicate that the package now has type hints.
+- New `mypy_strict` tox environment for running `mypy` tests.
 - New tox environments for testing a package built using `build_package` against a target Python version: `py37-test_built_package` through `py311-test_built_package`.
 - A new kwarg for initializing `fauxdoc.emitters.choice.Choice` instances: `cum_weights` can now be supplied, if needed. Note that you can only supply `weights` or `cum_weights` — not both. All previous args/kwargs still work as before.
 - A `fauxdoc.emitters.fromfields.SourceFieldGroup` class. This is a subtype of `fauxdoc.groups.ObjectGroup`, used in `fauxdoc.emitters.fromfield` emitters to represent groups of source fields. It now implements the `single_valued` property that was previously only a private attribute on the `fauxdoc.emitters.fromfields.CopyFields` class.
@@ -45,6 +45,7 @@ Overview of what's new in this version:
 
 - The minimum `pytest` version for Python 3.7 through 3.9 has been bumped up from 3.0.0 to 3.8.0. This is to allow testing deprecation warnings.
 - Tox environment `build_package` no longer tries `pip install`ing the built package. It's assumed you'll use the new `*-test_built_package` environments to test the built package, which will of course have to install it.
+- Comparing a `fauxdoc.dtrange.DateOrTimeRange` instance to another type of object is explicitly not supported and returns `NotImplemented`.
 - On `fauxdoc.emitters.choice.Choice`, any sequences provided for the `weights` and `cum_weights` attributes are now cast to tuples on assignment so that they are immutable once assigned. (You can set a brand new sequence, but you cannot change individual elements.)
 - `fauxdoc.emitters.fromfields.BasedOnFields` no longer inherits from `fauxdoc.emitters.fromfields.CopyFields`. The shared functionality that `CopyFields` previously provided is now implemented as `fauxdoc.emitters.fromfields.SourceFieldGroup`, which is now used for the `source` attribute on instances of both classes. If you set `source` directly, you must now give it a `SourceFieldGroup` instance.
 - `fauxdoc.emitters.fromfields.BasedOnFields` now uses the `fauxdoc.emitters.wrappers.BoundWrapper` class for its `action` attribute. This moves all of the relevant functionality that was basically duplicated from the `wrappers` emitters out into the `BoundWrapper`. If you set `action` directly, you must now give it a `BoundWrapper` instance.
@@ -59,7 +60,6 @@ Overview of what's new in this version:
 - The `fauxdoc.typing.EmitterLike` protocol is now more robust. It's now generic, so you can for instance use `EmitterLike[int]` to indicate that an Emitter-like type emits `int`s. It now includes properties `num_unique_values` and `emits_unique_values`. And `__call__` is overloaded to show that passing None returns a single atomic value, while passing an integer returns a list of values.
 - The `fauxdoc.typing.RandomEmitterLike` protocol now inherits from both `ImplementsRNG` and `EmitterLike`, and it is now generic.
 - The `fauxdoc.typing.FieldLike` protocol is now generic.
-- Comparing a `fauxdoc.dtrange.DateOrTimeRange` instance to another type of object is explicitly not supported and returns `NotImplemented`.
 
 ### Deprecated
 
