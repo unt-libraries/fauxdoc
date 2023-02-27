@@ -548,17 +548,16 @@ def test_schema_can_set_fields_directly():
     }
 
 
-def test_schema_addfields_can_set_fields():
+def test_schema_setfields():
     test_schema = Schema(
         Field('one', Static(1)),
         Field('two', Static(2)),
         Field('three', Static(3), hide=True)
     )
-    test_schema.add_fields(
+    test_schema.set_fields(
         Field('a', Static('a')),
         Field('b', Static('b'), hide=True),
-        Field('c', Static('c')),
-        reset=True
+        Field('c', Static('c'))
     )
     assert test_schema.public_fields == {
         'a': test_schema.fields['a'],

@@ -202,8 +202,8 @@ class Schema:
     """Class to define schemas, for generating full records/docs.
 
     Pass the field objects you want in your schema to __init__, add
-    them via `add_fields`, or modify `fields` directly. Call the object
-    to generate the next record.
+    them via `add_fields`, or set them via `set_fields`. Call the
+    Schema instance to generate the next record.
 
     Attributes:
         fields: An ObjectMap that maps field names (field.name) to
@@ -227,18 +227,30 @@ class Schema:
                 args. The `fields` attribute is generated from this.
                 Your field names become keys.
         """
-        self.add_fields(*fields, reset=True)
+        self.set_fields(*fields)
 
-    def add_fields(self, *fields: FieldLike[Any], reset: bool = False) -> None:
-        """Adds or sets schema fields, in the order provided.
+    def set_fields(self, *fields: FieldLike[Any]) -> None:
+        """Sets `fields` from the given Field instances.
+
+        This is a convenience method for setting the `fields`
+        attribute, which is an ObjectMap instance, from one or more
+        given Field instances. (You can still set `fields` directly by
+        passing an ObjectMap.)
 
         Args:
             *fields: The Field instances to add. Note this is a star
                 argument, so provide your fields as args.
-            reset: If True, existing fields will be overwritten.
         """
-        if reset:
-            self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
+        self.fields: ObjectMap[FieldLike[Any]] = ObjectMap({})
+        self.add_fields(*fields)
+
+    def add_fields(self, *fields: FieldLike[Any]) -> None:
+        """Adds schema fields, in the order provided.
+
+        Args:
+            *fields: The Field instances to add. Note this is a star
+                argument, so provide your fields as args.
+        """
         self.fields.update({field.name: field for field in fields})
 
     @property
