@@ -40,8 +40,9 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/unt-libraries/fauxdoc"
-repository = "https://github.com/unt-libraries/fauxdoc"
+Homepage = "https://github.com/unt-libraries/fauxdoc"
+Repository = "https://github.com/unt-libraries/fauxdoc"
+Changelog = "https://github.com/unt-libraries/fauxdoc/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
